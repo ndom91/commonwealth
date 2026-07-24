@@ -21,6 +21,41 @@ services:
     ports:
       - "127.0.0.1:${HOST_PORT:-3000}:3000"
 
+  admin:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      PORT: 3001
+    depends_on:
+      admin-migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-3001}:3001"
+
+  admin-migrate:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+    command: ["node", "--import", "tsx", "admin/scripts/migrate.ts"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      BETTER_AUTH_ALLOW_SIGN_UP: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   postgres:
     image: pgvector/pgvector:pg17
     environment:

@@ -6,4 +6,6 @@ storage/
 coverage/
 __pycache__/
 playground/
+admin/.output/
+admin/.tanstack/
 playground/
