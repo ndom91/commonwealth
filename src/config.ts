@@ -4,8 +4,6 @@ const environment = z.object({
   DATABASE_URL: z.string().url(),
   OLLAMA_URL: z.string().url(),
   EMBEDDING_MODEL: z.string().min(1),
-  BOOTSTRAP_ADMIN_NAME: z.string().min(1),
-  BOOTSTRAP_ADMIN_KEY: z.string().min(24),
   PORT: z.coerce.number().int().positive().default(3000),
   MARKITDOWN_URL: z.string().url().default("http://markitdown:8000"),
   SOURCE_STORAGE_PATH: z.string().default("/app/storage"),

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Config } from "../src/config.js";
 import { AccessService } from "../src/access-service.js";
+import { hashApiKey, keyPrefix } from "../src/auth.js";
+import { runMigrations } from "../src/migrations.js";
 import { KnowledgeRepository } from "../src/knowledge-repository.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -19,8 +21,6 @@ if (!databaseUrl) {
       DATABASE_URL: databaseUrl,
       OLLAMA_URL: "http://unused",
       EMBEDDING_MODEL: "test-embedding-model",
-      BOOTSTRAP_ADMIN_NAME: "Test Admin",
-      BOOTSTRAP_ADMIN_KEY: "test-bootstrap-key-that-is-long-enough",
       PORT: 3000,
       MARKITDOWN_URL: "http://unused",
       SOURCE_STORAGE_PATH: "/tmp/llm-team-kb-test",
@@ -33,12 +33,23 @@ if (!databaseUrl) {
       },
     };
     const knowledge = new KnowledgeRepository(config, embeddings);
-    const access = new AccessService(knowledge.sql, config);
+    const access = new AccessService(knowledge.sql);
+    const bootstrapKey = "test-bootstrap-key-that-is-long-enough";
 
     try {
       await knowledge.sql.unsafe("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
-      await access.bootstrap();
-      const actor = await access.authenticate(config.BOOTSTRAP_ADMIN_KEY);
+      await runMigrations(knowledge.sql);
+      const [workspace] = await knowledge.sql<{ id: string }[]>`
+        INSERT INTO workspaces (name) VALUES ('test') RETURNING id
+      `;
+      const [user] = await knowledge.sql<{ id: string }[]>`
+        INSERT INTO users (workspace_id, display_name, role) VALUES (${workspace!.id}, 'Test Admin', 'admin') RETURNING id
+      `;
+      await knowledge.sql`
+        INSERT INTO api_keys (user_id, key_prefix, secret_hash)
+        VALUES (${user!.id}, ${keyPrefix(bootstrapKey)}, ${hashApiKey(bootstrapKey)})
+      `;
+      const actor = await access.authenticate(bootstrapKey);
       assert.ok(actor);
 
       const source = await knowledge.submitNote(actor, {

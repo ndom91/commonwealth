@@ -11,7 +11,7 @@ import { KnowledgeRepository } from "./knowledge-repository.js";
 
 const config = loadConfig();
 const knowledge = new KnowledgeRepository(config, new Embeddings(config));
-const access = new AccessService(knowledge.sql, config);
+const access = new AccessService(knowledge.sql);
 
 function text(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -170,7 +170,6 @@ async function handleMcp(request: IncomingMessage, response: ServerResponse): Pr
 }
 
 async function main(): Promise<void> {
-  await access.bootstrap();
   const http = createServer((request, response) => {
     if (request.url === "/healthz") {
       response.writeHead(200, { "content-type": "application/json" });
