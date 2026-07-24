@@ -1,17 +1,53 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import postgres, { type Sql } from "postgres";
-import type { Config } from "./config.js";
+import postgres, { type Sql, type TransactionSql } from "postgres";
 import { hashApiKey, keyPrefix, verifyApiKey } from "./auth.js";
 import { chunkMarkdown } from "./chunking.js";
-import { Embeddings } from "./embeddings.js";
-import { EMBEDDING_DIMENSIONS } from "./embeddings.js";
+import type { Config } from "./config.js";
+import { EMBEDDING_DIMENSIONS, Embeddings } from "./embeddings.js";
+import { runMigrations } from "./migrations.js";
 
 export type Role = "reader" | "writer" | "reviewer" | "admin";
 export type Actor = { id: string; workspaceId: string; name: string; role: Role };
+type Authority = "canonical" | "approved" | "unverified";
+type SourceType = "note" | "upload";
+
+export type SearchInput = {
+  query: string;
+  tags: string[];
+  limit: number;
+  sourceType?: SourceType;
+  authority?: Authority;
+  authorId?: string;
+  updatedAfter?: string;
+  explain: boolean;
+};
 
 type KeyRow = Actor & { secret_hash: string };
+type SourceRow = {
+  id: string;
+  created_by: string;
+  current_revision_id: string;
+  title: string;
+  source_type: SourceType;
+  authority: Authority;
+};
+type RevisionInput = {
+  title: string;
+  markdown: string;
+  contentHash?: string;
+  originalFilename?: string;
+  mimeType?: string;
+  storagePath?: string;
+};
+type PreparedRevision = Omit<RevisionInput, "contentHash"> & {
+  contentHash: string;
+  chunks: ReturnType<typeof chunkMarkdown>;
+  vectors: number[][];
+};
+
+export class DomainError extends Error {}
 
 const permissions: Record<Role, readonly string[]> = {
   reader: ["read"],
@@ -41,6 +77,7 @@ export class Database {
   }
 
   async bootstrap(): Promise<void> {
+    await runMigrations(this.sql);
     const [workspace] = await this.sql<{ id: string }[]>`
       INSERT INTO workspaces (name) VALUES ('default')
       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
@@ -72,7 +109,6 @@ export class Database {
       RETURNING id
     `;
     if (!admin) throw new Error("Unable to create bootstrap administrator");
-
     await this.sql`
       INSERT INTO api_keys (user_id, key_prefix, secret_hash)
       VALUES (${admin.id}, ${keyPrefix(this.config.BOOTSTRAP_ADMIN_KEY)}, ${hashApiKey(this.config.BOOTSTRAP_ADMIN_KEY)})
@@ -83,49 +119,32 @@ export class Database {
     const keys = await this.sql<KeyRow[]>`
       SELECT users.id, users.workspace_id AS "workspaceId", users.display_name AS name,
              users.role, api_keys.secret_hash
-      FROM api_keys
-      JOIN users ON users.id = api_keys.user_id
+      FROM api_keys JOIN users ON users.id = api_keys.user_id
       WHERE api_keys.key_prefix = ${keyPrefix(key)}
-        AND api_keys.revoked_at IS NULL
-        AND users.disabled_at IS NULL
+        AND api_keys.revoked_at IS NULL AND users.disabled_at IS NULL
     `;
-
     const match = keys.find((candidate) => verifyApiKey(key, candidate.secret_hash));
     if (!match) return null;
-
     await this.sql`UPDATE api_keys SET last_used_at = now() WHERE secret_hash = ${match.secret_hash}`;
     return { id: match.id, workspaceId: match.workspaceId, name: match.name, role: match.role };
   }
 
-  async submitNote(actor: Actor, input: { title: string; markdown: string; tags: string[] }): Promise<{ id: string; chunkCount: number }> {
+  async submitNote(actor: Actor, input: { title: string; markdown: string; tags: string[] }): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
     requirePermission(actor, "write");
-    return this.indexSource(actor, { ...input, authority: "unverified", sourceType: "note" });
+    return this.createSource(actor, { ...input, sourceType: "note" });
   }
 
-  async submitDocument(actor: Actor, input: { title: string; filename: string; mimeType: string; bytes: Uint8Array; tags: string[] }): Promise<{ id: string; chunkCount: number }> {
+  async submitDocument(actor: Actor, input: { title: string; filename: string; mimeType: string; bytes: Uint8Array; tags: string[] }): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
     requirePermission(actor, "write");
     if (input.bytes.byteLength > this.config.MAX_UPLOAD_BYTES) {
       throw new Error(`Document exceeds the ${this.config.MAX_UPLOAD_BYTES} byte upload limit`);
     }
-
-    const allowedTypes = new Set([
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "text/csv",
-      "text/html",
-      "text/markdown",
-      "text/plain",
-    ]);
-    if (!allowedTypes.has(input.mimeType)) throw new Error("Unsupported document MIME type");
+    if (!allowedMimeTypes.has(input.mimeType)) throw new Error("Unsupported document MIME type");
 
     const form = new FormData();
     form.append("file", new Blob([Buffer.from(input.bytes)], { type: input.mimeType }), input.filename);
     const response = await fetch(`${this.config.MARKITDOWN_URL}/convert`, {
-      method: "POST",
-      body: form,
-      signal: AbortSignal.timeout(30_000),
+      method: "POST", body: form, signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error("Document conversion failed");
     const payload = (await response.json()) as { markdown?: string };
@@ -138,16 +157,16 @@ export class Database {
       await writeFile(storagePath, input.bytes, { flag: "wx" });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const existingFile = await readFile(storagePath);
-      if (digest(existingFile) !== contentHash) throw new Error("Stored document content does not match its expected hash");
+      if (digest(await readFile(storagePath)) !== contentHash) {
+        throw new Error("Stored document content does not match its expected hash");
+      }
     }
 
     try {
-      return await this.indexSource(actor, {
+      return await this.createSource(actor, {
         title: input.title,
         markdown: payload.markdown,
         tags: input.tags,
-        authority: "unverified",
         sourceType: "upload",
         originalFilename: input.filename,
         mimeType: input.mimeType,
@@ -155,69 +174,171 @@ export class Database {
         contentHash,
       });
     } catch (error) {
-      // Content-addressed files can be shared by concurrent identical uploads.
-      // A later maintenance job can remove unreferenced blobs without risking a live source.
       console.error("Document indexing failed; retaining content-addressed blob for safe cleanup", error);
       throw error;
     }
   }
 
-  async search(actor: Actor, query: string, tags: string[], limit: number): Promise<unknown[]> {
-    requirePermission(actor, "read");
-    const [embedding] = await this.embeddings.embed([query]);
-    if (!embedding) throw new Error("Embedding provider returned no query embedding");
-    const vector = toVector(embedding);
-    const requiredTags = tags.length === 0 ? null : tags;
-    const results = await this.sql`
-      WITH candidates AS (
-        SELECT chunks.id, chunks.content, chunks.heading, sources.id AS source_id,
-               sources.title, sources.authority, sources.content_updated_at,
-               1 - (chunks.embedding <=> ${vector}::vector) AS semantic_score,
-               ts_rank_cd(chunks.search_vector, websearch_to_tsquery('english', ${query})) AS keyword_score
-        FROM chunks
-        JOIN sources ON sources.id = chunks.source_id
-        WHERE sources.workspace_id = ${actor.workspaceId}
-          AND sources.status = 'active'
-          AND (${requiredTags}::text[] IS NULL OR EXISTS (
-            SELECT 1 FROM source_tags WHERE source_tags.source_id = sources.id AND source_tags.tag = ANY(${requiredTags}::text[])
-          ))
-        ORDER BY chunks.embedding <=> ${vector}::vector
-        LIMIT ${Math.max(limit * 8, 20)}
-      )
-      SELECT *,
-        (semantic_score * 0.78) + (LEAST(keyword_score, 1) * 0.14) +
-        (CASE authority WHEN 'canonical' THEN 0.06 WHEN 'approved' THEN 0.03 ELSE 0 END) +
-        (CASE WHEN content_updated_at > now() - interval '90 days' THEN 0.02 ELSE 0 END) AS final_score
-      FROM candidates
-      ORDER BY final_score DESC
-      LIMIT ${limit}
-    `;
+  async updateSource(actor: Actor, sourceId: string, input: { markdown: string; title?: string; tags?: string[] }): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
+    requirePermission(actor, "write");
+    return this.sql.begin(async (transaction) => {
+      const [source] = await transaction<SourceRow[]>`
+        SELECT id, created_by, current_revision_id, title, source_type, authority
+        FROM sources
+        WHERE id = ${sourceId} AND workspace_id = ${actor.workspaceId} AND status = 'active'
+        FOR UPDATE
+      `;
+      if (!source) throw new DomainError("Source not found");
+      if (actor.role === "writer" && source.created_by !== actor.id) {
+        throw new DomainError("Writers can only revise sources they created");
+      }
+      if (source.source_type === "upload") {
+        throw new DomainError("Uploaded sources require binary replacement; Markdown revisions are not supported yet");
+      }
+      if (source.authority !== "unverified" && actor.role !== "reviewer" && actor.role !== "admin") {
+        throw new DomainError("Reviewer access is required to revise approved or canonical sources");
+      }
 
-    await this.event(actor, "search", null, { query, resultCount: results.length }).catch((error) => {
-      console.error("Unable to record search event", error);
+      const revision = await this.prepareRevision({ title: input.title ?? source.title, markdown: input.markdown });
+
+      const [currentRevision] = await transaction<{ revision_number: number; content_hash: string }[]>`
+        SELECT revision_number, content_hash
+        FROM source_revisions WHERE id = ${source.current_revision_id}
+      `;
+      if (!currentRevision) throw new DomainError("Source has no current revision");
+      if (currentRevision.content_hash === revision.contentHash) {
+        throw new DomainError("Revision content matches the current source revision");
+      }
+
+      const nextRevisionNumber = currentRevision.revision_number + 1;
+      const revisionId = await this.insertRevision(transaction, source.id, nextRevisionNumber, source.current_revision_id, actor, revision);
+      await transaction`
+        UPDATE sources SET title = ${revision.title}, current_revision_id = ${revisionId},
+            content_hash = ${revision.contentHash}, markdown_content = ${revision.markdown}, content_updated_at = now()
+        WHERE id = ${source.id}
+      `;
+      if (input.tags !== undefined) await this.replaceTags(transaction, source.id, input.tags);
+      await transaction`
+        INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
+        VALUES (${actor.workspaceId}, ${actor.id}, 'source_revised', ${source.id},
+          ${JSON.stringify({ previousRevisionId: source.current_revision_id, revisionId, revisionNumber: nextRevisionNumber })}::jsonb)
+      `;
+      return { id: source.id, revisionNumber: nextRevisionNumber, chunkCount: revision.chunks.length };
     });
-    return results;
   }
 
-  async getSource(actor: Actor, sourceId: string): Promise<unknown> {
+  async search(actor: Actor, input: SearchInput): Promise<unknown[]> {
+    requirePermission(actor, "read");
+    const [embedding] = await this.embeddings.embed([input.query]);
+    if (!embedding) throw new Error("Embedding provider returned no query embedding");
+    const vector = toVector(embedding);
+    const tags = input.tags.length === 0 ? null : input.tags;
+    const candidateLimit = Math.max(input.limit * 10, 50);
+    const rows = await this.sql<Record<string, unknown>[]>`
+      WITH query_terms AS (
+        SELECT websearch_to_tsquery('english', ${input.query}) AS value
+      ), vector_candidates AS (
+        SELECT chunks.id
+        FROM chunks
+        JOIN source_revisions ON source_revisions.id = chunks.source_revision_id
+        JOIN sources ON sources.current_revision_id = source_revisions.id
+        WHERE sources.workspace_id = ${actor.workspaceId} AND sources.status = 'active'
+          AND (${tags}::text[] IS NULL OR EXISTS (
+            SELECT 1 FROM source_tags WHERE source_tags.source_id = sources.id AND source_tags.tag = ANY(${tags}::text[])
+          ))
+          AND (${input.sourceType ?? null}::text IS NULL OR sources.source_type = ${input.sourceType ?? null})
+          AND (${input.authority ?? null}::text IS NULL OR sources.authority = ${input.authority ?? null})
+          AND (${input.authorId ?? null}::uuid IS NULL OR source_revisions.created_by = ${input.authorId ?? null})
+          AND (${input.updatedAfter ?? null}::timestamptz IS NULL OR source_revisions.content_updated_at >= ${input.updatedAfter ?? null}::timestamptz)
+        ORDER BY chunks.embedding <=> ${vector}::vector LIMIT ${candidateLimit}
+      ), lexical_candidates AS (
+        SELECT chunks.id
+        FROM chunks
+        JOIN source_revisions ON source_revisions.id = chunks.source_revision_id
+        JOIN sources ON sources.current_revision_id = source_revisions.id
+        CROSS JOIN query_terms
+        WHERE sources.workspace_id = ${actor.workspaceId} AND sources.status = 'active'
+          AND chunks.search_vector @@ query_terms.value
+          AND (${tags}::text[] IS NULL OR EXISTS (
+            SELECT 1 FROM source_tags WHERE source_tags.source_id = sources.id AND source_tags.tag = ANY(${tags}::text[])
+          ))
+          AND (${input.sourceType ?? null}::text IS NULL OR sources.source_type = ${input.sourceType ?? null})
+          AND (${input.authority ?? null}::text IS NULL OR sources.authority = ${input.authority ?? null})
+          AND (${input.authorId ?? null}::uuid IS NULL OR source_revisions.created_by = ${input.authorId ?? null})
+          AND (${input.updatedAfter ?? null}::timestamptz IS NULL OR source_revisions.content_updated_at >= ${input.updatedAfter ?? null}::timestamptz)
+        ORDER BY ts_rank_cd(chunks.search_vector, query_terms.value) DESC LIMIT ${candidateLimit}
+      ), candidate_ids AS (
+        SELECT id FROM vector_candidates
+        UNION
+        SELECT id FROM lexical_candidates
+      )
+      SELECT chunks.id, chunks.content, chunks.heading, sources.id AS source_id, sources.title,
+             sources.source_type, sources.authority, source_revisions.revision_number,
+             source_revisions.content_updated_at, users.id AS author_id, users.display_name AS author,
+             1 - (chunks.embedding <=> ${vector}::vector) AS semantic_score,
+             ts_rank_cd(chunks.search_vector, query_terms.value) AS keyword_score,
+             CASE sources.authority WHEN 'canonical' THEN 0.06 WHEN 'approved' THEN 0.03 ELSE 0 END AS authority_boost,
+             CASE WHEN source_revisions.content_updated_at > now() - interval '90 days' THEN 0.02 ELSE 0 END AS freshness_boost,
+             (1 - (chunks.embedding <=> ${vector}::vector)) * 0.78 +
+             LEAST(ts_rank_cd(chunks.search_vector, query_terms.value), 1) * 0.14 +
+             CASE sources.authority WHEN 'canonical' THEN 0.06 WHEN 'approved' THEN 0.03 ELSE 0 END +
+             CASE WHEN source_revisions.content_updated_at > now() - interval '90 days' THEN 0.02 ELSE 0 END AS final_score
+      FROM candidate_ids
+      JOIN chunks ON chunks.id = candidate_ids.id
+      JOIN source_revisions ON source_revisions.id = chunks.source_revision_id
+      JOIN sources ON sources.current_revision_id = source_revisions.id
+      JOIN users ON users.id = source_revisions.created_by
+      CROSS JOIN query_terms
+      ORDER BY final_score DESC, source_revisions.content_updated_at DESC, chunks.id
+      LIMIT ${input.limit}
+    `;
+    await this.event(actor, "search", null, { query: input.query, resultCount: rows.length }).catch((error) => {
+      console.error("Unable to record search event", error);
+    });
+    return rows.map((row) => formatSearchResult(row, input.explain));
+  }
+
+  async getSource(actor: Actor, sourceId: string, revisionNumber?: number): Promise<unknown> {
     requirePermission(actor, "read");
     const [source] = await this.sql`
-      SELECT sources.id, sources.title, sources.source_type, sources.authority, sources.markdown_content,
-             sources.content_updated_at, sources.last_verified_at, users.display_name AS created_by
-      FROM sources JOIN users ON users.id = sources.created_by
+      SELECT sources.id, source_revisions.title, sources.source_type, sources.authority,
+             source_revisions.revision_number, source_revisions.markdown_content,
+             source_revisions.content_updated_at, source_revisions.original_filename,
+             source_revisions.mime_type, sources.last_verified_at, users.display_name AS created_by
+      FROM sources
+      JOIN source_revisions ON source_revisions.source_id = sources.id
+        AND (${revisionNumber ?? null}::integer IS NULL AND source_revisions.id = sources.current_revision_id
+          OR source_revisions.revision_number = ${revisionNumber ?? null})
+      JOIN users ON users.id = source_revisions.created_by
       WHERE sources.id = ${sourceId} AND sources.workspace_id = ${actor.workspaceId} AND sources.status = 'active'
     `;
-    if (!source) throw new Error("Source not found");
+    if (!source) throw new DomainError("Source not found");
     return source;
   }
 
-  async setAuthority(actor: Actor, sourceId: string, authority: "canonical" | "approved" | "unverified"): Promise<void> {
+  async getSourceHistory(actor: Actor, sourceId: string): Promise<unknown[]> {
+    requirePermission(actor, "read");
+    const revisions = await this.sql`
+      SELECT source_revisions.id, source_revisions.revision_number, source_revisions.content_hash,
+             source_revisions.content_updated_at, source_revisions.created_at,
+             source_revisions.id = sources.current_revision_id AS is_current,
+             users.display_name AS created_by
+      FROM sources
+      JOIN source_revisions ON source_revisions.source_id = sources.id
+      JOIN users ON users.id = source_revisions.created_by
+      WHERE sources.id = ${sourceId} AND sources.workspace_id = ${actor.workspaceId} AND sources.status = 'active'
+      ORDER BY source_revisions.revision_number DESC
+    `;
+    if (revisions.length === 0) throw new DomainError("Source not found");
+    return revisions;
+  }
+
+  async setAuthority(actor: Actor, sourceId: string, authority: Authority): Promise<void> {
     requirePermission(actor, "review");
     await this.sql.begin(async (transaction) => {
       const updated = await transaction`
         UPDATE sources SET authority = ${authority}
-        WHERE id = ${sourceId} AND workspace_id = ${actor.workspaceId} AND status = 'active'
-        RETURNING id
+        WHERE id = ${sourceId} AND workspace_id = ${actor.workspaceId} AND status = 'active' RETURNING id
       `;
       if (updated.length === 0) throw new Error("Source not found");
       await transaction`
@@ -232,8 +353,7 @@ export class Database {
     await this.sql.begin(async (transaction) => {
       const updated = await transaction`
         UPDATE sources SET status = 'deleted', deleted_at = now()
-        WHERE id = ${sourceId} AND workspace_id = ${actor.workspaceId} AND status = 'active'
-        RETURNING id
+        WHERE id = ${sourceId} AND workspace_id = ${actor.workspaceId} AND status = 'active' RETURNING id
       `;
       if (updated.length === 0) throw new Error("Source not found");
       await transaction`
@@ -243,55 +363,87 @@ export class Database {
     });
   }
 
-  private async indexSource(actor: Actor, input: {
-    title: string;
-    markdown: string;
-    tags: string[];
-    authority: "canonical" | "approved" | "unverified";
-    sourceType: "note" | "upload";
-    originalFilename?: string;
-    mimeType?: string;
-    storagePath?: string;
-    contentHash?: string;
-  }): Promise<{ id: string; chunkCount: number }> {
-    const markdown = input.markdown.trim();
-    if (!markdown) throw new Error("Knowledge source cannot be empty");
-    const chunks = chunkMarkdown(markdown);
-    if (chunks.length === 0) throw new Error("Knowledge source does not contain indexable text");
-    const vectors = await this.embeddings.embed(chunks.map((chunk) => chunk.content));
-    const contentHash = input.contentHash ?? digest(markdown);
-
+  private async createSource(actor: Actor, input: {
+    title: string; markdown: string; tags: string[]; sourceType: SourceType;
+    originalFilename?: string; mimeType?: string; storagePath?: string; contentHash?: string;
+  }): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
+    const revision = await this.prepareRevision({
+      title: input.title,
+      markdown: input.markdown,
+      contentHash: input.contentHash,
+      originalFilename: input.originalFilename,
+      mimeType: input.mimeType,
+      storagePath: input.storagePath,
+    });
     return this.sql.begin(async (transaction) => {
       const [source] = await transaction<{ id: string }[]>`
         INSERT INTO sources (
           workspace_id, title, source_type, authority, original_filename, mime_type, storage_path,
           content_hash, markdown_content, created_by
         ) VALUES (
-          ${actor.workspaceId}, ${input.title}, ${input.sourceType}, ${input.authority},
+          ${actor.workspaceId}, ${input.title}, ${input.sourceType}, 'unverified',
           ${input.originalFilename ?? null}, ${input.mimeType ?? null}, ${input.storagePath ?? null},
-          ${contentHash}, ${markdown}, ${actor.id}
-        )
-        RETURNING id
+          ${revision.contentHash}, ${revision.markdown}, ${actor.id}
+        ) RETURNING id
       `;
       if (!source) throw new Error("Unable to create source");
-
-      for (const [ordinal, chunk] of chunks.entries()) {
-        await transaction`
-          INSERT INTO chunks (source_id, ordinal, heading, content, token_count, embedding, embedding_model)
-          VALUES (${source.id}, ${ordinal}, ${chunk.heading}, ${chunk.content}, ${chunk.tokenCount},
-                  ${toVector(vectors[ordinal]!)}::vector, ${this.config.EMBEDDING_MODEL})
-        `;
-      }
-      for (const tag of [...new Set(input.tags.map((tag) => tag.trim()).filter(Boolean))]) {
-        await transaction`INSERT INTO source_tags (source_id, tag) VALUES (${source.id}, ${tag})`;
-      }
+      const revisionId = await this.insertRevision(transaction, source.id, 1, null, actor, revision);
+      await transaction`UPDATE sources SET current_revision_id = ${revisionId} WHERE id = ${source.id}`;
+      await this.replaceTags(transaction, source.id, input.tags);
       await transaction`
         INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
         VALUES (${actor.workspaceId}, ${actor.id}, 'source_submitted', ${source.id},
-                ${transaction.json({ sourceType: input.sourceType, authority: input.authority })})
+          ${JSON.stringify({ sourceType: input.sourceType, authority: 'unverified', revisionId })}::jsonb)
       `;
-      return { id: source.id, chunkCount: chunks.length };
+      return { id: source.id, revisionNumber: 1, chunkCount: revision.chunks.length };
     });
+  }
+
+  private async prepareRevision(input: RevisionInput): Promise<PreparedRevision> {
+    const markdown = input.markdown.trim();
+    if (!markdown) throw new Error("Knowledge source cannot be empty");
+    const chunks = chunkMarkdown(markdown);
+    if (chunks.length === 0) throw new Error("Knowledge source does not contain indexable text");
+    const vectors = await this.embeddings.embed(chunks.map((chunk) => chunk.content));
+    return {
+      title: input.title,
+      markdown,
+      contentHash: input.contentHash ?? digest(markdown),
+      originalFilename: input.originalFilename,
+      mimeType: input.mimeType,
+      storagePath: input.storagePath,
+      chunks,
+      vectors,
+    };
+  }
+
+  private async insertRevision(transaction: TransactionSql, sourceId: string, revisionNumber: number, supersedesRevisionId: string | null, actor: Actor, revision: PreparedRevision): Promise<string> {
+    const [created] = await transaction<{ id: string }[]>`
+      INSERT INTO source_revisions (
+        source_id, revision_number, title, content_hash, markdown_content, original_filename, mime_type,
+        storage_path, supersedes_revision_id, created_by
+      ) VALUES (
+        ${sourceId}, ${revisionNumber}, ${revision.title}, ${revision.contentHash}, ${revision.markdown},
+        ${revision.originalFilename ?? null}, ${revision.mimeType ?? null}, ${revision.storagePath ?? null},
+        ${supersedesRevisionId}, ${actor.id}
+      ) RETURNING id
+    `;
+    if (!created) throw new Error("Unable to create source revision");
+    for (const [ordinal, chunk] of revision.chunks.entries()) {
+      await transaction`
+        INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
+        VALUES (${sourceId}, ${created.id}, ${ordinal}, ${chunk.heading}, ${chunk.content}, ${chunk.tokenCount},
+                ${toVector(revision.vectors[ordinal]!)}::vector, ${this.config.EMBEDDING_MODEL})
+      `;
+    }
+    return created.id;
+  }
+
+  private async replaceTags(transaction: TransactionSql, sourceId: string, tags: string[]): Promise<void> {
+    await transaction`DELETE FROM source_tags WHERE source_id = ${sourceId}`;
+    for (const tag of uniqueTags(tags)) {
+      await transaction`INSERT INTO source_tags (source_id, tag) VALUES (${sourceId}, ${tag})`;
+    }
   }
 
   private async event(actor: Actor, eventType: string, sourceId: string | null, metadata: Record<string, unknown>): Promise<void> {
@@ -300,6 +452,47 @@ export class Database {
       VALUES (${actor.workspaceId}, ${actor.id}, ${eventType}, ${sourceId}, ${JSON.stringify(metadata)}::jsonb)
     `;
   }
+}
+
+const allowedMimeTypes = new Set([
+  "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv", "text/html", "text/markdown", "text/plain",
+]);
+
+export function formatSearchResult(row: Record<string, unknown>, explain: boolean): Record<string, unknown> {
+  const result = {
+    sourceId: row.source_id,
+    revisionNumber: row.revision_number,
+    title: row.title,
+    sourceType: row.source_type,
+    authority: row.authority,
+    author: row.author,
+    authorId: row.author_id,
+    heading: row.heading,
+    excerpt: row.content,
+    updatedAt: row.content_updated_at,
+  };
+  if (!explain) return result;
+  const semanticScore = Number(row.semantic_score);
+  const keywordScore = Number(row.keyword_score);
+  const authorityBoost = Number(row.authority_boost);
+  const freshnessBoost = Number(row.freshness_boost);
+  return {
+    ...result,
+    scores: { semanticScore, keywordScore, authorityBoost, freshnessBoost, finalScore: Number(row.final_score) },
+    explanation: [
+      semanticScore > 0 ? "semantic match" : null,
+      keywordScore > 0 ? "exact keyword match" : null,
+      authorityBoost > 0 ? `${String(row.authority)} source` : null,
+      freshnessBoost > 0 ? "recently updated" : null,
+    ].filter(Boolean).join("; "),
+  };
+}
+
+function uniqueTags(tags: string[]): string[] {
+  return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))];
 }
 
 function digest(value: string | Uint8Array): string {

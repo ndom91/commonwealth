@@ -9,5 +9,6 @@ ENV NODE_ENV=production
 RUN corepack enable
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json tsconfig.json ./
+COPY db ./db
 COPY src ./src
 CMD ["pnpm", "start"]

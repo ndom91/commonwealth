@@ -34,7 +34,6 @@ services:
       retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
 
   ollama:
     image: ollama/ollama:latest
