@@ -8,4 +8,5 @@ __pycache__/
 playground/
 admin/.output/
 admin/.tanstack/
+.impeccable/
 playground/
