@@ -11,7 +11,7 @@ export async function runMigrations(sql: Sql): Promise<void> {
   const connection = await sql.reserve();
   try {
     await connection`SELECT pg_advisory_lock(hashtext('llm-team-kb:migrations'))`;
-    await runMigrationsLocked(connection);
+    await runMigrationsLocked(sql);
   } finally {
     await connection`SELECT pg_advisory_unlock(hashtext('llm-team-kb:migrations'))`.catch(() => undefined);
     connection.release();

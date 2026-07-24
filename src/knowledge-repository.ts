@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import postgres, { type Sql, type TransactionSql } from "postgres";
 import { requirePermission } from "./access-service.js";
 import { chunkMarkdown } from "./chunking.js";
@@ -106,7 +106,7 @@ export class KnowledgeRepository {
       }
 
       const nextRevisionNumber = currentRevision.revision_number + 1;
-      const revisionId = await this.insertRevision(transaction, source.id, nextRevisionNumber, source.current_revision_id, actor, revision);
+      const revisionId = await this.insertRevision(transaction, source.id, randomUUID(), nextRevisionNumber, source.current_revision_id, actor, revision);
       await transaction`
         UPDATE sources SET current_revision_id = ${revisionId}, current_content_hash = ${revision.contentHash}
         WHERE id = ${source.id}
@@ -259,14 +259,15 @@ export class KnowledgeRepository {
       storagePath: input.storagePath,
     });
     return this.sql.begin(async (transaction) => {
+      const sourceId = randomUUID();
+      const revisionId = randomUUID();
       const [source] = await transaction<{ id: string }[]>`
-        INSERT INTO sources (workspace_id, source_type, authority, current_content_hash, created_by)
-        VALUES (${actor.workspaceId}, ${input.sourceType}, 'unverified', ${revision.contentHash}, ${actor.id})
+        INSERT INTO sources (id, workspace_id, source_type, authority, current_revision_id, current_content_hash, created_by)
+        VALUES (${sourceId}, ${actor.workspaceId}, ${input.sourceType}, 'unverified', ${revisionId}, ${revision.contentHash}, ${actor.id})
         RETURNING id
       `;
       if (!source) throw new Error("Unable to create source");
-      const revisionId = await this.insertRevision(transaction, source.id, 1, null, actor, revision);
-      await transaction`UPDATE sources SET current_revision_id = ${revisionId} WHERE id = ${source.id}`;
+      await this.insertRevision(transaction, source.id, revisionId, 1, null, actor, revision);
       await this.replaceTags(transaction, source.id, input.tags);
       await transaction`
         INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
@@ -290,13 +291,13 @@ export class KnowledgeRepository {
     return { ...content, ...input };
   }
 
-  private async insertRevision(transaction: TransactionSql, sourceId: string, revisionNumber: number, supersedesRevisionId: string | null, actor: Actor, revision: PreparedRevision): Promise<string> {
+  private async insertRevision(transaction: TransactionSql, sourceId: string, revisionId: string, revisionNumber: number, supersedesRevisionId: string | null, actor: Actor, revision: PreparedRevision): Promise<string> {
     const [created] = await transaction<{ id: string }[]>`
       INSERT INTO source_revisions (
-        source_id, revision_number, title, content_hash, markdown_content, original_filename, mime_type,
+        id, source_id, revision_number, title, content_hash, markdown_content, original_filename, mime_type,
         storage_path, supersedes_revision_id, created_by
       ) VALUES (
-        ${sourceId}, ${revisionNumber}, ${revision.title}, ${revision.contentHash}, ${revision.markdown},
+        ${revisionId}, ${sourceId}, ${revisionNumber}, ${revision.title}, ${revision.contentHash}, ${revision.markdown},
         ${revision.originalFilename ?? null}, ${revision.mimeType ?? null}, ${revision.storagePath ?? null},
         ${supersedesRevisionId}, ${actor.id}
       ) RETURNING id
