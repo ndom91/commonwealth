@@ -3,22 +3,34 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { loadConfig } from "./config.js";
-import { Database, DomainError, type Actor } from "./database.js";
+import { AccessService } from "./access-service.js";
+import type { Actor } from "./domain.js";
 import { Embeddings } from "./embeddings.js";
+import { DomainError } from "./errors.js";
+import { KnowledgeRepository } from "./knowledge-repository.js";
 
 const config = loadConfig();
-const database = new Database(config, new Embeddings(config));
+const knowledge = new KnowledgeRepository(config, new Embeddings(config));
+const access = new AccessService(knowledge.sql, config);
 
 function text(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
 }
 
-function failure(error: unknown) {
-  console.error("MCP tool failed", error);
+function failure(operation: string, error: unknown) {
+  console.error(`MCP tool failed: ${operation}`, error);
   return {
     content: [{ type: "text" as const, text: error instanceof DomainError ? error.message : "The operation failed. Check the server logs and retry." }],
     isError: true,
   };
+}
+
+async function runTool(operation: string, action: () => Promise<unknown>) {
+  try {
+    return text(await action());
+  } catch (error) {
+    return failure(operation, error);
+  }
 }
 
 function serverFor(actor: Actor): McpServer {
@@ -32,11 +44,7 @@ function serverFor(actor: Actor): McpServer {
       tags: z.array(z.string().min(1)).default([]),
     },
   }, async (input) => {
-    try {
-      return text(await database.submitNote(actor, input));
-    } catch (error) {
-      return failure(error);
-    }
+    return runTool("submit_note", () => knowledge.submitNote(actor, input));
   });
 
   server.registerTool("submit_document", {
@@ -49,11 +57,7 @@ function serverFor(actor: Actor): McpServer {
       tags: z.array(z.string().min(1)).default([]),
     },
   }, async ({ mime_type, file_base64, ...input }) => {
-    try {
-      return text(await database.submitDocument(actor, { ...input, mimeType: mime_type, bytes: Buffer.from(file_base64, "base64") }));
-    } catch (error) {
-      return failure(error);
-    }
+    return runTool("submit_document", () => knowledge.submitDocument(actor, { ...input, mimeType: mime_type, bytes: Buffer.from(file_base64, "base64") }));
   });
 
   server.registerTool("update_source", {
@@ -65,11 +69,7 @@ function serverFor(actor: Actor): McpServer {
       tags: z.array(z.string().min(1)).optional(),
     },
   }, async ({ source_id, ...input }) => {
-    try {
-      return text(await database.updateSource(actor, source_id, input));
-    } catch (error) {
-      return failure(error);
-    }
+    return runTool("update_source", () => knowledge.updateSource(actor, source_id, input));
   });
 
   server.registerTool("search_knowledge", {
@@ -86,16 +86,12 @@ function serverFor(actor: Actor): McpServer {
     },
     annotations: { readOnlyHint: true },
   }, async ({ source_type, author_id, updated_after, ...input }) => {
-    try {
-      return text(await database.search(actor, {
+    return runTool("search_knowledge", () => knowledge.search(actor, {
         ...input,
         sourceType: source_type,
         authorId: author_id,
         updatedAfter: updated_after,
       }));
-    } catch (error) {
-      return failure(error);
-    }
   });
 
   server.registerTool("get_source", {
@@ -103,11 +99,7 @@ function serverFor(actor: Actor): McpServer {
     inputSchema: { source_id: z.string().uuid(), revision_number: z.number().int().positive().optional() },
     annotations: { readOnlyHint: true },
   }, async ({ source_id, revision_number }) => {
-    try {
-      return text(await database.getSource(actor, source_id, revision_number));
-    } catch (error) {
-      return failure(error);
-    }
+    return runTool("get_source", () => knowledge.getSource(actor, source_id, revision_number));
   });
 
   server.registerTool("get_source_history", {
@@ -115,11 +107,7 @@ function serverFor(actor: Actor): McpServer {
     inputSchema: { source_id: z.string().uuid() },
     annotations: { readOnlyHint: true },
   }, async ({ source_id }) => {
-    try {
-      return text(await database.getSourceHistory(actor, source_id));
-    } catch (error) {
-      return failure(error);
-    }
+    return runTool("get_source_history", () => knowledge.getSourceHistory(actor, source_id));
   });
 
   server.registerTool("set_source_authority", {
@@ -129,24 +117,20 @@ function serverFor(actor: Actor): McpServer {
       authority: z.enum(["canonical", "approved", "unverified"]),
     },
   }, async ({ source_id, authority }) => {
-    try {
-      await database.setAuthority(actor, source_id, authority);
-      return text({ sourceId: source_id, authority });
-    } catch (error) {
-      return failure(error);
-    }
+    return runTool("set_source_authority", async () => {
+      await knowledge.setAuthority(actor, source_id, authority);
+      return { sourceId: source_id, authority };
+    });
   });
 
   server.registerTool("delete_source", {
     description: "Soft-delete an active source. Requires reviewer access.",
     inputSchema: { source_id: z.string().uuid() },
   }, async ({ source_id }) => {
-    try {
-      await database.deleteSource(actor, source_id);
-      return text({ sourceId: source_id, deleted: true });
-    } catch (error) {
-      return failure(error);
-    }
+    return runTool("delete_source", async () => {
+      await knowledge.deleteSource(actor, source_id);
+      return { sourceId: source_id, deleted: true };
+    });
   });
 
   return server;
@@ -167,7 +151,7 @@ async function handleMcp(request: IncomingMessage, response: ServerResponse): Pr
     }
     const authorization = request.headers.authorization;
     if (!authorization?.startsWith("Bearer ")) return unauthorized(response);
-    const actor = await database.authenticate(authorization.slice("Bearer ".length));
+    const actor = await access.authenticate(authorization.slice("Bearer ".length));
     if (!actor) return unauthorized(response);
 
     const server = serverFor(actor);
@@ -186,7 +170,7 @@ async function handleMcp(request: IncomingMessage, response: ServerResponse): Pr
 }
 
 async function main(): Promise<void> {
-  await database.bootstrap();
+  await access.bootstrap();
   const http = createServer((request, response) => {
     if (request.url === "/healthz") {
       response.writeHead(200, { "content-type": "application/json" });
@@ -210,7 +194,7 @@ async function main(): Promise<void> {
   http.listen(config.PORT, "0.0.0.0", () => console.log(`Knowledge MCP listening on ${config.PORT}`));
   const shutdown = async () => {
     http.close();
-    await database.close();
+    await knowledge.close();
   };
   process.once("SIGINT", () => void shutdown());
   process.once("SIGTERM", () => void shutdown());

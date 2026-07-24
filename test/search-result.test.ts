@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatSearchResult } from "../src/database.js";
+import { formatSearchResult } from "../src/knowledge-repository.js";
 
 const row = {
   source_id: "source-1",
