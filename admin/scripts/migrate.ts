@@ -26,8 +26,8 @@ if (legacyLedger?.exists) {
   if (!dashboardInstalled?.exists) {
     await client.unsafe(await readFile(new URL("../drizzle/0000_bored_the_fury.sql", import.meta.url), "utf8"));
   }
+  await client`CREATE SCHEMA IF NOT EXISTS "drizzle"`;
   await client`
-    CREATE SCHEMA IF NOT EXISTS "drizzle";
     CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
       "id" serial PRIMARY KEY NOT NULL,
       "hash" text NOT NULL,
