@@ -1,0 +1,92 @@
+services:
+  app:
+    build: .
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      OLLAMA_URL: ${OLLAMA_URL}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME}
+      BOOTSTRAP_ADMIN_KEY: ${BOOTSTRAP_ADMIN_KEY}
+      PORT: 3000
+      MAX_REQUEST_BYTES: ${MAX_REQUEST_BYTES:-15000000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+      markitdown:
+        condition: service_healthy
+    volumes:
+      - source_data:/app/storage
+    ports:
+      - "127.0.0.1:${HOST_PORT:-3000}:3000"
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: team_kb
+      POSTGRES_USER: team_kb
+      POSTGRES_PASSWORD: team_kb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U team_kb -d team_kb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+
+  ollama:
+    image: ollama/ollama:latest
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    volumes:
+      - ollama_data:/root/.ollama
+
+  ollama-init:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: ollama:11434
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "for attempt in $$(seq 1 60); do ollama list && exec ollama pull $${EMBEDDING_MODEL}; sleep 2; done; echo 'Ollama was not ready after 120 seconds' >&2; exit 1"]
+    restart: "no"
+
+  markitdown:
+    build: ./markitdown
+    cpus: 1.0
+    mem_limit: 1g
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["public"]
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
+    depends_on:
+      app:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  ollama_data:
+  caddy_data:
+  caddy_config:
+  source_data:
