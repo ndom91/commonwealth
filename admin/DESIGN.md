@@ -66,7 +66,7 @@ components:
     backgroundColor: "{colors.tag-stock}"
     textColor: "{colors.tag-ink}"
     rounded: "{rounded.none}"
-    padding: "10px 18px"
+    padding: "9px 18px"
     typography: "{typography.label}"
   button-primary-hover:
     backgroundColor: "#F1EADA"
@@ -80,6 +80,12 @@ components:
   button-void:
     backgroundColor: "transparent"
     textColor: "{colors.seal-mark}"
+    rounded: "{rounded.none}"
+    padding: "9px 12px"
+    typography: "{typography.label}"
+  button-row:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink-secondary}"
     rounded: "{rounded.none}"
     padding: "5px 10px"
     typography: "{typography.label}"
@@ -98,6 +104,12 @@ components:
   chip-signed:
     backgroundColor: "transparent"
     textColor: "{colors.ink}"
+    rounded: "{rounded.chip}"
+    padding: "3px 7px"
+    typography: "{typography.label}"
+  chip-suspended:
+    backgroundColor: "transparent"
+    textColor: "{colors.seal-mark}"
     rounded: "{rounded.chip}"
     padding: "3px 7px"
     typography: "{typography.label}"
@@ -287,6 +299,12 @@ tag stock.
 
 ### Buttons
 - **Shape:** square (0px), 1px hairline where outlined.
+- **Height:** every variant shares one block padding (9px). Variants change
+  colour and horizontal padding only, so any two controls sitting side by side
+  are the same height without per-pair correction.
+- **Row variant:** `btn--sm` (5px block) is the one exception, for controls
+  inside a register row. It applies to every control in that row, never to one
+  of a pair.
 - **Primary:** manila tag stock ground with tag ink, label typography, 10px/18px
   padding. It is the "issue / commit / sign in" action.
 - **Hover / Focus:** primary lightens to `#F1EADA`; focus draws a 2px offset
@@ -302,6 +320,8 @@ Seal state escalates by material commitment, not by hue:
 - **Unsealed** (`UNVERIFIED`): dashed hairline, meta ink, no fill.
 - **Signed** (`APPROVED`): solid hairline, primary ink, no fill.
 - **Sealed** (`CANONICAL`): oxide fill with tag-stock text.
+- **Suspended** (`DISABLED`): oxide outline, no fill, no strike — withdrawn
+  from service but intact. It is the one seal state that can be reversed.
 - **Void** (`WITHDRAWN` / `REVOKED`): oxide mark, struck through.
 
 ### Containers
@@ -349,6 +369,11 @@ is invisible on manila.
   never hides behind a disclosure.
 - **Do** define every color as a token pair so the light theme is a token
   swap, not a rewrite.
+- **Do** distinguish reversible suspension from destruction: an outlined oxide
+  chip for disabled, a struck one for voided.
+- **Do** let a control's size follow where it sits — head controls at the
+  default size, register-row controls at `btn--sm` — never which variant it
+  happens to use.
 
 ### Don't:
 - **Don't** introduce cards, rounded panels, pastel fills, gradient buttons,

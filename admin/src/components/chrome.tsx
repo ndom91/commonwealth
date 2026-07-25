@@ -165,9 +165,10 @@ export function AppShell({
 }
 
 /* Seal state escalates by material commitment rather than by hue: unsealed is
-   a dashed outline, signed is a solid outline, sealed is filled oxide, and a
-   voided object is struck through but never removed. */
-export type SealState = "unsealed" | "signed" | "sealed" | "void";
+   a dashed outline, signed is a solid outline, sealed is filled oxide, a
+   suspended object is outlined in oxide but intact, and a voided one is struck
+   through yet never removed. */
+export type SealState = "unsealed" | "signed" | "sealed" | "suspended" | "void";
 
 export function SealChip({ state, children }: { state: SealState; children: ReactNode }) {
   return <span className={`chip chip--${state}`}>{children}</span>;

@@ -505,6 +505,13 @@ select {
   color: var(--tag);
 }
 
+/* Withdrawn from service but intact: oxide outline, no fill, no strike. It is
+   the one seal state that can be reversed. */
+.chip--suspended {
+  border: 1px solid var(--seal);
+  color: var(--seal);
+}
+
 .chip--void {
   border: 1px solid transparent;
   color: var(--seal);
@@ -527,12 +534,16 @@ select {
   text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
+  /* One block padding for every variant: two controls sitting side by side
+     must never differ in height. Variants change colour and horizontal
+     padding only. */
+  padding: 9px 14px;
   transition: background 120ms ease-out, color 120ms ease-out,
     border-color 120ms ease-out;
 }
 
 .btn--primary {
-  padding: 10px 18px;
+  padding-inline: 18px;
   background: var(--tag);
   color: var(--tag-ink);
 }
@@ -549,7 +560,6 @@ select {
 }
 
 .btn--quiet {
-  padding: 9px 14px;
   border-color: var(--rule-strong);
   background: none;
   color: var(--ink-2);
@@ -560,14 +570,8 @@ select {
   color: var(--ink);
 }
 
-/* Row-level control: matches .btn--void exactly so paired confirm/cancel
-   controls in a register row are the same height. */
-.btn--sm {
-  padding: 5px 10px;
-}
-
 .btn--void {
-  padding: 5px 10px;
+  padding-inline: 12px;
   border-color: color-mix(in srgb, var(--seal) 45%, transparent);
   background: none;
   color: var(--seal);
@@ -576,6 +580,12 @@ select {
 .btn--void:hover {
   border-color: var(--seal);
   background: color-mix(in srgb, var(--seal) 12%, transparent);
+}
+
+/* Dense variant for controls inside a register row. Declared last so it wins
+   the horizontal padding of whichever variant it is paired with. */
+.btn--sm {
+  padding: 5px 10px;
 }
 
 .field {
@@ -765,14 +775,31 @@ select {
 
 .bench__seal {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-base);
+  gap: var(--s-tight) var(--s-base);
   margin-left: auto;
   padding-top: var(--s-base);
 }
 
 .bench__note {
   margin: var(--s-base) 0 0;
+}
+
+/* Shown only while a disable is armed; the resting state needs no banner. */
+.bench__consequence {
+  max-width: 60ch;
+  margin: var(--s-base) 0 0;
+  padding-left: var(--s-snug);
+  border-left: 1px solid var(--seal);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+/* A suspended holder still has to be readable in the register; it is dimmed
+   to secondary ink rather than hidden or struck. */
+.entry--disabled .entry__name {
+  color: var(--ink-2);
 }
 
 /* A role change is not a preference — it re-grants every credential the

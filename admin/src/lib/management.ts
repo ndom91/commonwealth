@@ -20,6 +20,7 @@ export const listIdentities = createServerFn({ method: "GET" }).handler(async ()
   await adminId();
   return client`
     SELECT users.id, users.display_name AS name, users.role, users.created_at, users.description,
+      users.disabled_at,
       COALESCE(json_agg(json_build_object('id', api_keys.id, 'prefix', api_keys.key_prefix, 'label', managed_api_key.label, 'createdAt', api_keys.created_at, 'lastUsedAt', api_keys.last_used_at, 'revokedAt', api_keys.revoked_at)
         ORDER BY api_keys.created_at DESC) FILTER (WHERE api_keys.id IS NOT NULL), '[]') AS keys
     FROM users
@@ -113,6 +114,42 @@ export const updateIdentity = createServerFn({ method: "POST" })
       }
     });
     return { identityId: data.identityId };
+  });
+
+/* Suspend or restore a holder in one move. AccessService only authenticates
+   keys whose holder has `disabled_at IS NULL`, so disabling blocks every
+   credential this holder owns at the MCP boundary immediately — and, unlike
+   revoking, it is reversible and destroys nothing. */
+export const setIdentityDisabled = createServerFn({ method: "POST" })
+  .validator((value: unknown): { identityId: string; disabled: boolean } => {
+    const input = value as Partial<{ identityId: string; disabled: boolean }>;
+    if (!input.identityId?.trim()) throw new Error("Invalid identity");
+    if (typeof input.disabled !== "boolean") throw new Error("Invalid state");
+    return { identityId: input.identityId.trim(), disabled: input.disabled };
+  })
+  .handler(async ({ data }) => {
+    await adminId();
+    await client.begin(async (transaction) => {
+      const [identity] = await transaction<{ workspace_id: string; disabled_at: string | null }[]>`
+        SELECT workspace_id, disabled_at FROM users WHERE id = ${data.identityId}
+      `;
+      if (!identity) throw new Error("That identity no longer exists");
+      if (data.disabled === Boolean(identity.disabled_at)) return;
+      /* Branch rather than interpolating a `now()` fragment: a fragment built
+         from the pooled client is not the transaction's handle, and the write
+         silently produced no timestamp. */
+      if (data.disabled) {
+        await transaction`UPDATE users SET disabled_at = now() WHERE id = ${data.identityId}`;
+      } else {
+        await transaction`UPDATE users SET disabled_at = NULL WHERE id = ${data.identityId}`;
+      }
+      await transaction`
+        INSERT INTO events (workspace_id, event_type, metadata)
+        VALUES (${identity.workspace_id}, ${data.disabled ? "identity_disabled" : "identity_enabled"},
+          ${JSON.stringify({ identityId: data.identityId })}::jsonb)
+      `;
+    });
+    return { identityId: data.identityId, disabled: data.disabled };
   });
 
 /* Issue an additional credential to an existing holder. Rotation is a normal

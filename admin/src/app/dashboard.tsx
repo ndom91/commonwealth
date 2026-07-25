@@ -6,6 +6,7 @@ import {
   issueCredential,
   listIdentities,
   revokeKey,
+  setIdentityDisabled,
   updateIdentity,
 } from "../lib/management.js";
 import { getSession } from "../lib/session.js";
@@ -41,6 +42,9 @@ type Identity = {
      layer and never returned to an agent. */
   description: string | null;
   created_at: string;
+  /* Set while the holder is suspended. AccessService refuses every credential
+     they own for as long as it is non-null. */
+  disabled_at: string | null;
   keys: Credential[];
 };
 
@@ -206,7 +210,7 @@ function Dashboard() {
                 <li key={identity.id}>
                   <button
                     type="button"
-                    className="entry"
+                    className={`entry${identity.disabled_at ? " entry--disabled" : ""}`}
                     aria-current={identity.id === selectedId}
                     onClick={() => {
                       setSelectedId(identity.id);
@@ -217,7 +221,13 @@ function Dashboard() {
                     <span className="entry__accession">
                       {accessionOf(identity.id)} · {live} live · {identity.keys.length} total
                     </span>
-                    <span className="entry__role role">{identity.role}</span>
+                    <span className="entry__role">
+                      {identity.disabled_at ? (
+                        <SealChip state="suspended">Disabled</SealChip>
+                      ) : (
+                        <span className="role">{identity.role}</span>
+                      )}
+                    </span>
                   </button>
                 </li>
               );
@@ -256,6 +266,10 @@ function Dashboard() {
               }}
               onAmend={async (amendment) => {
                 await updateIdentity({ data: { identityId: selected.id, ...amendment } });
+                await reload();
+              }}
+              onSetDisabled={async (disabled) => {
+                await setIdentityDisabled({ data: { identityId: selected.id, disabled } });
                 await reload();
               }}
             />
@@ -419,15 +433,20 @@ function Holder({
   onReload,
   onIssue,
   onAmend,
+  onSetDisabled,
 }: {
   identity: Identity;
   onReload: () => Promise<void>;
   onIssue: (keyLabel: string) => Promise<void>;
   onAmend: (amendment: Amendment) => Promise<void>;
+  onSetDisabled: (disabled: boolean) => Promise<void>;
 }) {
   const [arming, setArming] = useState<string>();
   const [adding, setAdding] = useState(false);
   const [amend, setAmend] = useState<Amendment>();
+  const [armDisable, setArmDisable] = useState(false);
+  const [togglePending, setTogglePending] = useState(false);
+  const [toggleError, setToggleError] = useState<string>();
   const [amendPending, setAmendPending] = useState(false);
   const [amendError, setAmendError] = useState<string>();
   const [newLabel, setNewLabel] = useState("");
@@ -492,7 +511,25 @@ function Holder({
     }
   }
 
+  async function setDisabled(disabled: boolean) {
+    setTogglePending(true);
+    setToggleError(undefined);
+    try {
+      await onSetDisabled(disabled);
+      setArmDisable(false);
+    } catch (cause) {
+      setToggleError(
+        cause instanceof Error && cause.message
+          ? `${cause.message}. Nothing was changed — try again.`
+          : "The holder's state could not be changed. Nothing was changed — try again.",
+      );
+    } finally {
+      setTogglePending(false);
+    }
+  }
+
   const live = identity.keys.filter((key) => !key.revokedAt).length;
+  const disabled = Boolean(identity.disabled_at);
 
   if (amend) {
     return (
@@ -586,6 +623,9 @@ function Holder({
           <h2>{identity.name}</h2>
         </div>
         <div className="bench__seal">
+          {disabled && (
+            <SealChip state="suspended">Disabled {stamp(identity.disabled_at)}</SealChip>
+          )}
           <span className="role">{identity.role}</span>
           <button
             type="button"
@@ -600,8 +640,56 @@ function Holder({
           >
             Edit
           </button>
+
+          {disabled ? (
+            <button
+              type="button"
+              className="btn btn--quiet"
+              disabled={togglePending}
+              onClick={() => void setDisabled(false)}
+            >
+              {togglePending ? "Enabling…" : "Enable"}
+            </button>
+          ) : armDisable ? (
+            <>
+              <button
+                type="button"
+                className="btn btn--void"
+                disabled={togglePending}
+                onClick={() => void setDisabled(true)}
+              >
+                {togglePending ? "Disabling…" : "Confirm disable"}
+              </button>
+              <button
+                type="button"
+                className="btn btn--quiet"
+                disabled={togglePending}
+                onClick={() => setArmDisable(false)}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn--void" onClick={() => setArmDisable(true)}>
+              Disable
+            </button>
+          )}
         </div>
       </div>
+
+      {armDisable && !disabled && (
+        <p className="bench__consequence">
+          Disabling refuses {live} live credential{live === 1 ? "" : "s"} at{" "}
+          <code className="register">/mcp</code> immediately. Nothing is voided,
+          and it can be undone.
+        </p>
+      )}
+
+      {toggleError && (
+        <p className="notice" role="alert">
+          {toggleError}
+        </p>
+      )}
 
       {identity.description && <p className="bench__note prose">{identity.description}</p>}
 
@@ -677,7 +765,7 @@ function Holder({
                     <>
                       <button
                         type="button"
-                        className="btn btn--void"
+                        className="btn btn--void btn--sm"
                         disabled={voiding === key.id}
                         onClick={() => void void_(key.id)}
                       >
@@ -695,7 +783,7 @@ function Holder({
                   ) : (
                     <button
                       type="button"
-                      className="btn btn--void"
+                      className="btn btn--void btn--sm"
                       onClick={() => setArming(key.id)}
                     >
                       Revoke
