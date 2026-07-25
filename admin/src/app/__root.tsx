@@ -7,4 +7,5 @@ export const Route = createRootRoute({
     links: [{ rel: "stylesheet", href: appCss }],
   }),
   component: () => <html lang="en"><head><HeadContent /></head><body><Outlet /><Scripts /></body></html>,
+  notFoundComponent: () => <main>Page not found</main>,
 });
