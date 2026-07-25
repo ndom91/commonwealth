@@ -1,9 +1,18 @@
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { eq } from "drizzle-orm";
 import { readFile } from "node:fs/promises";
-import { auth } from "../src/lib/auth.js";
 import { db, client } from "../src/lib/db.js";
 import { adminRole, user } from "../src/db/schema.js";
+
+/* Creating the first administrator is the one place sign-up must always be
+   permitted. auth.ts reads BETTER_AUTH_ALLOW_SIGN_UP at import time and the
+   running server keeps sign-up closed by default, so this script forces the
+   flag for its own process and imports auth lazily afterwards. Without this,
+   bootstrapping a fresh database outside Compose silently fails to create the
+   administrator, and operators have to know about a global toggle to run a
+   migration. */
+process.env.BETTER_AUTH_ALLOW_SIGN_UP = "true";
+const { auth } = await import("../src/lib/auth.js");
 
 const mcpBaselineHash = "41bf842e59b6710cf23897cde38427fd8f3f8f7a70e9261212c4bf1734b1d027";
 const mcpBaselineTimestamp = 1784914839303;

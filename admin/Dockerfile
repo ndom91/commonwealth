@@ -16,5 +16,9 @@ FROM node:24-alpine
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/admin ./admin
+# The workspace manifests let `pnpm migrate` resolve inside the image, so the
+# container and a developer's shell run the same script rather than two
+# separately maintained invocations.
+COPY package.json pnpm-workspace.yaml ./
 RUN corepack enable
 CMD ["node", "admin/.output/server/index.mjs"]

@@ -40,7 +40,7 @@ services:
     build:
       context: .
       dockerfile: admin/Dockerfile
-    command: ["node", "--import", "tsx", "admin/scripts/migrate.ts"]
+    command: ["pnpm", "migrate"]
     environment:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
@@ -49,7 +49,6 @@ services:
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
-      BETTER_AUTH_ALLOW_SIGN_UP: "true"
     depends_on:
       postgres:
         condition: service_healthy
