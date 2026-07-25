@@ -15,13 +15,13 @@ OpenCode, and Cursor.
 
 ```sh
 cp .env.example .env
-# Set BOOTSTRAP_ADMIN_KEY in .env with: openssl rand -hex 32
+# Set BOOTSTRAP_ADMIN_PASSWORD and BETTER_AUTH_SECRET with: openssl rand -base64 33
 docker compose up --build
 ```
 
-The initial administrator key is generated from `BOOTSTRAP_ADMIN_KEY` on first
-startup. It must be a unique secret; the sample environment file intentionally
-leaves it blank. Configure MCP clients to connect to `http://localhost:3000/mcp` with:
+Sign in to the dashboard at `http://localhost:3001` with the configured bootstrap
+email and password, then create an MCP identity and API key. Configure MCP clients
+to connect to `http://localhost:3000/mcp` with:
 
 ```text
 Authorization: Bearer <your key>
@@ -35,11 +35,15 @@ the evaluation corpus described in `PLAN.md` before changing the default.
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm dev
+docker compose up -d postgres ollama ollama-init markitdown app
+docker compose up admin-migrate
+pnpm --filter @llm-team-kb/admin dev
 ```
 
-Start Postgres and Ollama with Compose first, or set `DATABASE_URL` and
-`OLLAMA_URL` to compatible services.
+The development server runs on the host and connects through `DATABASE_URL`, which
+defaults to loopback Postgres. Containers use `COMPOSE_DATABASE_URL` and keep using
+the Docker network hostname. Do not run the `admin` Compose service while using the
+Vite development server; both use port 3001.
 
 ## License
 

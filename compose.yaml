@@ -2,7 +2,7 @@ services:
   app:
     build: .
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       OLLAMA_URL: ${OLLAMA_URL}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       PORT: 3000
@@ -24,7 +24,7 @@ services:
       context: .
       dockerfile: admin/Dockerfile
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       PORT: 3001
@@ -42,7 +42,7 @@ services:
       dockerfile: admin/Dockerfile
     command: ["node", "--import", "tsx", "admin/scripts/migrate.ts"]
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME}
@@ -66,6 +66,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
