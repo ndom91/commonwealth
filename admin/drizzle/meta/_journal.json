@@ -15,6 +15,13 @@
       "when": 1784914839303,
       "tag": "0001_mcp_schema_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784914839304,
+      "tag": "0002_identity_description",
+      "breakpoints": true
     }
   ]
 }

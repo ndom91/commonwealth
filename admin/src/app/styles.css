@@ -1,17 +1,1049 @@
-:root { color: #201f1b; background: #f4f0e8; font-family: Georgia, serif; }
-* { box-sizing: border-box; }
-body { margin: 0; }
-button, input, select { font: inherit; }
-.shell { min-height: 100vh; max-width: 1080px; margin: auto; padding: 56px 28px; }
-.masthead { display: flex; justify-content: space-between; border-bottom: 1px solid #c8c0b4; padding-bottom: 24px; margin-bottom: 44px; }
-.eyebrow { color: #7c4937; text-transform: uppercase; letter-spacing: .13em; font: 700 11px system-ui; }
-h1 { font-size: clamp(36px, 7vw, 70px); font-weight: 400; margin: 8px 0; letter-spacing: -.04em; }
-.card { background: #fffdf8; border: 1px solid #d9d1c6; padding: 24px; box-shadow: 5px 5px 0 #ded5c8; }
-.grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-label { display: grid; gap: 7px; font: 700 12px system-ui; text-transform: uppercase; letter-spacing: .08em; }
-input, select { border: 1px solid #a89e90; border-radius: 0; padding: 10px; background: #fffdf8; }
-button { border: 0; background: #7c4937; color: #fffdf8; padding: 11px 16px; cursor: pointer; }
-button:hover { background: #613626; }
-.muted { color: #706b62; }
-.key { font-family: ui-monospace, monospace; background: #eee7dc; padding: 12px; word-break: break-all; }
-table { width: 100%; border-collapse: collapse; } td, th { text-align: left; border-top: 1px solid #ded5c8; padding: 12px 0; }
+/* ── The Custody Bench ──────────────────────────────────────────────────────
+   THESIS: An admin surface for knowledge an agent is allowed to trust, staged
+   as an evidence bench rather than a dashboard. It refuses the near-black
+   developer-tool card grid and the cream editorial page in equal measure.
+   OWN-WORLD: Dark slate ground; manila tag stock as the only light material;
+   one oxide seal held in reserve for sealing, voiding and destruction.
+   Hairline rules and ground shifts instead of cards. Square corners. Tracked
+   mono field labels. No webfonts — the type stack resolves with no network.
+   STORY: An engineer arrives to issue or void a credential, sees who holds
+   what and since when, and leaves certain nothing was destroyed silently.
+   FIRST VIEWPORT: Cabinet rail of drawer labels at 236px; masthead carrying
+   the page title and the issue action; below it a 340px identity register
+   ruled row by row, and a bench pane holding the selected holder, their
+   credential stubs and their custody line.
+   FORM: Chain-of-custody evidence handling — candidate 4 of 7 on the
+   resonance-ordered list, assigned by concept-seed key kb-chrome-01, staged
+   as index-and-bench rather than the dealt radar sweep.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: dark;
+
+  --slate-ground: #0e1214;
+  --slate-cabinet: #12171a;
+  --slate-bench: #171d20;
+  --slate-raised: #1d2429;
+  --rule-hair: #262f34;
+  --rule-strong: #36424a;
+
+  --ink: #e6eae9;
+  --ink-2: #a2adb1;
+  --ink-3: #8a969b;
+  --ink-dormant: #5a666c;
+
+  --tag: #e3dac6;
+  --tag-edge: #cfc3a9;
+  --tag-hover: #f1eada;
+  --tag-ink: #1a1815;
+  --tag-ink-2: #4a453c;
+
+  /* Tag stock used as ink rather than as ground — active drawer rules, the
+     selected accession, credential prefixes. Kept separate from --tag so the
+     light theme can darken the mark without darkening the tag surface. */
+  --mark: #e3dac6;
+
+  --seal: #e86b38;
+  --seal-fill: #9a3414;
+
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-register: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --s-hair: 4px;
+  --s-tight: 8px;
+  --s-snug: 12px;
+  --s-base: 16px;
+  --s-loose: 24px;
+  --s-section: 32px;
+  --s-gutter: 40px;
+
+  --rail: 236px;
+  --index: 340px;
+  --issued-lift: 0 10px 28px -6px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+
+    --slate-ground: #e8e9e6;
+    --slate-cabinet: #dfe1dd;
+    --slate-bench: #f2f3f0;
+    --slate-raised: #dcded9;
+    --rule-hair: #c6cac4;
+    --rule-strong: #a8ada6;
+
+    --ink: #14181a;
+    --ink-2: #444d51;
+    --ink-3: #555e62;
+    --ink-dormant: #7c8489;
+
+    --tag: #dcd2bb;
+    --tag-edge: #b9ad91;
+    --tag-hover: #e7dfcc;
+
+    --mark: #7a2e14;
+    --seal: #96300f;
+    --seal-fill: #9a3414;
+  }
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --slate-ground: #e8e9e6;
+  --slate-cabinet: #dfe1dd;
+  --slate-bench: #f2f3f0;
+  --slate-raised: #dcded9;
+  --rule-hair: #c6cac4;
+  --rule-strong: #a8ada6;
+
+  --ink: #14181a;
+  --ink-2: #444d51;
+  --ink-3: #555e62;
+  --ink-dormant: #7c8489;
+
+  --tag: #dcd2bb;
+  --tag-edge: #b9ad91;
+  --tag-hover: #e7dfcc;
+
+  --mark: #7a2e14;
+  --seal: #96300f;
+  --seal-fill: #9a3414;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--slate-ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ── Records grammar ─────────────────────────────────────────────────────── */
+
+.label {
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.register {
+  font-family: var(--font-register);
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.prose {
+  max-width: 68ch;
+  color: var(--ink-2);
+}
+
+/* ── Shell ───────────────────────────────────────────────────────────────── */
+
+.custody {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.cabinet {
+  display: flex;
+  flex-direction: column;
+  background: var(--slate-cabinet);
+  border-right: 1px solid var(--rule-hair);
+}
+
+.cabinet__plate {
+  display: block;
+  margin: var(--s-loose) var(--s-base) var(--s-section);
+  padding: 9px 11px;
+  background: var(--tag);
+  border-radius: 2px;
+  color: var(--tag-ink);
+  text-decoration: none;
+}
+
+.cabinet__plate span {
+  display: block;
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.cabinet__plate small {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-register);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--tag-ink-2);
+}
+
+.drawers {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-loose);
+  padding-bottom: var(--s-loose);
+}
+
+.drawer-group > .label {
+  display: block;
+  padding: 0 var(--s-base) var(--s-tight);
+}
+
+.drawer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px var(--s-base);
+  border: 0;
+  border-left: 1px solid transparent;
+  background: none;
+  color: var(--ink-2);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.drawer:hover {
+  background: var(--slate-raised);
+  color: var(--ink);
+}
+
+.drawer[aria-current="page"] {
+  background: var(--slate-bench);
+  border-left-color: var(--mark);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.drawer__mark {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.drawer[aria-current="page"] .drawer__mark {
+  color: var(--mark);
+}
+
+.drawer__count {
+  margin-left: auto;
+  font-family: var(--font-register);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.drawer--dormant {
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+
+.drawer--dormant:hover {
+  background: none;
+  color: var(--ink-3);
+}
+
+.drawer--dormant .drawer__count {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  padding: 1px 5px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 2px;
+}
+
+.cabinet__foot {
+  border-top: 1px solid var(--rule-hair);
+  padding: var(--s-base);
+  display: grid;
+  gap: 10px;
+}
+
+.cabinet__holder {
+  overflow: hidden;
+}
+
+.cabinet__holder b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Main column ─────────────────────────────────────────────────────────── */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-loose);
+  padding: var(--s-section) var(--s-gutter) var(--s-base);
+  border-bottom: 2px solid var(--rule-hair);
+}
+
+.masthead h1 {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.masthead__actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--s-tight);
+}
+
+.panes {
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--index) minmax(0, 1fr);
+  min-height: 0;
+}
+
+/* Long registers scroll inside their pane so the rail, the masthead and the
+   issue action stay put — a filing cabinet does not slide away while you read
+   one folder. */
+@media (min-width: 861px) {
+  .custody {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .cabinet,
+  .index,
+  .detail {
+    overflow-y: auto;
+  }
+
+  .index__head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--slate-ground);
+  }
+}
+
+.index {
+  border-right: 1px solid var(--rule-hair);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.index__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-tight);
+  padding: var(--s-base) var(--s-loose) var(--s-snug);
+  border-bottom: 1px solid var(--rule-hair);
+}
+
+.detail {
+  background: var(--slate-bench);
+  padding: var(--s-loose) var(--s-gutter) var(--s-gutter);
+  min-width: 0;
+}
+
+/* ── Register of entries ─────────────────────────────────────────────────── */
+
+.index__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s-snug);
+  padding: var(--s-snug) var(--s-loose) var(--s-tight);
+}
+
+.index__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px var(--s-snug);
+  width: 100%;
+  padding: var(--s-snug) var(--s-loose);
+  border: 0;
+  border-top: 1px solid var(--rule-hair);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+
+.entry:hover {
+  background: var(--slate-raised);
+}
+
+.entry[aria-current="true"] {
+  background: var(--slate-bench);
+}
+
+.entry__name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entry__accession {
+  grid-column: 1;
+  font-family: var(--font-register);
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.entry[aria-current="true"] .entry__accession {
+  color: var(--mark);
+}
+
+.entry__seal,
+.entry__role {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+}
+
+/* Role is authority to act, not a seal state — it never spends oxide. */
+.role {
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.index__note {
+  display: grid;
+  justify-items: start;
+  gap: var(--s-snug);
+  padding-inline: var(--s-loose);
+}
+
+/* ── Seal chips ──────────────────────────────────────────────────────────── */
+
+.chip {
+  display: inline-block;
+  padding: 3px 7px;
+  border-radius: 2px;
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.chip--unsealed {
+  border: 1px dashed var(--rule-strong);
+  color: var(--ink-3);
+}
+
+.chip--signed {
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+}
+
+.chip--sealed {
+  border: 1px solid var(--seal-fill);
+  background: var(--seal-fill);
+  color: var(--tag);
+}
+
+.chip--void {
+  border: 1px solid transparent;
+  color: var(--seal);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out,
+    border-color 120ms ease-out;
+}
+
+.btn--primary {
+  padding: 10px 18px;
+  background: var(--tag);
+  color: var(--tag-ink);
+}
+
+.btn--primary:hover {
+  background: var(--tag-hover);
+}
+
+.btn--primary:disabled {
+  background: none;
+  border-color: var(--rule-strong);
+  color: var(--ink-2);
+  cursor: progress;
+}
+
+.btn--quiet {
+  padding: 9px 14px;
+  border-color: var(--rule-strong);
+  background: none;
+  color: var(--ink-2);
+}
+
+.btn--quiet:hover {
+  background: var(--slate-raised);
+  color: var(--ink);
+}
+
+/* Row-level control: matches .btn--void exactly so paired confirm/cancel
+   controls in a register row are the same height. */
+.btn--sm {
+  padding: 5px 10px;
+}
+
+.btn--void {
+  padding: 5px 10px;
+  border-color: color-mix(in srgb, var(--seal) 45%, transparent);
+  background: none;
+  color: var(--seal);
+}
+
+.btn--void:hover {
+  border-color: var(--seal);
+  background: color-mix(in srgb, var(--seal) 12%, transparent);
+}
+
+.field {
+  display: grid;
+  gap: var(--s-hair);
+}
+
+.field > input,
+.field > select {
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.field > input::placeholder {
+  color: var(--ink-3);
+}
+
+.field > input:focus,
+.field > select:focus {
+  outline: none;
+  border-bottom-color: var(--ink);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.field > select {
+  appearance: none;
+  padding-right: var(--s-base);
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: right 6px center, right 1px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.field--error > input,
+.field--error > select {
+  border-bottom-color: var(--seal);
+  box-shadow: 0 1px 0 var(--seal);
+}
+
+.field--error > .label {
+  color: var(--seal);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.notice {
+  display: flex;
+  gap: var(--s-tight);
+  padding: 10px 0 0;
+  color: var(--seal);
+  font-size: 13px;
+}
+
+/* ── Credential tag: the one-time reveal ─────────────────────────────────── */
+
+.credential {
+  position: relative;
+  max-width: 34rem;
+  margin: var(--s-base) 0 var(--s-loose);
+  padding: var(--s-base) 18px;
+  background: var(--tag);
+  border-radius: 2px;
+  color: var(--tag-ink);
+  box-shadow: var(--issued-lift);
+  animation: issue 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.credential :focus-visible {
+  outline-color: var(--tag-ink);
+}
+
+.credential__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-tight);
+  margin-bottom: 10px;
+}
+
+.credential__head .label {
+  color: var(--tag-ink-2);
+}
+
+.credential__punch {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--tag-ink-2);
+  border-radius: 50%;
+}
+
+.credential__secret {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--tag-edge);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--tag-edge) 35%, transparent);
+  font-family: var(--font-register);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tag-ink);
+  word-break: break-all;
+  text-align: left;
+  cursor: copy;
+}
+
+.credential__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-snug);
+  margin-top: var(--s-snug);
+}
+
+.credential__note {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tag-ink-2);
+}
+
+.credential__dismiss {
+  margin-left: auto;
+  padding: 5px 10px;
+  border: 1px solid var(--tag-ink-2);
+  border-radius: 0;
+  background: none;
+  color: var(--tag-ink);
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.credential__dismiss:hover {
+  background: var(--tag-ink);
+  color: var(--tag);
+}
+
+@keyframes issue {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* ── Detail bench ────────────────────────────────────────────────────────── */
+
+.bench__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-base);
+  padding-bottom: var(--s-base);
+  border-bottom: 1px solid var(--rule-hair);
+}
+
+.bench__head h2 {
+  margin: var(--s-hair) 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.bench__section {
+  margin-top: var(--s-section);
+}
+
+.bench__section > .label {
+  display: block;
+  margin-bottom: var(--s-snug);
+}
+
+.bench__seal {
+  display: flex;
+  align-items: center;
+  gap: var(--s-base);
+  margin-left: auto;
+  padding-top: var(--s-base);
+}
+
+.bench__note {
+  margin: var(--s-base) 0 0;
+}
+
+/* A role change is not a preference — it re-grants every credential the
+   holder owns, so the consequence is stated before the save, not after. */
+.amend__consequence {
+  margin: 0;
+  padding: var(--s-snug) var(--s-base);
+  border-left: 1px solid var(--seal);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.bench__section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-base);
+  margin-bottom: var(--s-snug);
+}
+
+.bench__section-head > .label {
+  margin: 0;
+}
+
+.bench__section-head > .btn {
+  margin-left: auto;
+}
+
+.bench__inline {
+  display: grid;
+  gap: var(--s-base);
+  max-width: 34rem;
+  margin-bottom: var(--s-loose);
+  padding: var(--s-base);
+  border: 1px solid var(--rule-hair);
+}
+
+.bench__form {
+  display: grid;
+  gap: var(--s-loose);
+  max-width: 34rem;
+}
+
+.bench__controls {
+  display: flex;
+  gap: var(--s-tight);
+}
+
+.stubs {
+  display: grid;
+  gap: 1px;
+  background: var(--rule-hair);
+  border-block: 1px solid var(--rule-hair);
+}
+
+.stub {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--s-base);
+  padding: var(--s-snug) 0;
+  background: var(--slate-bench);
+}
+
+.stub__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stub__meta {
+  grid-column: 1;
+  color: var(--ink-3);
+}
+
+.stub__meta b {
+  color: var(--mark);
+  font-weight: 400;
+}
+
+.stub__action {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--s-snug);
+}
+
+.line {
+  display: grid;
+  gap: var(--s-tight);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line li {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: var(--s-base);
+  padding-left: var(--s-base);
+  border-left: 1px solid var(--rule-hair);
+  position: relative;
+}
+
+.line li::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  background: var(--rule-strong);
+}
+
+.line time {
+  color: var(--ink-3);
+}
+
+.empty {
+  padding: var(--s-snug) 0 var(--s-section);
+  color: var(--ink-3);
+}
+
+.stub__notice {
+  grid-column: 1 / -1;
+  padding-bottom: var(--s-tight);
+}
+
+.line__caption {
+  max-width: 60ch;
+  margin: var(--s-snug) 0 0;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.detail > .empty {
+  padding-left: var(--s-base);
+  border-left: 1px solid var(--rule-hair);
+}
+
+/* ── Intake (sign-in) ────────────────────────────────────────────────────── */
+
+.intake {
+  min-height: 100vh;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: var(--s-loose);
+  max-width: 420px;
+  margin: 0 auto;
+  padding: var(--s-gutter) var(--s-loose);
+}
+
+.intake__plate {
+  padding: 9px 11px;
+  background: var(--tag);
+  border-radius: 2px;
+  color: var(--tag-ink);
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.intake__form {
+  width: 100%;
+  display: grid;
+  gap: var(--s-loose);
+  padding-top: var(--s-loose);
+  border-top: 2px solid var(--rule-hair);
+}
+
+.intake h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.intake__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-snug) var(--s-base);
+  width: 100%;
+  padding-top: var(--s-tight);
+}
+
+/* ── Adaptation ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1080px) {
+  .panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .index {
+    border-right: 0;
+    border-bottom: 1px solid var(--rule-hair);
+  }
+
+  .detail {
+    padding: var(--s-loose);
+  }
+
+  .masthead {
+    padding: var(--s-loose) var(--s-loose) var(--s-base);
+  }
+}
+
+@media (max-width: 860px) {
+  .custody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cabinet {
+    border-right: 0;
+    border-bottom: 1px solid var(--rule-hair);
+  }
+
+  .cabinet__plate {
+    width: fit-content;
+    margin: var(--s-base);
+  }
+
+  .cabinet__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-snug) var(--s-loose);
+  }
+
+  .drawers {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--s-base);
+    padding: 0 var(--s-base) var(--s-base);
+  }
+
+  .drawer {
+    width: auto;
+    border-left: 0;
+    border-bottom: 1px solid transparent;
+  }
+
+  .drawer[aria-current="page"] {
+    border-left-color: transparent;
+    border-bottom-color: var(--mark);
+  }
+
+  .masthead {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .masthead__actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .line li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
