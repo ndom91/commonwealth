@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { authClient } from "../lib/auth-client.js";
 import { getSession } from "../lib/session.js";
-import { getNavCounts, listSources, searchSources } from "../lib/knowledge.js";
+import { getNavCounts, listSources, listSubmitters, searchSources } from "../lib/knowledge.js";
 import { Search, X } from "lucide-react";
 import { AppShell, IconButton, SealChip, accessionOf, authoritySeal, stamp } from "../components/chrome.js";
 import { readFailure } from "../lib/read-failure.js";
@@ -12,14 +12,19 @@ export type SourceFilters = {
   authority?: "unverified" | "approved" | "canonical";
   type?: "note" | "upload";
   status?: "active" | "deleted" | "failed";
-  /* A keyword query replaces the filtered register rather than narrowing it:
-     ranking and filtering answer different questions, and showing a ranked
-     list under filter controls that no longer apply would be a lie. */
+  /* The identity that submitted the source — `sources.created_by`, an agent
+     holder rather than an administrator. */
+  submitter?: string;
+  /* A keyword query narrows the same filtered register rather than replacing
+     it. "Everything this agent submitted, about deployments" is one question,
+     not two. */
   q?: string;
 };
 
 const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | undefined =>
   typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /* `ts_headline` wraps matched terms in STX/ETX rather than markup. Splitting on
    them and returning React children keeps the highlight real while every piece
@@ -42,6 +47,7 @@ export const Route = createFileRoute("/sources")({
     authority: oneOf(search.authority, ["unverified", "approved", "canonical"] as const),
     type: oneOf(search.type, ["note", "upload"] as const),
     status: oneOf(search.status, ["active", "deleted", "failed"] as const),
+    submitter: typeof search.submitter === "string" && UUID.test(search.submitter) ? search.submitter : undefined,
     q: typeof search.q === "string" && search.q.trim() ? search.q.trim().slice(0, 200) : undefined,
   }),
   loaderDeps: ({ search }) => search,
@@ -53,17 +59,33 @@ export const Route = createFileRoute("/sources")({
        database is unreachable, which the register's own message explains in
        full; two alarms for one fault would be noise. */
     const counts = await getNavCounts().catch(() => undefined);
+    const filters = {
+      authority: deps.authority,
+      sourceType: deps.type,
+      status: deps.status,
+      submitter: deps.submitter,
+    };
     try {
-      if (deps.q) {
-        const hits = await searchSources({ data: { query: deps.q } });
-        return { counts, register: { sources: hits, hasMore: false }, failure: undefined };
-      }
-      const register = await listSources({
-        data: { authority: deps.authority, sourceType: deps.type, status: deps.status },
-      });
-      return { counts, register, failure: undefined };
+      /* Submitters are read alongside the register so the filter offers only
+         identities that have actually submitted something. */
+      const [register, submitters] = await Promise.all([
+        deps.q
+          ? searchSources({ data: { ...filters, query: deps.q } }).then((sources) => ({
+              sources,
+              hasMore: false,
+            }))
+          : listSources({ data: filters }),
+        listSubmitters(),
+      ]);
+      return { counts, register, submitters, failure: undefined };
     } catch (cause) {
-      return { counts, register: undefined, failure: readFailure(cause, "The register") };
+      const submitters: Array<{ id: string; name: string; count: number }> = [];
+      return {
+        counts,
+        register: undefined,
+        submitters,
+        failure: readFailure(cause, "The register"),
+      };
     }
   },
   component: Sources,
@@ -93,9 +115,10 @@ function Sources() {
   const navigate = useNavigate({ from: "/sources" });
   const { holder } = Route.useRouteContext();
   const filters = Route.useSearch();
-  const { counts, register, failure } = Route.useLoaderData();
+  const { counts, register, submitters, failure } = Route.useLoaderData();
 
   const sources = (register?.sources ?? []) as unknown as SourceRow[];
+  const holders = submitters as Array<{ id: string; name: string; count: number }>;
   const hasMore = register?.hasMore ?? false;
   const searching = Boolean(filters.q);
 
@@ -128,7 +151,10 @@ function Sources() {
               event.preventDefault();
               const value = new FormData(event.currentTarget).get("q");
               void navigate({
-                search: { q: typeof value === "string" && value.trim() ? value.trim() : undefined },
+                search: (previous: SourceFilters) => ({
+                  ...previous,
+                  q: typeof value === "string" && value.trim() ? value.trim() : undefined,
+                }),
               });
             }}
           >
@@ -148,12 +174,13 @@ function Sources() {
               <IconButton
                 label="Clear search"
                 icon={X}
-                onClick={() => void navigate({ search: {} })}
+                onClick={() =>
+                  void navigate({ search: (previous: SourceFilters) => ({ ...previous, q: undefined }) })
+                }
               />
             )}
           </form>
 
-          {!searching && (
           <div className="filters">
             <label className="filters__field">
               <span className="label">Authority</span>
@@ -187,8 +214,23 @@ function Sources() {
                 <option value="failed">Failed</option>
               </select>
             </label>
+            {holders.length > 0 && (
+              <label className="filters__field filters__field--row">
+                <span className="label">Submitted by</span>
+                <select
+                  value={filters.submitter ?? ""}
+                  onChange={(event) => setFilter("submitter", event.target.value)}
+                >
+                  <option value="">Anyone</option>
+                  {holders.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.name} · {entry.count}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
-          )}
 
           {failure && (
             <p className="notice index__note" role="alert">

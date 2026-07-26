@@ -408,6 +408,13 @@ select {
   min-width: 0;
 }
 
+/* A field whose values are names rather than fixed words takes the full row:
+   four equal columns in a 340px register would truncate every holder to a few
+   characters, and a filter you cannot read is not a filter. */
+.filters__field--row {
+  grid-column: 1 / -1;
+}
+
 .filters__field > select {
   width: 100%;
   padding: 6px 0;

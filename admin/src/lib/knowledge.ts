@@ -59,33 +59,51 @@ function optionalOneOf<T extends string>(value: unknown, allowed: readonly T[], 
   return value as T;
 }
 
-type ListInput = {
+/* Shape-checked before it reaches SQL: the predicate casts to uuid, and a
+   malformed value would surface as a database error rather than a rejected
+   filter. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function optionalId(value: unknown, field: string): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !UUID.test(value)) throw new Error(`Invalid ${field}`);
+  return value;
+}
+
+/* Filters shared by the register and by keyword search. A query narrows the
+   same register rather than replacing it, so both paths apply these
+   identically. */
+type SourceFilters = {
   authority: Authority | null;
   sourceType: SourceType | null;
   status: Status | null;
+  submitter: string | null;
+};
+
+function validateFilters(input: Record<string, unknown>): SourceFilters {
+  return {
+    authority: optionalOneOf(input.authority, AUTHORITIES, "authority"),
+    sourceType: optionalOneOf(input.sourceType, SOURCE_TYPES, "source type"),
+    status: optionalOneOf(input.status, STATUSES, "status"),
+    submitter: optionalId(input.submitter, "submitter"),
+  };
+}
+
+type ListInput = SourceFilters & {
   /* Keyset cursor. Ordering is (created_at DESC, id DESC), so a page continues
      from the last row rather than an offset that shifts as agents submit. */
   cursor: { createdAt: string; id: string } | null;
 };
 
 function validateList(value: unknown): ListInput {
-  const input = (value ?? {}) as Partial<{
-    authority: string;
-    sourceType: string;
-    status: string;
-    cursor: { createdAt?: string; id?: string };
-  }>;
+  const input = (value ?? {}) as Record<string, unknown>;
+  const cursorInput = input.cursor as { createdAt?: string; id?: string } | undefined;
   let cursor: ListInput["cursor"] = null;
-  if (input.cursor) {
-    if (!input.cursor.createdAt || !input.cursor.id) throw new Error("Invalid cursor");
-    cursor = { createdAt: input.cursor.createdAt, id: input.cursor.id };
+  if (cursorInput) {
+    if (!cursorInput.createdAt || !cursorInput.id) throw new Error("Invalid cursor");
+    cursor = { createdAt: cursorInput.createdAt, id: cursorInput.id };
   }
-  return {
-    authority: optionalOneOf(input.authority, AUTHORITIES, "authority"),
-    sourceType: optionalOneOf(input.sourceType, SOURCE_TYPES, "source type"),
-    status: optionalOneOf(input.status, STATUSES, "status"),
-    cursor,
-  };
+  return { ...validateFilters(input), cursor };
 }
 
 export const listSources = createServerFn({ method: "GET" })
@@ -109,6 +127,7 @@ export const listSources = createServerFn({ method: "GET" })
       WHERE (${data.authority}::text IS NULL OR sources.authority = ${data.authority})
         AND (${data.sourceType}::text IS NULL OR sources.source_type = ${data.sourceType})
         AND (${data.status}::text IS NULL OR sources.status = ${data.status})
+        AND (${data.submitter}::uuid IS NULL OR sources.created_by = ${data.submitter})
         AND (
           ${data.cursor?.createdAt ?? null}::timestamptz IS NULL
           OR (sources.created_at, sources.id)
@@ -422,13 +441,19 @@ export const listEventTypes = createServerFn({ method: "GET" }).handler(async ()
  * signal than mentioning it. Matched body terms come back wrapped in STX/ETX
  * control characters rather than markup. The client splits on them and renders
  * each piece as a React child, so the highlight is real but no part of the body
- * is ever parsed as HTML — the same rule the source bench follows. */
+ * is ever parsed as HTML — the same rule the source bench follows.
+ *
+ * The register's filters apply here too. A query narrows the register rather
+ * than replacing it: "everything this agent submitted, about deployments" is a
+ * question people actually have, and answering only half of it would send them
+ * to scroll a ranked list by eye. */
 export const searchSources = createServerFn({ method: "GET" })
-  .validator((value: unknown): { query: string } => {
-    const query = (value as { query?: string })?.query?.trim();
+  .validator((value: unknown): SourceFilters & { query: string } => {
+    const input = (value ?? {}) as Record<string, unknown>;
+    const query = typeof input.query === "string" ? input.query.trim() : "";
     if (!query) throw new Error("Enter something to search for");
     if (query.length > 200) throw new Error("That search is too long");
-    return { query };
+    return { ...validateFilters(input), query };
   })
   .handler(async ({ data }) => {
     await adminId();
@@ -457,7 +482,10 @@ export const searchSources = createServerFn({ method: "GET" })
           AND chunks.search_vector @@ terms.value
         GROUP BY terms.value
       ) AS body ON true
-      WHERE sources.status = 'active'
+      WHERE (${data.status}::text IS NULL OR sources.status = ${data.status})
+        AND (${data.authority}::text IS NULL OR sources.authority = ${data.authority})
+        AND (${data.sourceType}::text IS NULL OR sources.source_type = ${data.sourceType})
+        AND (${data.submitter}::uuid IS NULL OR sources.created_by = ${data.submitter})
         AND (body.rank IS NOT NULL OR strpos(lower(revision.title), lower(${data.query})) > 0)
       ORDER BY (strpos(lower(revision.title), lower(${data.query})) > 0) DESC,
                body.rank DESC NULLS LAST,
@@ -465,3 +493,19 @@ export const searchSources = createServerFn({ method: "GET" })
       LIMIT 25
     `;
   });
+
+/* Identities that have submitted at least one source, for the register's
+   submitter filter. Counts every status, not just active: a submitter whose
+   only sources were withdrawn must stay selectable, or the Withdrawn status
+   filter has nobody to combine with. */
+export const listSubmitters = createServerFn({ method: "GET" }).handler(async () => {
+  await adminId();
+  const rows = await client<{ id: string; name: string; count: string }[]>`
+    SELECT users.id, users.display_name AS name, count(*) AS count
+    FROM sources
+    JOIN users ON users.id = sources.created_by
+    GROUP BY users.id, users.display_name
+    ORDER BY users.display_name
+  `;
+  return rows.map((row) => ({ id: row.id, name: row.name, count: Number(row.count) }));
+});

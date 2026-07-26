@@ -345,11 +345,17 @@ bench head. They are labels an agent applied, not states the product assigns,
 so they take no seal material — no oxide, no tag stock.
 
 ### Filter bar
-Three underline selects in a row above the register, each with its tracked
-label. Filters live in the URL, not component state: a filtered register is a
-thing people send each other, and the review queue hands off into it. The bar
-sits inside the index pane below its head, separated by a hairline, so it
-reads as a property of the register rather than of the page.
+Underline selects above the register, each with its tracked label. Filters live
+in the URL, not component state: a filtered register is a thing people send each
+other, and the review queue hands off into it. The bar sits inside the index
+pane below its head, separated by a hairline, so it reads as a property of the
+register rather than of the page.
+
+Authority, type and status share a row of equal columns — their values are
+fixed words of known length. **Submitted by** takes a full row of its own: its
+values are holder names, and four equal columns in a 340px register would
+truncate every one of them to a few characters. A filter you cannot read is not
+a filter.
 
 ### Source body
 The recessed content block: `{colors.slate-ground}` inside a hairline box,
@@ -380,9 +386,10 @@ live. The browser's own `type=search` clear is suppressed: the row already has
 a Clear that resets the URL too, and offering both invites the one that only
 empties the field.
 
-A query **replaces** the filter bar rather than joining it: ranking and
-filtering answer different questions, and leaving filter controls visible over
-a ranked list would claim they still apply.
+A query **narrows** the filtered register rather than replacing it. The filter
+bar stays visible and stays applied: "everything this agent submitted, about
+deployments" is one question, not two, and hiding the filters would force it to
+be asked in two steps with the second done by eye.
 
 Two ways to match, because they fail in opposite directions. **Titles match by
 substring** — full-text search only matches whole stemmed words, so typing
@@ -397,9 +404,11 @@ not something issued. The excerpt arrives with terms delimited by control
 characters and is split into React children, so the highlight is real without
 any body text being parsed as HTML.
 
-Below the field sits one sentence saying exactly what is matched. Agents
-retrieve with meaning as well as words; presenting this as the same thing would
-misrepresent what an agent will actually get back.
+No standing caption explains the matching. What matched is visible in the
+results — a highlighted excerpt for a body hit, the title itself for a title
+hit — and a paragraph of explanation over every search reads as apology rather
+than help. That admin search is lexical while agents retrieve by meaning is
+recorded here and in the code, not restated on screen.
 
 ### Activity log
 The workspace-wide custody line: one ruled row per event, newest first, in four
