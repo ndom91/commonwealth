@@ -426,6 +426,17 @@ hit — and a paragraph of explanation over every search reads as apology rather
 than help. That admin search is lexical while agents retrieve by meaning is
 recorded here and in the code, not restated on screen.
 
+### Custody line
+A single hairline rail down the left with a square tick at each entry, one row
+per moment, newest first. The rail belongs to the list rather than to each row:
+drawn per row it was broken by the gap between rows, which read as unrelated
+ticks rather than as one unbroken chain — the opposite of what the component is
+for. Rows are separated by their own block padding so the rail stays continuous.
+
+Only immutable moments belong on it. A mutable column such as `last_used_at`
+would make the line rewrite itself every time an agent presented a key, so it
+lives on the credential stub instead.
+
 ### Activity log
 The workspace-wide custody line: one ruled row per event, newest first, in four
 columns — when, what, which source, who. Event types are rendered as the
@@ -509,5 +520,5 @@ is invisible on manila.
   void, or a load. Every destructive and asynchronous control carries its own
   pending and failure state.
 - **Don't** put a synthesized timeline under a label that implies the real
-  event log. The custody line is captioned as derived until the `events` table
-  is reachable.
+  event log. The holder bench's line is assembled from credential timestamps,
+  so it says so and links to the Activity log, which is the real thing.

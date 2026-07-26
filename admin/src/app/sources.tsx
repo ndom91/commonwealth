@@ -138,13 +138,6 @@ function Sources() {
     >
       <div className="panes">
         <section className="index" aria-label="Source register">
-          <div className="index__head">
-            <span className="label">Sources</span>
-            <span className="label register">
-              {failure ? "—" : `${sources.length}${hasMore ? "+" : ""}`}
-            </span>
-          </div>
-
           <form
             className="seek"
             onSubmit={(event) => {

@@ -1034,11 +1034,14 @@ select {
   gap: var(--s-snug);
 }
 
+/* The rail belongs to the line, not to each entry. Drawn per row it was broken
+   by the gap between rows, which read as unrelated ticks rather than one chain
+   of custody — the opposite of what the component is for. */
 .line {
   display: grid;
-  gap: var(--s-tight);
   margin: 0;
-  padding: 0;
+  padding-left: var(--s-base);
+  border-left: 1px solid var(--rule-hair);
   list-style: none;
 }
 
@@ -1046,16 +1049,17 @@ select {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
   gap: var(--s-base);
-  padding-left: var(--s-base);
-  border-left: 1px solid var(--rule-hair);
+  padding-block: var(--s-hair);
   position: relative;
 }
 
+/* Centred on the rail, which now sits one padding plus one border to the left
+   of the row's own edge. */
 .line li::before {
   content: "";
   position: absolute;
-  left: -3px;
-  top: 7px;
+  left: calc(-1 * var(--s-base) - 3px);
+  top: 10px;
   width: 5px;
   height: 5px;
   background: var(--rule-strong);
