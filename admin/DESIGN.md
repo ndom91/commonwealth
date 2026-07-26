@@ -321,6 +321,22 @@ tag stock.
 - **Void:** transparent with oxide mark and a 1px oxide hairline. Used for
   revoke and delete. Never filled — a filled oxide button reads as an
   affirmative, and destruction is not affirmative.
+- **Current:** the option already in force inside a set of mutually exclusive
+  actions — the authority a source already carries. Raised ground with the mark
+  as ink and a neutral border, reusing the ground-shift-plus-mark pair the
+  register already uses for a selected row and the active drawer.
+
+  It is deliberately **not** `btn--primary:disabled`: that pair means a primary
+  action mid-flight and carries `cursor: progress`, which would claim work is
+  happening. Nor is it outlined in the mark, because in the light theme the mark
+  is oxide-brown and an oxide-outlined control beside Withdraw would put two of
+  them in one row and blunt the Reserved Seal Rule.
+
+**Actions are verbs; chips are states.** The authority controls read *Unverify*,
+*Approve*, *Mark canonical* — what a person would be doing — while the chip
+beside the title reads *APPROVED*. Labelling the controls with the state names
+made a row of three buttons look like a status display, and hid the fact that a
+human is the one who decides.
 
 ### Chips (seal states)
 Seal state escalates by material commitment, not by hue:

@@ -396,7 +396,12 @@ select {
 
 .filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  /* 78px, not 88: the register pane leaves 276px inside its gutter, and three
+     tracks plus two gaps must fit or the row breaks to two and reads ragged.
+     A vertical scrollbar takes enough off the pane to cross that line, so the
+     bar was collapsing only once the register was long enough to scroll. The
+     widest label, AUTHORITY, measures ~70px at label typography. */
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
   gap: var(--s-snug);
   padding: var(--s-snug) var(--s-loose) var(--s-base);
   border-bottom: 1px solid var(--rule-hair);
@@ -691,6 +696,26 @@ select {
 .btn--quiet:hover {
   background: var(--slate-raised);
   color: var(--ink);
+}
+
+/* The option already in force, in a set where the others are actions.
+ *
+ * Not `btn--primary:disabled`: that pair means a primary action mid-flight and
+ * carries `cursor: progress`, which would claim work is happening. Not filled
+ * manila either — under the Issued-Material Rule that ground means something is
+ * being issued or handed over, and a state that already holds is neither. It is
+ * marked in tag stock instead: present, legible, and plainly not a target. */
+.btn--current {
+  /* Raised ground plus mark as ink — the same pair the register already uses
+     for the selected row and the active drawer. The border stays neutral on
+     purpose: in the light theme `--mark` is oxide-brown, and an oxide-outlined
+     control sitting beside Withdraw would put two of them in one row and blunt
+     the Reserved Seal Rule. Ground carries the selection, ink carries the
+     mark, and oxide stays spent only on destruction. */
+  background: var(--slate-raised);
+  border-color: var(--rule-strong);
+  color: var(--mark);
+  cursor: default;
 }
 
 .btn--void {

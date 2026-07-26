@@ -56,7 +56,14 @@ type Event = {
   actor: string | null;
 };
 
-const AUTHORITIES: Authority[] = ["unverified", "approved", "canonical"];
+/* The chip states what a source *is*; these buttons say what a person would be
+   doing to it. Labelling them with the state names made them read as a status
+   display rather than three things a reviewer can do. */
+const AUTHORITY_ACTIONS: Array<{ value: Authority; action: string }> = [
+  { value: "unverified", action: "Unverify" },
+  { value: "approved", action: "Approve" },
+  { value: "canonical", action: "Mark canonical" },
+];
 
 function SourceBench() {
   const { sourceId } = Route.useParams();
@@ -176,22 +183,28 @@ function SourceBench() {
           </span>
         </div>
         <div className="authority-set">
-          {AUTHORITIES.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={`btn ${value === detail.authority ? "btn--primary" : "btn--quiet"}`}
-              disabled={pending || withdrawn || value === detail.authority}
-              onClick={() =>
-                void act(
-                  () => setSourceAuthority({ data: { sourceId, authority: value } }),
-                  "The authority could not be changed.",
-                )
-              }
-            >
-              {value}
-            </button>
-          ))}
+          {AUTHORITY_ACTIONS.map(({ value, action }) => {
+            const current = value === detail.authority;
+            return (
+              <button
+                key={value}
+                type="button"
+                className={`btn ${current ? "btn--current" : "btn--quiet"}`}
+                disabled={pending || withdrawn || current}
+                /* The disabled control is the one already in force, which a
+                   verb alone no longer conveys. */
+                title={current ? `Already ${value}` : undefined}
+                onClick={() =>
+                  void act(
+                    () => setSourceAuthority({ data: { sourceId, authority: value } }),
+                    "The authority could not be changed.",
+                  )
+                }
+              >
+                {action}
+              </button>
+            );
+          })}
           <span className="authority-set__spacer" />
           {withdrawn ? (
             <button
