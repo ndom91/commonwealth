@@ -403,10 +403,12 @@ export class KnowledgeRepository {
     `;
     if (!created) throw new Error('Unable to create source revision');
     for (const [ordinal, chunk] of revision.chunks.entries()) {
+      const vector = revision.vectors[ordinal];
+      if (!vector) throw new Error('Embedding provider returned an incomplete result');
       await transaction`
         INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
         VALUES (${sourceId}, ${created.id}, ${ordinal}, ${chunk.heading}, ${chunk.content}, ${chunk.tokenCount},
-                ${toVector(revision.vectors[ordinal]!)}::vector, ${this.config.EMBEDDING_MODEL})
+                ${toVector(vector)}::vector, ${this.config.EMBEDDING_MODEL})
       `;
     }
     return created.id;

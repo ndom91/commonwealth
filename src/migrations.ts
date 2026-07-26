@@ -93,7 +93,8 @@ async function inspectLegacySchema(
     chunks: ['id', 'source_id', 'ordinal', 'content', 'embedding', 'embedding_model'],
     events: ['id', 'workspace_id', 'event_type', 'metadata'],
   };
-  const tables = Object.keys(requiredColumns);
+  const entries = Object.entries(requiredColumns);
+  const tables = entries.map(([table]) => table);
   const rows = await sql<{ table_name: string; column_name: string }[]>`
     SELECT table_name, column_name FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = ANY(${tables}::text[])
@@ -104,10 +105,10 @@ async function inspectLegacySchema(
     columns.add(row.column_name);
     columnsByTable.set(row.table_name, columns);
   }
-  const missing = tables.flatMap((table) =>
-    requiredColumns[table]!.filter((column) => !columnsByTable.get(table)?.has(column)).map(
-      (column) => `${table}.${column}`
-    )
+  const missing = entries.flatMap(([table, columns]) =>
+    columns
+      .filter((column) => !columnsByTable.get(table)?.has(column))
+      .map((column) => `${table}.${column}`)
   );
   return { anyTables: rows.length > 0, complete: missing.length === 0, missing };
 }

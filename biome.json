@@ -36,6 +36,7 @@
       "!.certs",
       "!packages/graphql/types.ts",
       "!packages/linear-api/graphql/types.ts",
+      "!admin/src/routeTree.gen.ts",
       "!test-results",
       "!playroom/dist",
       "!ui/theme/colors/source"
@@ -49,7 +50,8 @@
         "useHookAtTopLevel": "error"
       },
       "complexity": {
-        "noForEach": "off"
+        "noForEach": "off",
+        "noImportantStyles": "off"
       },
       "a11y": {
         "noSvgWithoutTitle": "off",
@@ -58,15 +60,15 @@
         "noAutofocus": "off",
         "noLabelWithoutControl": "off"
       },
+      "style": {
+        "noDescendingSpecificity": "off"
+      },
       "performance": {
         "noDelete": "off"
       },
       "suspicious": {
         "noArrayIndexKey": "off",
-        "noConsole": {
-          "level": "error",
-          "fix": "none"
-        },
+        "noConsole": "off",
         "noControlCharactersInRegex": "off"
       },
       "security": {

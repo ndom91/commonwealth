@@ -187,9 +187,9 @@ function SourceBench() {
           </div>
         </div>
         <div className="authority-set">
-          <div className="authority-control">
-            <span className="label">Set authority to</span>
-            <div className="authority-control__choices" role="group" aria-label="Set authority to">
+          <fieldset className="authority-control">
+            <legend className="label">Set authority to</legend>
+            <div className="authority-control__choices">
               {AUTHORITIES.map((value) => {
                 const current = value === detail.authority;
                 return (
@@ -211,7 +211,7 @@ function SourceBench() {
                 );
               })}
             </div>
-          </div>
+          </fieldset>
           <span className="authority-set__spacer" />
           {withdrawn ? (
             <button

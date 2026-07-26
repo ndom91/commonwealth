@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useLoaderData, useRouter } from '@tanstack/react-router';
+import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { accessionOf, SealChip, stamp, stampAt } from '../../components/chrome.js';
 import {

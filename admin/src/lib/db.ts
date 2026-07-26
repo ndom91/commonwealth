@@ -2,7 +2,9 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '../db/schema.js';
 
-const client = postgres(process.env.DATABASE_URL!);
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) throw new Error('DATABASE_URL is required');
+const client = postgres(databaseUrl);
 
 /* `drizzle()` mutates the client it is handed: it replaces postgres.js's jsonb
    serializer with a pass-through so it can supply its own already-encoded JSON.

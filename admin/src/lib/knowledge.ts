@@ -569,6 +569,8 @@ export const reviseSource = createServerFn({ method: 'POST' })
     if (chunks.length === 0) throw new Error('That text contains nothing indexable.');
     const contentHash = createHash('sha256').update(data.markdown).digest('hex');
     const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
+    if (vectors.length !== chunks.length)
+      throw new Error('Embedding provider returned an incomplete result');
     const model = embeddingModel();
 
     try {
@@ -616,10 +618,12 @@ export const reviseSource = createServerFn({ method: 'POST' })
         if (!revision) throw new Error('Unable to record the revision');
 
         for (const [ordinal, chunk] of chunks.entries()) {
+          const vector = vectors[ordinal];
+          if (!vector) throw new Error('Embedding provider returned an incomplete result');
           await transaction`
             INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
             VALUES (${data.sourceId}, ${revision.id}, ${ordinal}, ${chunk.heading}, ${chunk.content},
-                    ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(',')}]`}::vector, ${model})
+                    ${chunk.tokenCount}, ${`[${vector.join(',')}]`}::vector, ${model})
           `;
         }
 
@@ -711,6 +715,8 @@ async function writeNewSource(
   const contentHash =
     input.contentHash ?? createHash('sha256').update(input.markdown).digest('hex');
   const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
+  if (vectors.length !== chunks.length)
+    throw new Error('Embedding provider returned an incomplete result');
   const model = embeddingModel();
 
   const sourceId = randomUUID();
@@ -746,10 +752,12 @@ async function writeNewSource(
       `;
 
       for (const [ordinal, chunk] of chunks.entries()) {
+        const vector = vectors[ordinal];
+        if (!vector) throw new Error('Embedding provider returned an incomplete result');
         await transaction`
           INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
           VALUES (${sourceId}, ${revisionId}, ${ordinal}, ${chunk.heading}, ${chunk.content},
-                  ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(',')}]`}::vector, ${model})
+                  ${chunk.tokenCount}, ${`[${vector.join(',')}]`}::vector, ${model})
         `;
       }
 

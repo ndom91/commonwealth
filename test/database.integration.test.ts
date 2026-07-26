@@ -42,12 +42,14 @@ if (!databaseUrl) {
       const [workspace] = await knowledge.sql<{ id: string }[]>`
         INSERT INTO workspaces (name) VALUES ('test') RETURNING id
       `;
+      assert.ok(workspace);
       const [user] = await knowledge.sql<{ id: string }[]>`
-        INSERT INTO users (workspace_id, display_name, role) VALUES (${workspace!.id}, 'Test Admin', 'admin') RETURNING id
+        INSERT INTO users (workspace_id, display_name, role) VALUES (${workspace.id}, 'Test Admin', 'admin') RETURNING id
       `;
+      assert.ok(user);
       await knowledge.sql`
         INSERT INTO api_keys (user_id, key_prefix, secret_hash)
-        VALUES (${user!.id}, ${keyPrefix(bootstrapKey)}, ${hashApiKey(bootstrapKey)})
+        VALUES (${user.id}, ${keyPrefix(bootstrapKey)}, ${hashApiKey(bootstrapKey)})
       `;
       const actor = await access.authenticate(bootstrapKey);
       assert.ok(actor);
