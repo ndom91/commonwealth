@@ -72,7 +72,7 @@ function drawerGroups(counts: NavCounts | undefined): DrawerGroup[] {
         { mark: "identities", label: "Identities", to: "/dashboard", count: counts?.identities },
       ],
     },
-    { label: "Custody", items: [{ mark: "activity", label: "Activity" }] },
+    { label: "Custody", items: [{ mark: "activity", label: "Activity", to: "/activity" }] },
   ];
 }
 

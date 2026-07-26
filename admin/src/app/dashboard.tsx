@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { authClient } from "../lib/auth-client.js";
 import {
@@ -845,8 +845,9 @@ function Holder({
           ))}
         </ul>
         <p className="line__caption">
-          Derived from credential timestamps. The append-only event log is not
-          yet reachable from the browser.
+          Derived from credential timestamps.{" "}
+          <Link to="/activity">The full event log</Link> records every change
+          with the person or agent who made it.
         </p>
       </div>
     </>

@@ -1181,3 +1181,154 @@ select {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Keyword search ─────────────────────────────────────────────────────────
+   A register you can address by content. The field sits above the filters
+   because a query replaces them rather than narrowing them. */
+.seek {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-snug);
+  padding: var(--s-snug) var(--s-loose);
+  border-bottom: 1px solid var(--rule-hair);
+}
+
+.seek__field {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.seek__field input {
+  min-width: 0;
+  padding: 5px 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.seek__field input::placeholder {
+  color: var(--ink-dormant);
+}
+
+.seek__field input:focus-visible {
+  outline: none;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 4px;
+}
+
+/* The honesty note: admin search is lexical, agent retrieval is not. */
+.seek__note {
+  padding: var(--s-snug) var(--s-loose);
+  border-bottom: 1px solid var(--rule-hair);
+}
+
+/* ts_headline delimits matched terms with « ». Left as text rather than
+   parsed to markup — the same reason source bodies are never rendered. */
+.entry__excerpt {
+  grid-column: 1;
+  margin-top: 3px;
+  font-family: var(--font-register);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-secondary);
+}
+
+/* ── Activity log ───────────────────────────────────────────────────────────
+   One workspace-wide register of what happened, newest first. Four columns:
+   when, what, to which source, by whom. */
+.log {
+  min-width: 0;
+  padding: var(--s-loose) var(--s-gutter) var(--s-gutter);
+  overflow-y: auto;
+}
+
+/* The log's filter sits inside an already-padded pane, so it drops the
+   register's own gutter and keeps only the rule beneath it. One control, so
+   one column — the register's auto-fit track would stretch it to the page. */
+.filters--flush {
+  grid-template-columns: minmax(0, 300px);
+  padding-inline: 0;
+  padding-top: 0;
+  margin-bottom: var(--s-base);
+}
+
+.log__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.log__row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.5fr);
+  gap: var(--s-snug);
+  align-items: baseline;
+  padding: var(--s-snug) 0;
+  border-bottom: 1px solid var(--rule-hair);
+}
+
+.log__at {
+  font-size: 12px;
+  color: var(--ink-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.log__what {
+  min-width: 0;
+  font-size: 14px;
+}
+
+.log__detail {
+  color: var(--ink-secondary);
+}
+
+.log__subject,
+.log__actor {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.log__actor {
+  grid-column: 4;
+  text-align: right;
+}
+
+/* Rows written before events carried an administrator id. Shown, not hidden:
+   the log is append-only and is not retconned. */
+.log__unattributed {
+  /* Quieter than an actor name but still legible: the absence of an actor is
+     information, so it clears AA rather than fading toward the ground. The
+     italic carries the distinction the colour alone should not. */
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+@media (max-width: 1080px) {
+  .log__row {
+    grid-template-columns: 116px minmax(0, 1fr);
+  }
+
+  .log__subject,
+  .log__actor {
+    grid-column: 2;
+    text-align: left;
+  }
+}
+
+/* Matched terms in a keyword excerpt. Tag stock as ink, not as ground: the
+   match is a mark on the record, not something issued. */
+.entry__excerpt mark {
+  background: none;
+  color: var(--mark);
+  font-weight: 600;
+}

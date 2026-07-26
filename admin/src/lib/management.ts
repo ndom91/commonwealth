@@ -61,8 +61,9 @@ export const createIdentity = createServerFn({ method: "POST" })
         VALUES (${keyId}, ${identity.id}, ${data.keyLabel}, ${createdByAdminId})
       `;
       await transaction`
-        INSERT INTO events (workspace_id, event_type, metadata)
-        SELECT id, 'api_key_created', ${JSON.stringify({ identityId: identity.id, keyId, label: data.keyLabel })}::jsonb
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        SELECT id, ${createdByAdminId}, 'api_key_created',
+          ${JSON.stringify({ identityId: identity.id, keyId, label: data.keyLabel })}::jsonb
         FROM workspaces WHERE name = 'default'
       `;
     });
@@ -95,7 +96,7 @@ export const updateIdentity = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data }) => {
-    await adminId();
+    const administrator = await adminId();
     await client.begin(async (transaction) => {
       const [before] = await transaction<
         {
@@ -130,8 +131,8 @@ export const updateIdentity = createServerFn({ method: "POST" })
         changed.autoApprove = { from: before.auto_approve, to: data.autoApprove };
       if (Object.keys(changed).length > 0) {
         await transaction`
-          INSERT INTO events (workspace_id, event_type, metadata)
-          VALUES (${before.workspace_id}, 'identity_amended',
+          INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+          VALUES (${before.workspace_id}, ${administrator}, 'identity_amended',
             ${JSON.stringify({ identityId: data.identityId, changed })}::jsonb)
         `;
       }
@@ -151,7 +152,7 @@ export const setIdentityDisabled = createServerFn({ method: "POST" })
     return { identityId: input.identityId.trim(), disabled: input.disabled };
   })
   .handler(async ({ data }) => {
-    await adminId();
+    const administrator = await adminId();
     await client.begin(async (transaction) => {
       const [identity] = await transaction<{ workspace_id: string; disabled_at: string | null }[]>`
         SELECT workspace_id, disabled_at FROM users WHERE id = ${data.identityId}
@@ -167,8 +168,9 @@ export const setIdentityDisabled = createServerFn({ method: "POST" })
         await transaction`UPDATE users SET disabled_at = NULL WHERE id = ${data.identityId}`;
       }
       await transaction`
-        INSERT INTO events (workspace_id, event_type, metadata)
-        VALUES (${identity.workspace_id}, ${data.disabled ? "identity_disabled" : "identity_enabled"},
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${identity.workspace_id}, ${administrator},
+          ${data.disabled ? "identity_disabled" : "identity_enabled"},
           ${JSON.stringify({ identityId: data.identityId })}::jsonb)
       `;
     });
@@ -204,8 +206,8 @@ export const issueCredential = createServerFn({ method: "POST" })
         VALUES (${keyId}, ${identity.id}, ${data.keyLabel}, ${createdByAdminId})
       `;
       await transaction`
-        INSERT INTO events (workspace_id, event_type, metadata)
-        VALUES (${identity.workspace_id}, 'api_key_created',
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${identity.workspace_id}, ${createdByAdminId}, 'api_key_created',
           ${JSON.stringify({ identityId: identity.id, keyId, label: data.keyLabel })}::jsonb)
       `;
     });
@@ -219,7 +221,34 @@ export const revokeKey = createServerFn({ method: "POST" })
     return { keyId };
   })
   .handler(async ({ data }) => {
-    await adminId();
-    await client`UPDATE api_keys SET revoked_at = now() WHERE id = ${data.keyId} AND revoked_at IS NULL`;
+    const administrator = await adminId();
+    await client.begin(async (transaction) => {
+      /* Only the first revoke is an event. Voiding an already-void key is a
+         no-op, and RETURNING lets the write itself decide that rather than a
+         separate read that could race another administrator. */
+      const [revoked] = await transaction<{ user_id: string; key_prefix: string }[]>`
+        UPDATE api_keys SET revoked_at = now()
+        WHERE id = ${data.keyId} AND revoked_at IS NULL
+        RETURNING user_id, key_prefix
+      `;
+      if (!revoked) return;
+      const [identity] = await transaction<{ workspace_id: string }[]>`
+        SELECT workspace_id FROM users WHERE id = ${revoked.user_id}
+      `;
+      if (!identity) return;
+      const [managed] = await transaction<{ label: string }[]>`
+        SELECT label FROM managed_api_key WHERE id = ${data.keyId}
+      `;
+      await transaction`
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${identity.workspace_id}, ${administrator}, 'api_key_revoked',
+          ${JSON.stringify({
+            identityId: revoked.user_id,
+            keyId: data.keyId,
+            prefix: revoked.key_prefix,
+            label: managed?.label ?? null,
+          })}::jsonb)
+      `;
+    });
     return { revoked: true };
   });

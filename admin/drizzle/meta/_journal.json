@@ -29,6 +29,13 @@
       "when": 1784914839305,
       "tag": "0003_identity_auto_approve",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784914839306,
+      "tag": "0004_event_actor_admin",
+      "breakpoints": true
     }
   ]
 }

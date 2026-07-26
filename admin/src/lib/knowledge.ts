@@ -262,7 +262,7 @@ export const setSourceAuthority = createServerFn({ method: "POST" })
     return { sourceId: input.sourceId.trim(), authority: input.authority as Authority };
   })
   .handler(async ({ data }) => {
-    await adminId();
+    const administrator = await adminId();
     await client.begin(async (transaction) => {
       const [source] = await transaction<{ workspace_id: string; authority: string }[]>`
         SELECT workspace_id, authority FROM sources WHERE id = ${data.sourceId}
@@ -275,8 +275,8 @@ export const setSourceAuthority = createServerFn({ method: "POST" })
       `;
       if (source.authority !== data.authority) {
         await transaction`
-          INSERT INTO events (workspace_id, event_type, source_id, metadata)
-          VALUES (${source.workspace_id}, 'source_authority_changed', ${data.sourceId},
+          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
+          VALUES (${source.workspace_id}, ${administrator}, 'source_authority_changed', ${data.sourceId},
             ${JSON.stringify({ authority: data.authority, from: source.authority })}::jsonb)
         `;
       }
@@ -287,7 +287,7 @@ export const setSourceAuthority = createServerFn({ method: "POST" })
 export const withdrawSource = createServerFn({ method: "POST" })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await adminId();
+    const administrator = await adminId();
     await client.begin(async (transaction) => {
       const [source] = await transaction<{ workspace_id: string; status: string }[]>`
         SELECT workspace_id, status FROM sources WHERE id = ${data.sourceId}
@@ -298,8 +298,8 @@ export const withdrawSource = createServerFn({ method: "POST" })
         UPDATE sources SET status = 'deleted', deleted_at = now() WHERE id = ${data.sourceId}
       `;
       await transaction`
-        INSERT INTO events (workspace_id, event_type, source_id, metadata)
-        VALUES (${source.workspace_id}, 'source_deleted', ${data.sourceId}, '{}'::jsonb)
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
+        VALUES (${source.workspace_id}, ${administrator}, 'source_deleted', ${data.sourceId}, '{}'::jsonb)
       `;
     });
     return { sourceId: data.sourceId, status: "deleted" as const };
@@ -313,7 +313,7 @@ export const withdrawSource = createServerFn({ method: "POST" })
 export const restoreSource = createServerFn({ method: "POST" })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await adminId();
+    const administrator = await adminId();
     try {
       await client.begin(async (transaction) => {
         const [source] = await transaction<{ workspace_id: string; status: string }[]>`
@@ -325,8 +325,8 @@ export const restoreSource = createServerFn({ method: "POST" })
           UPDATE sources SET status = 'active', deleted_at = NULL WHERE id = ${data.sourceId}
         `;
         await transaction`
-          INSERT INTO events (workspace_id, event_type, source_id, metadata)
-          VALUES (${source.workspace_id}, 'source_restored', ${data.sourceId}, '{}'::jsonb)
+          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
+          VALUES (${source.workspace_id}, ${administrator}, 'source_restored', ${data.sourceId}, '{}'::jsonb)
         `;
       });
     } catch (cause) {
@@ -339,4 +339,107 @@ export const restoreSource = createServerFn({ method: "POST" })
       throw cause;
     }
     return { sourceId: data.sourceId, status: "active" as const };
+  });
+
+/* The workspace-wide event log.
+ *
+ * Two actor columns, never both set: `actor_id` names the agent identity that
+ * acted over MCP, `actor_admin_id` the signed-in administrator who acted here.
+ * Rows written before 0004 carry neither, which reads as "unattributed" rather
+ * than being hidden — the log is append-only and does not get retconned. */
+export const listEvents = createServerFn({ method: "GET" })
+  .validator((value: unknown): { eventType: string | null; cursor: { createdAt: string; id: string } | null } => {
+    const input = (value ?? {}) as Partial<{ eventType: string; cursor: { createdAt?: string; id?: string } }>;
+    let cursor: { createdAt: string; id: string } | null = null;
+    if (input.cursor) {
+      if (!input.cursor.createdAt || !input.cursor.id) throw new Error("Invalid cursor");
+      cursor = { createdAt: input.cursor.createdAt, id: input.cursor.id };
+    }
+    const eventType = input.eventType?.trim() || null;
+    /* An allowlist would go stale every time a new event type is written, so
+       the shape is constrained instead: the filter is matched exactly against
+       a column, and anything that is not a bare event-type token is refused. */
+    if (eventType && !/^[a-z_]{1,64}$/.test(eventType)) throw new Error("Invalid event type");
+    return { eventType, cursor };
+  })
+  .handler(async ({ data }) => {
+    await adminId();
+    const rows = await client`
+      SELECT events.id, events.event_type, events.metadata, events.created_at,
+             events.source_id, revision.title AS source_title,
+             agent.display_name AS actor_agent,
+             administrator.email AS actor_admin
+      FROM events
+      LEFT JOIN users AS agent ON agent.id = events.actor_id
+      LEFT JOIN "user" AS administrator ON administrator.id = events.actor_admin_id
+      LEFT JOIN sources ON sources.id = events.source_id
+      LEFT JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
+      WHERE (${data.eventType}::text IS NULL OR events.event_type = ${data.eventType})
+        AND (
+          ${data.cursor?.createdAt ?? null}::timestamptz IS NULL
+          OR (events.created_at, events.id)
+             < (${data.cursor?.createdAt ?? null}::timestamptz, ${data.cursor?.id ?? null}::uuid)
+        )
+      ORDER BY events.created_at DESC, events.id DESC
+      LIMIT ${PAGE_SIZE + 1}
+    `;
+    return {
+      events: rows.slice(0, PAGE_SIZE).map((row) => ({ ...row, metadata: eventMetadata(row.metadata) })),
+      hasMore: rows.length > PAGE_SIZE,
+    };
+  });
+
+/* The distinct event types actually present, so the filter offers what this
+   workspace has rather than a hardcoded list that drifts from the writers. */
+export const listEventTypes = createServerFn({ method: "GET" }).handler(async () => {
+  await adminId();
+  const rows = await client<{ event_type: string; count: string }[]>`
+    SELECT event_type, count(*) AS count FROM events GROUP BY event_type ORDER BY event_type
+  `;
+  return rows.map((row) => ({ eventType: row.event_type, count: Number(row.count) }));
+});
+
+/* Keyword search over the corpus.
+ *
+ * This is lexical only, and the UI must say so. Agents get hybrid semantic +
+ * lexical ranking through `search_knowledge`; the query vector for the semantic
+ * half comes from Ollama, which the admin service cannot reach — it has only
+ * DATABASE_URL. Presenting these results as "search" without qualification
+ * would misrepresent what an agent actually retrieves.
+ *
+ * `chunks.search_vector` is a generated tsvector with a GIN index, so this
+ * costs nothing beyond the query. Ranking with ts_rank_cd rewards matches that
+ * sit close together, and the best-scoring chunk stands for its source. */
+export const searchSources = createServerFn({ method: "GET" })
+  .validator((value: unknown): { query: string } => {
+    const query = (value as { query?: string })?.query?.trim();
+    if (!query) throw new Error("Enter something to search for");
+    if (query.length > 200) throw new Error("That search is too long");
+    return { query };
+  })
+  .handler(async ({ data }) => {
+    await adminId();
+    return client`
+      WITH terms AS (SELECT websearch_to_tsquery('english', ${data.query}) AS value)
+      SELECT sources.id, sources.authority, sources.source_type, sources.status,
+             revision.title, revision.revision_number, revision.content_updated_at,
+             author.display_name AS author,
+             (${IS_STALE}) AS is_stale,
+             max(ts_rank_cd(chunks.search_vector, terms.value)) AS rank,
+             ts_headline('english', (array_agg(chunks.content ORDER BY
+               ts_rank_cd(chunks.search_vector, terms.value) DESC))[1], terms.value,
+               'MaxFragments=1, MaxWords=28, MinWords=12,
+                 StartSel=\x02, StopSel=\x03') AS excerpt
+      FROM chunks
+      CROSS JOIN terms
+      JOIN source_revisions AS revision ON revision.id = chunks.source_revision_id
+      JOIN sources ON sources.current_revision_id = revision.id
+      LEFT JOIN users AS author ON author.id = sources.created_by
+      WHERE sources.status = 'active' AND chunks.search_vector @@ terms.value
+      GROUP BY sources.id, sources.authority, sources.source_type, sources.status,
+               revision.title, revision.revision_number, revision.content_updated_at,
+               author.display_name, sources.last_verified_at, terms.value
+      ORDER BY rank DESC
+      LIMIT 25
+    `;
   });

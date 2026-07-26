@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { authClient } from "../lib/auth-client.js";
 import { getSession } from "../lib/session.js";
-import { getNavCounts, listSources } from "../lib/knowledge.js";
+import { getNavCounts, listSources, searchSources } from "../lib/knowledge.js";
 import { AppShell, SealChip, accessionOf, authoritySeal, stamp } from "../components/chrome.js";
 import { readFailure } from "../lib/read-failure.js";
 
@@ -11,10 +11,25 @@ export type SourceFilters = {
   authority?: "unverified" | "approved" | "canonical";
   type?: "note" | "upload";
   status?: "active" | "deleted" | "failed";
+  /* A keyword query replaces the filtered register rather than narrowing it:
+     ranking and filtering answer different questions, and showing a ranked
+     list under filter controls that no longer apply would be a lie. */
+  q?: string;
 };
 
 const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | undefined =>
   typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
+
+/* `ts_headline` wraps matched terms in STX/ETX rather than markup. Splitting on
+   them and returning React children keeps the highlight real while every piece
+   of body text stays escaped — source content is never parsed as HTML. */
+function highlight(excerpt: string) {
+  return excerpt.split("\u0002").flatMap((chunk, index) => {
+    const [matched, rest] = chunk.split("\u0003");
+    if (index === 0) return [<span key={index}>{chunk}</span>];
+    return [<mark key={`m${index}`}>{matched}</mark>, <span key={index}>{rest ?? ""}</span>];
+  });
+}
 
 export const Route = createFileRoute("/sources")({
   beforeLoad: async () => {
@@ -26,6 +41,7 @@ export const Route = createFileRoute("/sources")({
     authority: oneOf(search.authority, ["unverified", "approved", "canonical"] as const),
     type: oneOf(search.type, ["note", "upload"] as const),
     status: oneOf(search.status, ["active", "deleted", "failed"] as const),
+    q: typeof search.q === "string" && search.q.trim() ? search.q.trim().slice(0, 200) : undefined,
   }),
   loaderDeps: ({ search }) => search,
   /* The register and the rail load here rather than in the component so that
@@ -37,6 +53,10 @@ export const Route = createFileRoute("/sources")({
        full; two alarms for one fault would be noise. */
     const counts = await getNavCounts().catch(() => undefined);
     try {
+      if (deps.q) {
+        const hits = await searchSources({ data: { query: deps.q } });
+        return { counts, register: { sources: hits, hasMore: false }, failure: undefined };
+      }
       const register = await listSources({
         data: { authority: deps.authority, sourceType: deps.type, status: deps.status },
       });
@@ -62,6 +82,9 @@ export type SourceRow = {
   author: string | null;
   tags: string[];
   is_stale: boolean;
+  /* Present only on keyword hits: the best-matching fragment of the body with
+     the matched terms delimited. */
+  excerpt?: string;
 };
 
 function Sources() {
@@ -73,6 +96,7 @@ function Sources() {
 
   const sources = (register?.sources ?? []) as unknown as SourceRow[];
   const hasMore = register?.hasMore ?? false;
+  const searching = Boolean(filters.q);
 
   const setFilter = (key: keyof SourceFilters, value: string) =>
     void navigate({ search: (previous: SourceFilters) => ({ ...previous, [key]: value || undefined }) });
@@ -97,6 +121,48 @@ function Sources() {
             </span>
           </div>
 
+          <form
+            className="seek"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const value = new FormData(event.currentTarget).get("q");
+              void navigate({
+                search: { q: typeof value === "string" && value.trim() ? value.trim() : undefined },
+              });
+            }}
+          >
+            <label className="seek__field">
+              <span className="label">Keyword search</span>
+              <input
+                key={filters.q ?? ""}
+                name="q"
+                type="search"
+                defaultValue={filters.q ?? ""}
+                placeholder="Words in the body"
+                autoComplete="off"
+              />
+            </label>
+            <button type="submit" className="btn btn--quiet btn--sm">
+              Search
+            </button>
+            {searching && (
+              <button
+                type="button"
+                className="btn btn--quiet btn--sm"
+                onClick={() => void navigate({ search: {} })}
+              >
+                Clear
+              </button>
+            )}
+          </form>
+
+          {searching ? (
+            <p className="line__caption seek__note">
+              Keyword match only, ranked by term proximity. Agents retrieve with
+              meaning as well as words, so this can miss what{" "}
+              <code className="register">search_knowledge</code> would return.
+            </p>
+          ) : (
           <div className="filters">
             <label className="filters__field">
               <span className="label">Authority</span>
@@ -131,6 +197,7 @@ function Sources() {
               </select>
             </label>
           </div>
+          )}
 
           {failure && (
             <p className="notice index__note" role="alert">
@@ -140,9 +207,15 @@ function Sources() {
 
           {!failure && sources.length === 0 && (
             <p className="empty index__note">
-              No sources match. Agents submit knowledge over MCP with{" "}
-              <code className="register">submit_note</code> and{" "}
-              <code className="register">submit_document</code>.
+              {searching ? (
+                <>No source body contains those words. Try fewer, or clear the search to browse the register.</>
+              ) : (
+                <>
+                  No sources match. Agents submit knowledge over MCP with{" "}
+                  <code className="register">submit_note</code> and{" "}
+                  <code className="register">submit_document</code>.
+                </>
+              )}
             </p>
           )}
 
@@ -162,6 +235,9 @@ function Sources() {
                     {stamp(source.content_updated_at)}
                     {source.author ? ` · ${source.author}` : ""}
                   </span>
+                  {source.excerpt && (
+                    <span className="entry__excerpt">{highlight(source.excerpt)}</span>
+                  )}
                   <span className="entry__role">
                     {source.status === "deleted" ? (
                       <SealChip state="void">Withdrawn</SealChip>

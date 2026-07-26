@@ -363,6 +363,37 @@ consequence saying what the group means for agents right now. The groups are
 separate because they are different failures — nobody has looked, versus
 somebody looked and then the text moved underneath them.
 
+### Keyword search
+A single underline field above the register with its own tracked label, a
+`btn--sm` submit, and a Clear that appears only while a query is live. A query
+**replaces** the filter bar rather than joining it: ranking and filtering answer
+different questions, and leaving filter controls visible over a ranked list
+would claim they still apply.
+
+Results carry an excerpt in register type with matched terms marked in
+`{colors.mark}` — tag stock as ink, because a match is a mark on the record and
+not something issued. The excerpt arrives with terms delimited by control
+characters and is split into React children, so the highlight is real without
+any body text being parsed as HTML.
+
+Below the field sits one sentence saying the search is keyword-only. Agents
+retrieve with meaning as well as words; presenting this as the same thing would
+misrepresent what an agent will actually get back.
+
+### Activity log
+The workspace-wide custody line: one ruled row per event, newest first, in four
+columns — when, what, which source, who. Event types are rendered as the
+sentence a person would say ("Voided a credential"), with an unmapped type
+falling back to its raw name so a new writer shows up legibly without a code
+change. One line of detail rides in the *what* column and nothing more; the
+benches have room for the rest.
+
+**The Attribution Rule.** Every row names an actor or says it cannot. Agents
+carry their holder name, administrators their email, and rows written before
+events recorded an administrator read `unattributed` in dormant italic. They
+are shown rather than hidden or backfilled — the log is append-only, and a
+gap in the record is itself part of the record.
+
 ### Containers
 There are no cards. Regions are declared by a ground shift plus a hairline
 rule, with a tracked label at the top-left of the region.
