@@ -184,7 +184,8 @@ export class KnowledgeRepository {
       )
         SELECT chunks.id, chunks.content, chunks.heading, sources.id AS source_id, source_revisions.title,
              sources.source_type, sources.authority, source_revisions.revision_number,
-             source_revisions.content_updated_at, users.id AS author_id, users.display_name AS author,
+             source_revisions.content_updated_at, users.id AS author_id,
+             COALESCE(users.display_name, 'administrator') AS author,
              1 - (chunks.embedding <=> ${vector}::vector) AS semantic_score,
              ts_rank_cd(chunks.search_vector, query_terms.value) AS keyword_score,
              CASE sources.authority WHEN 'canonical' THEN 0.06 WHEN 'approved' THEN 0.03 ELSE 0 END AS authority_boost,
@@ -197,7 +198,12 @@ export class KnowledgeRepository {
       JOIN chunks ON chunks.id = candidate_ids.id
       JOIN source_revisions ON source_revisions.id = chunks.source_revision_id
       JOIN sources ON sources.current_revision_id = source_revisions.id
-      JOIN users ON users.id = source_revisions.created_by
+      /* LEFT, because created_by is null on revisions written by a human
+         administrator from the browser. An inner join here would not error - it
+         would drop the row, so a source a human had just corrected would go
+         missing from every agent search result and nothing would say why.
+         The same applies to getSource and getSourceHistory below. */
+      LEFT JOIN users ON users.id = source_revisions.created_by
       CROSS JOIN query_terms
       ORDER BY final_score DESC, source_revisions.content_updated_at DESC, chunks.id
       LIMIT ${input.limit}
@@ -214,12 +220,13 @@ export class KnowledgeRepository {
       SELECT sources.id, source_revisions.title, sources.source_type, sources.authority,
              source_revisions.revision_number, source_revisions.markdown_content,
              source_revisions.content_updated_at, source_revisions.original_filename,
-             source_revisions.mime_type, sources.last_verified_at, users.display_name AS created_by
+             source_revisions.mime_type, sources.last_verified_at,
+             COALESCE(users.display_name, 'administrator') AS created_by
       FROM sources
       JOIN source_revisions ON source_revisions.source_id = sources.id
         AND (${revisionNumber ?? null}::integer IS NULL AND source_revisions.id = sources.current_revision_id
           OR source_revisions.revision_number = ${revisionNumber ?? null})
-      JOIN users ON users.id = source_revisions.created_by
+      LEFT JOIN users ON users.id = source_revisions.created_by
       WHERE sources.id = ${sourceId} AND sources.workspace_id = ${actor.workspaceId} AND sources.status = 'active'
     `;
     if (!source) throw new DomainError("Source not found");
@@ -232,10 +239,10 @@ export class KnowledgeRepository {
       SELECT source_revisions.id, source_revisions.revision_number, source_revisions.content_hash,
              source_revisions.content_updated_at, source_revisions.created_at,
              source_revisions.id = sources.current_revision_id AS is_current,
-             users.display_name AS created_by
+             COALESCE(users.display_name, 'administrator') AS created_by
       FROM sources
       JOIN source_revisions ON source_revisions.source_id = sources.id
-      JOIN users ON users.id = source_revisions.created_by
+      LEFT JOIN users ON users.id = source_revisions.created_by
       WHERE sources.id = ${sourceId} AND sources.workspace_id = ${actor.workspaceId} AND sources.status = 'active'
       ORDER BY source_revisions.revision_number DESC
     `;
