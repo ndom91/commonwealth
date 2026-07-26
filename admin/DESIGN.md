@@ -297,10 +297,16 @@ Square by default (`{rounded.none}`) — panels, inputs, buttons, rows. The only
 rounded things are applied chips and tags (`{rounded.chip}`, 2px), which read
 as die-cut label stock. No pills, no capsules, no rounded cards.
 
-Borders are 1px hairlines. A 2px rule is permitted only as a masthead underline
-or a table head divider. Colored left-borders are not part of this language;
-selection is expressed by ground shift and by the accession number changing to
-tag stock.
+Borders are 1px hairlines, the masthead underline included. A doubled-weight
+rule reads at this density as two stacked hairlines rather than as emphasis, so
+hierarchy comes from ground and spacing and never from thickening a rule. Two
+boundaries meeting must resolve to one line: where a closing rule and an
+opening rule coincide, the lower element drops its own. The single structural
+exception is the sign-in form's opening rule, which stands on a bare page with
+no register grammar around it to set its scale. 2px otherwise means focus — the
+field underline and the focus ring. Colored left-borders are not part of this
+language; selection is expressed by ground shift and by the accession number
+changing to tag stock.
 
 ## Components
 

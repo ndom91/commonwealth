@@ -319,12 +319,17 @@ select {
   min-height: 0;
 }
 
+/* A hairline, not the 2px rule this once carried: at this density a doubled
+   rule in the hairline colour reads as two stacked lines rather than as
+   emphasis, so it looked like a mistake on every page. The masthead is already
+   separated by a section of space above and the pane grounds below; the rule
+   only has to close it. */
 .masthead {
   display: flex;
   align-items: flex-end;
   gap: var(--s-loose);
   padding: var(--s-section) var(--s-gutter) var(--s-base);
-  border-bottom: 2px solid var(--rule-hair);
+  border-bottom: 1px solid var(--rule-hair);
 }
 
 .masthead h1 {
@@ -539,6 +544,17 @@ select {
   text-align: left;
   cursor: pointer;
   transition: background 120ms ease-out;
+}
+
+/* The filter bar closes itself with a rule and the first row opens with one,
+   which draws the same boundary twice. The row yields: a row's top rule exists
+   to separate it from the row above, and the first row has none.
+ *
+ * Scoped to this adjacency rather than to `:first-child` everywhere — on the
+ * holder register and the review queue nothing above the list draws a closing
+ * rule, so there the first row's border is the only thing opening it. */
+.filters + .index__list li:first-child .entry {
+  border-top: 0;
 }
 
 .entry:hover {
