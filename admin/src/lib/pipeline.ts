@@ -1,4 +1,4 @@
-import { Embeddings } from "@llm-team-kb/pipeline";
+import { DocumentIngestion, Embeddings } from "@llm-team-kb/pipeline";
 
 /* The admin's half of the shared pipeline. Chunking is a pure function and
    needs nothing from here; embedding needs Ollama, which the admin service
@@ -31,4 +31,24 @@ export function embeddings(): Embeddings {
    uses or the index quietly holds two incompatible vector spaces. */
 export function embeddingModel(): string {
   return required("EMBEDDING_MODEL");
+}
+
+export function maxUploadBytes(): number {
+  const raw = process.env.MAX_UPLOAD_BYTES;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 10 * 1024 * 1024;
+}
+
+/* Lazy for the same reason as the embedder: an instance whose compose file
+   predates these variables keeps working, and only uploading fails, naming what
+   is missing. */
+let ingestion: DocumentIngestion | undefined;
+
+export function documentIngestion(): DocumentIngestion {
+  ingestion ??= new DocumentIngestion({
+    markitdownUrl: required("MARKITDOWN_URL"),
+    storagePath: required("SOURCE_STORAGE_PATH"),
+    maxUploadBytes: maxUploadBytes(),
+  });
+  return ingestion;
 }

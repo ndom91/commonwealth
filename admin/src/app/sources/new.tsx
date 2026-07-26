@@ -1,18 +1,26 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { createSource } from "../../lib/knowledge.js";
+import { createSource, uploadSource } from "../../lib/knowledge.js";
 
 export const Route = createFileRoute("/sources/new")({
   component: NewSource,
 });
 
+/* Two ways in, one bench. A note is typed; a document is converted by MarkItDown
+   and its original kept, addressed by content hash. They are presented as one
+   screen with a mode rather than two routes, because the decision is "what am I
+   holding" — not a different task. */
+type Mode = "note" | "upload";
+
 function NewSource() {
   const router = useRouter();
   const navigate = useNavigate();
 
+  const [mode, setMode] = useState<Mode>("note");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [tags, setTags] = useState("");
+  const [file, setFile] = useState<File>();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -21,9 +29,21 @@ function NewSource() {
     setPending(true);
     setError(undefined);
     try {
-      const result = await createSource({
-        data: { title, markdown: body, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) },
-      });
+      let result: { sourceId: string };
+      if (mode === "upload") {
+        if (!file) throw new Error("Choose a document to upload.");
+        /* FormData rather than base64: a 10 MB document would otherwise become
+           a 13 MB string held on both sides of the request. */
+        const payload = new FormData();
+        payload.set("file", file);
+        payload.set("title", title);
+        payload.set("tags", tags);
+        result = await uploadSource({ data: payload });
+      } else {
+        result = await createSource({
+          data: { title, markdown: body, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) },
+        });
+      }
       await router.invalidate();
       await navigate({ to: "/sources/$sourceId", params: { sourceId: result.sourceId }, search: {} });
     } catch (cause) {
@@ -43,7 +63,23 @@ function NewSource() {
         <div className="bench__head">
           <div>
             <span className="label">New source</span>
-            <h2>Write a note</h2>
+            <h2>{mode === "upload" ? "Upload a document" : "Write a note"}</h2>
+          </div>
+          <div className="bench__seal">
+            {(["note", "upload"] as Mode[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={`btn ${mode === value ? "btn--current" : "btn--quiet"}`}
+                disabled={pending}
+                onClick={() => {
+                  setMode(value);
+                  setError(undefined);
+                }}
+              >
+                {value === "note" ? "Write" : "Upload"}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -60,19 +96,32 @@ function NewSource() {
             />
           </label>
 
-          <label className="field">
-            <span className="label">Markdown</span>
-            <textarea
-              className="revise__body register"
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              disabled={pending}
-              rows={20}
-              spellCheck={false}
-              required
-              placeholder="# Heading&#10;&#10;What an agent should know, and where it came from."
-            />
-          </label>
+          {mode === "upload" ? (
+            <label className="field">
+              <span className="label">Document</span>
+              <input
+                required
+                type="file"
+                accept=".pdf,.docx,.pptx,.xlsx,.csv,.html,.md,.txt"
+                disabled={pending}
+                onChange={(event) => setFile(event.target.files?.[0])}
+              />
+            </label>
+          ) : (
+            <label className="field">
+              <span className="label">Markdown</span>
+              <textarea
+                className="revise__body register"
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                disabled={pending}
+                rows={20}
+                spellCheck={false}
+                required
+                placeholder="# Heading&#10;&#10;What an agent should know, and where it came from."
+              />
+            </label>
+          )}
 
           <label className="field">
             <span className="label">Tags</span>
@@ -84,9 +133,9 @@ function NewSource() {
           </label>
 
           <p className="line__caption">
-            Written by you, so it lands approved and verified rather than queuing
-            for review — the queue is for text nobody has vouched for. Marking it
-            canonical stays a separate decision.
+            {mode === "upload"
+              ? "The document is converted to Markdown for indexing and the original is kept, addressed by its content hash. Uploads cannot be edited as text afterwards — replace the file instead."
+              : "Written by you, so it lands approved and verified rather than queuing for review — the queue is for text nobody has vouched for. Marking it canonical stays a separate decision."}
           </p>
 
           {error && (
@@ -97,7 +146,13 @@ function NewSource() {
 
           <div className="bench__controls">
             <button className="btn btn--primary" disabled={pending}>
-              {pending ? "Writing…" : "Create source"}
+              {pending
+                ? mode === "upload"
+                  ? "Converting…"
+                  : "Writing…"
+                : mode === "upload"
+                  ? "Upload document"
+                  : "Create source"}
             </button>
             <button
               type="button"

@@ -4,7 +4,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { chunkMarkdown } from "@llm-team-kb/pipeline";
 import { client } from "./db.js";
 import { auth } from "./auth.js";
-import { embeddingModel, embeddings } from "./pipeline.js";
+import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from "./pipeline.js";
 
 /* Read and curation access to the knowledge corpus.
  *
@@ -658,71 +658,147 @@ export const createSource = createServerFn({ method: "POST" })
       : [];
     return { title, markdown, tags };
   })
+  .handler(async ({ data }) =>
+    writeNewSource(await adminId(), { ...data, sourceType: "note" }),
+  );
+
+/* The single writer for a source an administrator creates, whether they typed
+   the Markdown or uploaded a document that MarkItDown converted. The two paths
+   differ only in where the text came from; everything after that — the deferred
+   id pair, the content hash, the chunk rows, the authority decision, the event
+   — is identical, and duplicating it is how the two would quietly drift apart.
+ *
+ * An upload passes the hash of the *original bytes*, so the source is identified
+ * by the file rather than by whatever Markdown the converter happened to emit.
+ * Re-uploading the same file therefore collides on the unique index, which is
+ * the intended behaviour. */
+async function writeNewSource(
+  administrator: string,
+  input: {
+    title: string;
+    markdown: string;
+    tags: string[];
+    sourceType: "note" | "upload";
+    originalFilename?: string;
+    mimeType?: string;
+    storagePath?: string;
+    contentHash?: string;
+  },
+) {
+  const chunks = chunkMarkdown(input.markdown);
+  if (chunks.length === 0) throw new Error("That text contains nothing indexable.");
+  const contentHash = input.contentHash ?? createHash("sha256").update(input.markdown).digest("hex");
+  const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
+  const model = embeddingModel();
+
+  const sourceId = randomUUID();
+  const revisionId = randomUUID();
+
+  try {
+    return await client.begin(async (transaction) => {
+      const [workspace] = await transaction<{ id: string }[]>`
+        SELECT id FROM workspaces WHERE name = 'default'
+      `;
+      if (!workspace) throw new Error("Default workspace is unavailable");
+
+      await transaction`
+        INSERT INTO sources (
+          id, workspace_id, source_type, authority, current_revision_id,
+          current_content_hash, created_by, created_by_admin_id, last_verified_at
+        ) VALUES (
+          ${sourceId}, ${workspace.id}, ${input.sourceType}, 'approved', ${revisionId},
+          ${contentHash}, NULL, ${administrator}, now()
+        )
+      `;
+
+      await transaction`
+        INSERT INTO source_revisions (
+          id, source_id, revision_number, title, content_hash, markdown_content,
+          original_filename, mime_type, storage_path,
+          supersedes_revision_id, created_by, created_by_admin_id
+        ) VALUES (
+          ${revisionId}, ${sourceId}, 1, ${input.title}, ${contentHash}, ${input.markdown},
+          ${input.originalFilename ?? null}, ${input.mimeType ?? null}, ${input.storagePath ?? null},
+          NULL, NULL, ${administrator}
+        )
+      `;
+
+      for (const [ordinal, chunk] of chunks.entries()) {
+        await transaction`
+          INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
+          VALUES (${sourceId}, ${revisionId}, ${ordinal}, ${chunk.heading}, ${chunk.content},
+                  ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(",")}]`}::vector, ${model})
+        `;
+      }
+
+      for (const tag of input.tags) {
+        await transaction`INSERT INTO source_tags (source_id, tag) VALUES (${sourceId}, ${tag})`;
+      }
+
+      await transaction`
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
+        VALUES (${workspace.id}, ${administrator}, 'source_submitted', ${sourceId},
+          ${JSON.stringify({ sourceType: input.sourceType, authority: "approved", revisionId, chunkCount: chunks.length })}::jsonb)
+      `;
+
+      return { sourceId, chunkCount: chunks.length };
+    });
+  } catch (cause) {
+    if ((cause as { code?: string })?.code === "23505") {
+      throw new Error(
+        "An active source already holds exactly this content. Open that one and revise it instead of creating a duplicate",
+      );
+    }
+    throw cause;
+  }
+}
+
+/* Upload. The file is sent as FormData rather than base64 so a 10 MB document
+   does not become a 13 MB string in memory on both sides.
+ *
+ * Conversion happens before the transaction, like embedding: MarkItDown is a
+ * network round trip and a slow one, and it also writes the original to disk. If
+ * the database write then fails, the blob is left behind deliberately — it is
+ * content-addressed, so a retry finds it rather than duplicating it, and an
+ * orphan is recoverable where a lost original is not. */
+export const uploadSource = createServerFn({ method: "POST" })
+  .validator((value: unknown): { file: File; title: string; tags: string[] } => {
+    if (!(value instanceof FormData)) throw new Error("Expected a file upload");
+    const file = value.get("file");
+    if (!(file instanceof File) || file.size === 0) throw new Error("Choose a document to upload.");
+    const title = String(value.get("title") ?? "").trim();
+    if (!title) throw new Error("A source needs a title.");
+    const tags = [
+      ...new Set(
+        String(value.get("tags") ?? "")
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      ),
+    ];
+    return { file, title, tags };
+  })
   .handler(async ({ data }) => {
     const administrator = await adminId();
-
-    const chunks = chunkMarkdown(data.markdown);
-    if (chunks.length === 0) throw new Error("That text contains nothing indexable.");
-    const contentHash = createHash("sha256").update(data.markdown).digest("hex");
-    const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
-    const model = embeddingModel();
-
-    const sourceId = randomUUID();
-    const revisionId = randomUUID();
-
-    try {
-      return await client.begin(async (transaction) => {
-        const [workspace] = await transaction<{ id: string }[]>`
-          SELECT id FROM workspaces WHERE name = 'default'
-        `;
-        if (!workspace) throw new Error("Default workspace is unavailable");
-
-        await transaction`
-          INSERT INTO sources (
-            id, workspace_id, source_type, authority, current_revision_id,
-            current_content_hash, created_by, created_by_admin_id, last_verified_at
-          ) VALUES (
-            ${sourceId}, ${workspace.id}, 'note', 'approved', ${revisionId},
-            ${contentHash}, NULL, ${administrator}, now()
-          )
-        `;
-
-        await transaction`
-          INSERT INTO source_revisions (
-            id, source_id, revision_number, title, content_hash, markdown_content,
-            supersedes_revision_id, created_by, created_by_admin_id
-          ) VALUES (
-            ${revisionId}, ${sourceId}, 1, ${data.title}, ${contentHash}, ${data.markdown},
-            NULL, NULL, ${administrator}
-          )
-        `;
-
-        for (const [ordinal, chunk] of chunks.entries()) {
-          await transaction`
-            INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
-            VALUES (${sourceId}, ${revisionId}, ${ordinal}, ${chunk.heading}, ${chunk.content},
-                    ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(",")}]`}::vector, ${model})
-          `;
-        }
-
-        for (const tag of data.tags) {
-          await transaction`INSERT INTO source_tags (source_id, tag) VALUES (${sourceId}, ${tag})`;
-        }
-
-        await transaction`
-          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-          VALUES (${workspace.id}, ${administrator}, 'source_submitted', ${sourceId},
-            ${JSON.stringify({ sourceType: "note", authority: "approved", revisionId, chunkCount: chunks.length })}::jsonb)
-        `;
-
-        return { sourceId, chunkCount: chunks.length };
-      });
-    } catch (cause) {
-      if ((cause as { code?: string })?.code === "23505") {
-        throw new Error(
-          "An active source already holds exactly this content. Open that one and revise it instead of creating a duplicate",
-        );
-      }
-      throw cause;
+    const limit = maxUploadBytes();
+    if (data.file.size > limit) {
+      throw new Error(`That file is larger than the ${Math.floor(limit / 1_000_000)} MB upload limit.`);
     }
+
+    const document = await documentIngestion().ingest({
+      filename: data.file.name,
+      mimeType: data.file.type,
+      bytes: new Uint8Array(await data.file.arrayBuffer()),
+    });
+
+    return writeNewSource(administrator, {
+      title: data.title,
+      markdown: document.markdown,
+      tags: data.tags,
+      sourceType: "upload",
+      originalFilename: data.file.name,
+      mimeType: data.file.type,
+      storagePath: document.storagePath,
+      contentHash: document.contentHash,
+    });
   });

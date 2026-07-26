@@ -32,6 +32,9 @@ services:
       # two models in one index do not error, they quietly stop matching.
       OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      MARKITDOWN_URL: ${COMPOSE_MARKITDOWN_URL:-http://markitdown:8000}
+      SOURCE_STORAGE_PATH: ${COMPOSE_SOURCE_STORAGE_PATH:-/app/storage}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10000000}
       PORT: 3001
     depends_on:
       admin-migrate:
@@ -40,6 +43,8 @@ services:
         condition: service_healthy
       ollama-init:
         condition: service_completed_successfully
+      markitdown:
+        condition: service_healthy
     # The same volume `app` mounts. Uploaded originals are addressed by content
     # hash, so both services must look in one place or each sees only its own.
     volumes:
@@ -110,6 +115,10 @@ services:
 
   markitdown:
     build: ./markitdown
+    # Published on loopback for the same reason as ollama: `pnpm dev` runs on the
+    # host, where the compose service name does not resolve.
+    ports:
+      - "127.0.0.1:${MARKITDOWN_PORT:-8000}:8000"
     cpus: 1.0
     mem_limit: 1g
     pids_limit: 128
