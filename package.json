@@ -10,7 +10,8 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test 'test/**/*.test.ts'",
-    "migrate": "pnpm --filter @llm-team-kb/admin migrate"
+    "migrate": "pnpm --filter @llm-team-kb/admin migrate",
+    "db:studio": "pnpm --filter @llm-team-kb/admin db:studio"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",

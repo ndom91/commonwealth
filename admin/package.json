@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit",
     "start": "node .output/server/index.mjs",
     "migrate": "tsx scripts/migrate.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "node --env-file=../.env ./node_modules/drizzle-kit/bin.cjs studio"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.168.2",
@@ -27,7 +27,7 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.3",
     "@types/react-dom": "^19.2.3",
-    "drizzle-kit": "1.0.0-rc.4",
+    "drizzle-kit": "0.31.9",
     "tsx": "^4.23.1",
     "typescript": "^5.9.3"
   }
