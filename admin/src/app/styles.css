@@ -560,7 +560,7 @@ select {
   border-top: 1px solid var(--rule-hair);
   background: none;
   color: inherit;
-  /* Register rows are anchors on /sources and buttons on /dashboard. The row
+  /* Register rows are anchors on /sources and buttons on /identities. The row
      is the target, so it carries no underline — the name is not a link
      within a row, the row is the link. */
   text-decoration: none;

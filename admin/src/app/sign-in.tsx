@@ -5,7 +5,7 @@ import { getSession } from "../lib/session.js";
 
 export const Route = createFileRoute("/sign-in")({
   beforeLoad: async () => {
-    if (await getSession()) throw redirect({ to: "/dashboard" });
+    if (await getSession()) throw redirect({ to: "/identities" });
   },
   component: SignIn,
 });
@@ -27,7 +27,7 @@ function SignIn() {
       setPending(false);
       return;
     }
-    router.navigate({ to: "/dashboard" });
+    router.navigate({ to: "/identities" });
   }
 
   return (

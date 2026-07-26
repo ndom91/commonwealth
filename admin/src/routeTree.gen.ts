@@ -12,9 +12,12 @@ import { Route as rootRouteImport } from './app/__root'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as ActivityRouteImport } from './app/activity'
 import { Route as DashboardRouteImport } from './app/dashboard'
+import { Route as IdentitiesRouteImport } from './app/identities'
 import { Route as ReviewRouteImport } from './app/review'
 import { Route as SignInRouteImport } from './app/sign-in'
 import { Route as SourcesRouteImport } from './app/sources'
+import { Route as IdentitiesIndexRouteImport } from './app/identities/index'
+import { Route as IdentitiesIdentityIdRouteImport } from './app/identities/$identityId'
 import { Route as SourcesIndexRouteImport } from './app/sources/index'
 import { Route as SourcesSourceIdRouteImport } from './app/sources/$sourceId'
 import { Route as ApiAuthSplatRouteImport } from './app/api/auth/$'
@@ -34,6 +37,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IdentitiesRoute = IdentitiesRouteImport.update({
+  id: '/identities',
+  path: '/identities',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
   path: '/review',
@@ -48,6 +56,16 @@ const SourcesRoute = SourcesRouteImport.update({
   id: '/sources',
   path: '/sources',
   getParentRoute: () => rootRouteImport,
+} as any)
+const IdentitiesIndexRoute = IdentitiesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => IdentitiesRoute,
+} as any)
+const IdentitiesIdentityIdRoute = IdentitiesIdentityIdRouteImport.update({
+  id: '/$identityId',
+  path: '/$identityId',
+  getParentRoute: () => IdentitiesRoute,
 } as any)
 const SourcesIndexRoute = SourcesIndexRouteImport.update({
   id: '/',
@@ -69,10 +87,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/dashboard': typeof DashboardRoute
+  '/identities': typeof IdentitiesRouteWithChildren
   '/review': typeof ReviewRoute
   '/sign-in': typeof SignInRoute
   '/sources': typeof SourcesRouteWithChildren
+  '/identities/$identityId': typeof IdentitiesIdentityIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/identities/': typeof IdentitiesIndexRoute
   '/sources/': typeof SourcesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -82,7 +103,9 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/review': typeof ReviewRoute
   '/sign-in': typeof SignInRoute
+  '/identities/$identityId': typeof IdentitiesIdentityIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/identities': typeof IdentitiesIndexRoute
   '/sources': typeof SourcesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -91,10 +114,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/dashboard': typeof DashboardRoute
+  '/identities': typeof IdentitiesRouteWithChildren
   '/review': typeof ReviewRoute
   '/sign-in': typeof SignInRoute
   '/sources': typeof SourcesRouteWithChildren
+  '/identities/$identityId': typeof IdentitiesIdentityIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/identities/': typeof IdentitiesIndexRoute
   '/sources/': typeof SourcesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -104,10 +130,13 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/dashboard'
+    | '/identities'
     | '/review'
     | '/sign-in'
     | '/sources'
+    | '/identities/$identityId'
     | '/sources/$sourceId'
+    | '/identities/'
     | '/sources/'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
@@ -117,7 +146,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/review'
     | '/sign-in'
+    | '/identities/$identityId'
     | '/sources/$sourceId'
+    | '/identities'
     | '/sources'
     | '/api/auth/$'
   id:
@@ -125,10 +156,13 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/dashboard'
+    | '/identities'
     | '/review'
     | '/sign-in'
     | '/sources'
+    | '/identities/$identityId'
     | '/sources/$sourceId'
+    | '/identities/'
     | '/sources/'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -137,6 +171,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
   DashboardRoute: typeof DashboardRoute
+  IdentitiesRoute: typeof IdentitiesRouteWithChildren
   ReviewRoute: typeof ReviewRoute
   SignInRoute: typeof SignInRoute
   SourcesRoute: typeof SourcesRouteWithChildren
@@ -166,6 +201,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/identities': {
+      id: '/identities'
+      path: '/identities'
+      fullPath: '/identities'
+      preLoaderRoute: typeof IdentitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/review': {
       id: '/review'
       path: '/review'
@@ -186,6 +228,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/sources'
       preLoaderRoute: typeof SourcesRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/identities/': {
+      id: '/identities/'
+      path: '/'
+      fullPath: '/identities/'
+      preLoaderRoute: typeof IdentitiesIndexRouteImport
+      parentRoute: typeof IdentitiesRoute
+    }
+    '/identities/$identityId': {
+      id: '/identities/$identityId'
+      path: '/$identityId'
+      fullPath: '/identities/$identityId'
+      preLoaderRoute: typeof IdentitiesIdentityIdRouteImport
+      parentRoute: typeof IdentitiesRoute
     }
     '/sources/': {
       id: '/sources/'
@@ -211,6 +267,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface IdentitiesRouteChildren {
+  IdentitiesIdentityIdRoute: typeof IdentitiesIdentityIdRoute
+  IdentitiesIndexRoute: typeof IdentitiesIndexRoute
+}
+
+const IdentitiesRouteChildren: IdentitiesRouteChildren = {
+  IdentitiesIdentityIdRoute: IdentitiesIdentityIdRoute,
+  IdentitiesIndexRoute: IdentitiesIndexRoute,
+}
+
+const IdentitiesRouteWithChildren = IdentitiesRoute._addFileChildren(
+  IdentitiesRouteChildren,
+)
+
 interface SourcesRouteChildren {
   SourcesSourceIdRoute: typeof SourcesSourceIdRoute
   SourcesIndexRoute: typeof SourcesIndexRoute
@@ -228,6 +298,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
   DashboardRoute: DashboardRoute,
+  IdentitiesRoute: IdentitiesRouteWithChildren,
   ReviewRoute: ReviewRoute,
   SignInRoute: SignInRoute,
   SourcesRoute: SourcesRouteWithChildren,

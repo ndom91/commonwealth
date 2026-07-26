@@ -70,7 +70,7 @@ function drawerGroups(counts: NavCounts | undefined): DrawerGroup[] {
     {
       label: "Access",
       items: [
-        { mark: "identities", label: "Identities", to: "/dashboard", count: counts?.identities },
+        { mark: "identities", label: "Identities", to: "/identities", count: counts?.identities },
       ],
     },
     { label: "Custody", items: [{ mark: "activity", label: "Activity", to: "/activity" }] },
@@ -108,7 +108,7 @@ export function AppShell({
       </a>
 
       <aside className="cabinet">
-        <Link to="/dashboard" className="cabinet__plate">
+        <Link to="/identities" className="cabinet__plate">
           <span>Team knowledge base</span>
           <small>Custody bench</small>
         </Link>
