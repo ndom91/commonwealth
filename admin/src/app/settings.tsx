@@ -147,8 +147,10 @@ function Password() {
       setError("The new password and its confirmation do not match.");
       return;
     }
-    if (next.length < 12) {
-      setError("Use at least 12 characters.");
+    /* Matches better-auth's `minPasswordLength` default, which is what actually
+       enforces this — checking here only saves a round trip. */
+    if (next.length < 8) {
+      setError("Use at least 8 characters.");
       return;
     }
     setPending(true);
@@ -333,7 +335,7 @@ function AddAdministrator({ onAdded }: { onAdded: () => Promise<void> }) {
           value={password}
           disabled={pending}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder="At least 12 characters"
+          placeholder="At least 8 characters"
         />
       </label>
       <p className="line__caption">

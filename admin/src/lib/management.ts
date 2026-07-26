@@ -333,10 +333,11 @@ export const createAdministrator = createServerFn({ method: "POST" })
     const name = input.name?.trim();
     if (!name) throw new Error("A name is required.");
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("That does not look like an email address.");
-    /* better-auth's own floor is 8; saying so here means the person finds out
-       before the account is half-made rather than from a provider error. */
-    if (!input.password || input.password.length < 12) {
-      throw new Error("Use at least 12 characters for the initial password.");
+    /* Eight is better-auth's own `minPasswordLength` default, so this adds no
+       rule of its own — it just fails here, with a sentence, rather than as a
+       provider error once the account is half-made. */
+    if (!input.password || input.password.length < 8) {
+      throw new Error("Use at least 8 characters for the initial password.");
     }
     return { name, email, password: input.password };
   })
