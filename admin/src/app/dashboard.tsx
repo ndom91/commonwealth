@@ -170,13 +170,6 @@ function Dashboard() {
     >
       <div className="panes">
         <section className="index" aria-label="Identity register">
-          <div className="index__head">
-            <span className="label">Holders</span>
-            <span className="label register">
-              {status.state === "ready" ? identities.length : "—"}
-            </span>
-          </div>
-
           {status.state === "ready" && identities.length > 0 && (
             <div className="index__cols">
               <span className="label">Holder</span>

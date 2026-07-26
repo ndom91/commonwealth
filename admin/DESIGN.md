@@ -369,8 +369,8 @@ so they take no seal material — no oxide, no tag stock.
 ### Filter bar
 Underline selects above the register, each with its tracked label. Filters live
 in the URL, not component state: a filtered register is a thing people send each
-other, and the review queue hands off into it. The bar sits inside the index
-pane below its head, separated by a hairline, so it reads as a property of the
+other, and the review queue hands off into it. The bar sits at the top of the
+index pane and closes with a hairline, so it reads as a property of the
 register rather than of the page.
 
 Authority, type and status share a row of equal columns — their values are
@@ -474,6 +474,11 @@ ground plus a 1px left hairline in tag stock and an ink-weight bump. Sections
 that do not exist yet render as genuinely `disabled` buttons with an uppercase
 `PENDING` register mark and a visually hidden explanation — honest about what
 is built rather than linking to nothing.
+
+The rail is the only place a register's size is stated. A register never
+repeats its own count in a head above itself: the number is already in the rail
+a few inches to the left, and a head carrying nothing but a number it duplicates
+is a row of chrome between the reader and the rows.
 
 ### Credential Tag (signature component)
 The one-time key reveal. A manila plate carrying the full secret in register

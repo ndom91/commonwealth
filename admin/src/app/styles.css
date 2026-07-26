@@ -367,13 +367,6 @@ select {
   .detail {
     overflow-y: auto;
   }
-
-  .index__head {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: var(--slate-ground);
-  }
 }
 
 .index {
@@ -381,14 +374,6 @@ select {
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-
-.index__head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-tight);
-  padding: var(--s-base) var(--s-loose) var(--s-snug);
-  border-bottom: 1px solid var(--rule-hair);
 }
 
 .detail {
