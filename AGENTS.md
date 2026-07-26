@@ -21,6 +21,40 @@ The admin app is different: `pnpm dev` in `admin/` is a Vite dev server and
 picks changes up on save. Server functions occasionally need a manual reload
 of the page to re-run.
 
+## The MCP SDK is pinned to an exact beta, deliberately
+
+`@modelcontextprotocol/server` and `@modelcontextprotocol/node` are pinned to an
+exact version with no caret. **Do not widen the range.** These are 2.x
+pre-releases and breaking changes ship *between* betas — beta.5 alone relocated
+`serverInfo` on the wire and changed two exported types. A caret range would
+pick those up on an unrelated `pnpm install`.
+
+We took a beta on purpose. Tool schemas here are valibot, and valibot reaches
+`registerTool` through Standard Schema, which exists in no 1.x release: SDK 1.29
+typed that parameter as `z3.ZodTypeAny | z4.$ZodType` and accepted nothing else.
+The choice was a pinned beta or staying on zod.
+
+Two consequences worth knowing before you touch a tool:
+
+- **Valibot schemas must go through `toStandardJsonSchema`** (from
+  `@valibot/to-json-schema`, wrapped as `input()` in `src/index.ts`). Valibot is
+  the one Standard Schema library that doesn't carry JSON Schema conversion on
+  the schema itself — Zod and ArkType are accepted bare. Pass a raw `v.object()`
+  and registration still succeeds, but `tools/list` advertises an empty schema
+  and every agent loses the argument contract. Nothing errors.
+- **`strictObject`, not `object`.** It keeps `additionalProperties: false` in
+  the advertised schema, matching what zod produced. It also means an invented
+  argument is rejected rather than silently dropped — which for
+  `search_knowledge` is the difference between an agent being told its filter
+  was wrong and it receiving unfiltered results it believes were filtered.
+
+`pnpm why zod` still returns hits. That's expected, not a regression: the SDK
+depends on zod for the protocol's own schemas. What left is *our* use of it.
+
+When 2.x reaches GA: unpin, expect type-level breakage on the way, and re-run
+the `tools/list` schema comparison — the advertised JSON Schema is the contract
+agents actually consume, so it is the thing worth diffing across the upgrade.
+
 ## The shared pipeline is TypeScript source, not a build
 
 `@llm-team-kb/pipeline` (`packages/pipeline/`) holds chunking, embedding and
