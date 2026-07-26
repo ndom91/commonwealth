@@ -21,8 +21,8 @@ without having read the source. Two distinct moments:
   visits.
 
 **Secondary: the operator doing first-run setup.** Runs `docker compose up`,
-generates `BOOTSTRAP_ADMIN_KEY`, and is the only account until they invite
-others. Same person as a primary user afterwards.
+sets `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`, and is the only
+account until they invite others. Same person as a primary user afterwards.
 
 **High-volume consumer: the agents themselves.** Agents read and write far more
 than humans do, but only over MCP — they never touch the admin UI. Human
@@ -63,9 +63,14 @@ Three things a neighboring RAG or docs tool could not truthfully copy at once:
   `admin` (this web surface), `admin-migrate`, `postgres` (pgvector), `ollama`
   + `ollama-init`, `markitdown`, `caddy` for optional HTTPS.
 - **Endpoints:** MCP at `:3000/mcp`, admin UI at `:3001`.
-- **Bootstrap:** the first administrator key is derived from
-  `BOOTSTRAP_ADMIN_KEY` on first startup. `.env.example` leaves it blank on
-  purpose; the operator generates it with `openssl rand -hex 32`.
+- **Bootstrap:** the `admin-migrate` service applies migrations and then seeds
+  the first administrator from `BOOTSTRAP_ADMIN_EMAIL`,
+  `BOOTSTRAP_ADMIN_PASSWORD` and optional `BOOTSTRAP_ADMIN_NAME` — creating a
+  better-auth account and granting it `admin_role`. It is idempotent: an
+  existing account with that email is reused rather than recreated. No agent API
+  key is issued at bootstrap; those are minted from the admin UI afterwards.
+  `.env.example` leaves the password blank on purpose and the README generates
+  it with `openssl rand -base64 33`.
 - **Agent auth:** MCP clients send `Authorization: Bearer <key>`. Keys are shown
   once at creation and never again; the UI stores and displays only a prefix.
 - **Human auth:** email and password via better-auth. Sign-up is disabled unless
