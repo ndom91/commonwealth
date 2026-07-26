@@ -75,6 +75,12 @@ Three things a neighboring RAG or docs tool could not truthfully copy at once:
   once at creation and never again; the UI stores and displays only a prefix.
 - **Human auth:** email and password via better-auth. Sign-up is disabled unless
   `BETTER_AUTH_ALLOW_SIGN_UP=true`, so the admin surface is closed by default.
+  Further administrators are added from **Settings** inside the admin UI, which
+  provisions the account directly — so the flag should stay off. It exists for
+  the bootstrap script, not as the way to onboard a colleague. The new
+  administrator is given an initial password and is expected to replace it from
+  the same screen; `BOOTSTRAP_ADMIN_PASSWORD` is likewise a first-boot
+  credential to be rotated there, not a permanent one.
 
 ## Capabilities and Constraints
 

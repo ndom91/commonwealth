@@ -2,7 +2,7 @@ import { randomBytes, randomUUID, scryptSync } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { client } from "./db.js";
-import { auth } from "./auth.js";
+import { auth, provisioning } from "./auth.js";
 import { PAGE_SIZE } from "./knowledge.js";
 
 type Role = "reader" | "writer" | "reviewer" | "admin";
@@ -280,3 +280,88 @@ export const revokeKey = createServerFn({ method: "POST" })
     });
     return { revoked: true };
   });
+
+/* Administrators — the humans who can reach this surface at all.
+ *
+ * Distinct from the identities above: those are agent holders in the knowledge
+ * schema (`users`, uuid), these are better-auth accounts (`"user"`, text) that
+ * hold a row in `admin_role`. The two never mix, which is why the register can
+ * show a holder called "Admin" that is nobody's colleague. */
+export type Administrator = { id: string; name: string; email: string; createdAt: string; isYou: boolean };
+
+/* Unpaginated on purpose, unlike `listIdentities`. Administrators are people
+   with a password to this instance; if that list ever needs a cursor, something
+   has gone wrong that pagination would only hide. */
+export const listAdministrators = createServerFn({ method: "GET" }).handler(async (): Promise<Administrator[]> => {
+  const you = await adminId();
+  /* `created_at` comes back as a string, not a Date. `drizzle()` mutates the
+     client it is handed (see `db.ts`) and that extends to its date parsers, so
+     this client hands back raw Postgres timestamps while a bare postgres.js
+     client would give you a Date. Pass it through untouched and let `stampAt`
+     format it, which is what every other register here already does. */
+  const rows = await client<{ id: string; name: string; email: string; created_at: string }[]>`
+    SELECT "user".id, "user".name, "user".email, admin_role.created_at
+    FROM admin_role
+    JOIN "user" ON "user".id = admin_role.user_id
+    ORDER BY admin_role.created_at ASC, "user".email ASC
+  `;
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    createdAt: row.created_at,
+    isYou: row.id === you,
+  }));
+});
+
+/* Mirrors the bootstrap at `admin/scripts/migrate.ts:81-87`, the only other
+   place an administrator is created.
+ *
+ * Goes through `provisioning` rather than `auth`: `disableSignUp` is enforced
+ * inside the sign-up handler, so the request-facing instance refuses this even
+ * server-side. See the comment in `auth.ts` for why that is a separate instance
+ * rather than a flag flip.
+ *
+ * The existence check is not only for a nicer message. With `autoSignIn: false`
+ * better-auth answers an already-registered email generically, so a duplicate
+ * would otherwise look like success. Checking first also lets an existing
+ * account be promoted instead of refused. */
+export const createAdministrator = createServerFn({ method: "POST" })
+  .validator((value: unknown): { name: string; email: string; password: string } => {
+    const input = (value ?? {}) as Partial<{ name: string; email: string; password: string }>;
+    const email = input.email?.trim().toLowerCase();
+    const name = input.name?.trim();
+    if (!name) throw new Error("A name is required.");
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("That does not look like an email address.");
+    /* better-auth's own floor is 8; saying so here means the person finds out
+       before the account is half-made rather than from a provider error. */
+    if (!input.password || input.password.length < 12) {
+      throw new Error("Use at least 12 characters for the initial password.");
+    }
+    return { name, email, password: input.password };
+  })
+  .handler(async ({ data }) => {
+    await adminId();
+
+    const [existing] = await client<{ id: string }[]>`SELECT id FROM "user" WHERE lower(email) = ${data.email}`;
+    if (existing) {
+      const [already] = await client<{ user_id: string }[]>`
+        SELECT user_id FROM admin_role WHERE user_id = ${existing.id}
+      `;
+      if (already) throw new Error(`${data.email} is already an administrator.`);
+      await client`INSERT INTO admin_role (user_id) VALUES (${existing.id}) ON CONFLICT DO NOTHING`;
+      return { email: data.email, promoted: true };
+    }
+
+    await provisioning.api.signUpEmail({ body: { name: data.name, email: data.email, password: data.password } });
+    const [created] = await client<{ id: string }[]>`SELECT id FROM "user" WHERE lower(email) = ${data.email}`;
+    if (!created) throw new Error("The account could not be created. Nothing was changed.");
+    await client`INSERT INTO admin_role (user_id) VALUES (${created.id}) ON CONFLICT DO NOTHING`;
+    return { email: data.email, promoted: false };
+  });
+
+/* Changing your own name and password goes through `authClient.updateUser` and
+   `authClient.changePassword` on the client rather than a server function here.
+   Both are better-auth's own routes: they run its hooks, re-issue the session,
+   and — for the password — verify the current one and revoke other sessions.
+   A raw UPDATE against `"user"` would do none of that. */

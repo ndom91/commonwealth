@@ -20,7 +20,12 @@ docker compose up --build
 ```
 
 Sign in to the dashboard at `http://localhost:3001` with the configured bootstrap
-email and password, then create an MCP identity and API key. Configure MCP clients
+email and password. Go to **Settings** to replace that password — it is a
+first-boot credential, and until you change it your admin login is whatever is
+sitting in `.env`. Additional administrators are added from the same screen, so
+`BETTER_AUTH_ALLOW_SIGN_UP` can stay off.
+
+Then create an MCP identity and API key. Configure MCP clients
 to connect to `http://localhost:3000/mcp` with:
 
 ```text

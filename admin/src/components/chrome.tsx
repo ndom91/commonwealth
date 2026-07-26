@@ -1,6 +1,6 @@
 import { type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import type { LucideIcon } from "lucide-react";
+import { UserRoundCog, type LucideIcon } from "lucide-react";
 
 /* Application chrome for the Custody Bench. Every workbench screen mounts
    inside AppShell and reuses the index-and-bench split: a ruled register of
@@ -153,9 +153,31 @@ export function AppShell({
 
         <div className="cabinet__foot">
           {holder && (
-            <div className="cabinet__holder">
-              <span className="label">Signed in</span>
-              <b>{holder}</b>
+            <div className="cabinet__identity">
+              <div className="cabinet__holder">
+                <span className="label">Signed in</span>
+                <b>{holder}</b>
+              </div>
+              {/* Settings sits with the signed-in name rather than in a drawer:
+                  it is your account and who else holds one, not a section of
+                  the corpus.
+                 *
+                  A Lucide glyph, like the other icon-only controls — the
+                  hand-drawn marks are the drawer vocabulary, not this one.
+                  `user-round-cog` rather than a bare cog: a lone gear beside a
+                  name reads as app configuration, and a gear drawn small enough
+                  to fit reads as a sun. The person makes it unmistakably
+                  *your account*. Label moves to `aria-label` and `title` per
+                  the Icon Button rule. */}
+              <Link
+                to="/settings"
+                className="icon-btn"
+                aria-label="Settings"
+                title="Settings"
+                activeProps={{ "aria-current": "page" }}
+              >
+                <UserRoundCog size={15} strokeWidth={1.75} aria-hidden="true" />
+              </Link>
             </div>
           )}
           <button type="button" className="btn btn--quiet" onClick={onSignOut}>

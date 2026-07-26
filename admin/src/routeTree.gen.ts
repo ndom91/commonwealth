@@ -14,6 +14,7 @@ import { Route as ActivityRouteImport } from './app/activity'
 import { Route as DashboardRouteImport } from './app/dashboard'
 import { Route as IdentitiesRouteImport } from './app/identities'
 import { Route as ReviewRouteImport } from './app/review'
+import { Route as SettingsRouteImport } from './app/settings'
 import { Route as SignInRouteImport } from './app/sign-in'
 import { Route as SourcesRouteImport } from './app/sources'
 import { Route as IdentitiesIndexRouteImport } from './app/identities/index'
@@ -46,6 +47,11 @@ const IdentitiesRoute = IdentitiesRouteImport.update({
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
   path: '/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/identities': typeof IdentitiesRouteWithChildren
   '/review': typeof ReviewRoute
+  '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sources': typeof SourcesRouteWithChildren
   '/identities/$identityId': typeof IdentitiesIdentityIdRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/activity': typeof ActivityRoute
   '/dashboard': typeof DashboardRoute
   '/review': typeof ReviewRoute
+  '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/identities/$identityId': typeof IdentitiesIdentityIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/identities': typeof IdentitiesRouteWithChildren
   '/review': typeof ReviewRoute
+  '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sources': typeof SourcesRouteWithChildren
   '/identities/$identityId': typeof IdentitiesIdentityIdRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/identities'
     | '/review'
+    | '/settings'
     | '/sign-in'
     | '/sources'
     | '/identities/$identityId'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/dashboard'
     | '/review'
+    | '/settings'
     | '/sign-in'
     | '/identities/$identityId'
     | '/sources/$sourceId'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/identities'
     | '/review'
+    | '/settings'
     | '/sign-in'
     | '/sources'
     | '/identities/$identityId'
@@ -185,6 +197,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   IdentitiesRoute: typeof IdentitiesRouteWithChildren
   ReviewRoute: typeof ReviewRoute
+  SettingsRoute: typeof SettingsRoute
   SignInRoute: typeof SignInRoute
   SourcesRoute: typeof SourcesRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -225,6 +238,13 @@ declare module '@tanstack/react-router' {
       path: '/review'
       fullPath: '/review'
       preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in': {
@@ -321,6 +341,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   IdentitiesRoute: IdentitiesRouteWithChildren,
   ReviewRoute: ReviewRoute,
+  SettingsRoute: SettingsRoute,
   SignInRoute: SignInRoute,
   SourcesRoute: SourcesRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

@@ -11,7 +11,7 @@ export const Route = createFileRoute("/activity")({
   beforeLoad: async () => {
     const session = await getSession();
     if (!session) throw redirect({ to: "/sign-in" });
-    return { holder: session.user.email ?? session.user.name ?? undefined };
+    return { holder: session.user.name ?? session.user.email ?? undefined };
   },
   validateSearch: (search: Record<string, unknown>): ActivityFilters => ({
     type: typeof search.type === "string" && /^[a-z_]{1,64}$/.test(search.type) ? search.type : undefined,

@@ -41,7 +41,7 @@ export const Route = createFileRoute("/sources")({
   beforeLoad: async () => {
     const session = await getSession();
     if (!session) throw redirect({ to: "/sign-in" });
-    return { holder: session.user.email ?? session.user.name ?? undefined };
+    return { holder: session.user.name ?? session.user.email ?? undefined };
   },
   validateSearch: (search: Record<string, unknown>): SourceFilters => ({
     authority: oneOf(search.authority, ["unverified", "approved", "canonical"] as const),

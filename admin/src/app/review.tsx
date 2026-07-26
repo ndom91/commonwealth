@@ -9,7 +9,7 @@ export const Route = createFileRoute("/review")({
   beforeLoad: async () => {
     const session = await getSession();
     if (!session) throw redirect({ to: "/sign-in" });
-    return { holder: session.user.email ?? session.user.name ?? undefined };
+    return { holder: session.user.name ?? session.user.email ?? undefined };
   },
   loader: async () => {
     const counts = await getNavCounts().catch(() => undefined);

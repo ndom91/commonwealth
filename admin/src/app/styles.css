@@ -46,6 +46,9 @@
   --seal: #e86b38;
   --seal-fill: #9a3414;
 
+  --scrollbar-thumb: var(--ink-3);
+  --scrollbar-track: var(--slate-cabinet);
+
   --font-ui:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
@@ -127,6 +130,35 @@ html,
 body {
   margin: 0;
   height: 100%;
+}
+
+:where(html, .cabinet, .index, .detail, .source-body, .queue, .log) {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+@supports not (scrollbar-color: auto) {
+  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar-thumb {
+    border: 2px solid var(--scrollbar-track);
+    border-radius: 8px;
+    background: var(--scrollbar-thumb);
+  }
+
+  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log) {
+    --scrollbar-thumb: var(--ink);
+    --scrollbar-track: var(--slate-ground);
+  }
 }
 
 body {
@@ -300,6 +332,26 @@ select {
   padding: var(--s-base);
   display: grid;
   gap: 10px;
+}
+
+/* The name and the way into your account share a row. The control is pushed to
+   the end so it lands in the same column as the rail's counts. */
+.cabinet__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--s-snug);
+}
+
+.cabinet__identity > .icon-btn {
+  margin-left: auto;
+}
+
+/* Current-page marking matches the drawer links: a ground shift and stronger
+   ink, never a colored border. */
+.cabinet__identity > .icon-btn[aria-current="page"] {
+  background: var(--slate-raised);
+  border-color: var(--rule-strong);
+  color: var(--ink);
 }
 
 .cabinet__holder {

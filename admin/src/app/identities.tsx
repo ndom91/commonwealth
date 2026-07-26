@@ -33,7 +33,7 @@ export const Route = createFileRoute("/identities")({
   beforeLoad: async () => {
     const session = await getSession();
     if (!session) throw redirect({ to: "/sign-in" });
-    return { holder: session.user.email ?? session.user.name ?? undefined };
+    return { holder: session.user.name ?? session.user.email ?? undefined };
   },
   /* The cursor lives in the URL like every other register state, so a page of
      the register is linkable and a reload does not silently jump back to the
