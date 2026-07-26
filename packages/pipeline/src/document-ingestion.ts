@@ -35,8 +35,15 @@ export class DocumentIngestion {
 
     const form = new FormData();
     form.append("file", new Blob([Buffer.from(input.bytes)], { type: input.mimeType }), input.filename);
+    /* Named for the same reason as the embedding call: two slow network hops in
+       one request, and an anonymous timeout leaves you guessing which. */
     const response = await fetch(`${this.options.markitdownUrl}/convert`, {
       method: "POST", body: form, signal: AbortSignal.timeout(30_000),
+    }).catch((cause: unknown) => {
+      if (cause instanceof Error && cause.name === "TimeoutError") {
+        throw new Error(`Converting ${input.filename} timed out after 30s.`);
+      }
+      throw new Error(`Could not reach the document converter at ${this.options.markitdownUrl}`, { cause });
     });
     if (!response.ok) throw new Error("Document conversion failed");
     const payload = (await response.json()) as { markdown?: string };
