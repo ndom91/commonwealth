@@ -20,6 +20,7 @@ import { Route as IdentitiesIndexRouteImport } from './app/identities/index'
 import { Route as IdentitiesIdentityIdRouteImport } from './app/identities/$identityId'
 import { Route as SourcesIndexRouteImport } from './app/sources/index'
 import { Route as SourcesSourceIdRouteImport } from './app/sources/$sourceId'
+import { Route as SourcesNewRouteImport } from './app/sources/new'
 import { Route as ApiAuthSplatRouteImport } from './app/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -77,6 +78,11 @@ const SourcesSourceIdRoute = SourcesSourceIdRouteImport.update({
   path: '/$sourceId',
   getParentRoute: () => SourcesRoute,
 } as any)
+const SourcesNewRoute = SourcesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => SourcesRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/sources': typeof SourcesRouteWithChildren
   '/identities/$identityId': typeof IdentitiesIdentityIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/sources/new': typeof SourcesNewRoute
   '/identities/': typeof IdentitiesIndexRoute
   '/sources/': typeof SourcesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -105,6 +112,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/identities/$identityId': typeof IdentitiesIdentityIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/sources/new': typeof SourcesNewRoute
   '/identities': typeof IdentitiesIndexRoute
   '/sources': typeof SourcesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   '/sources': typeof SourcesRouteWithChildren
   '/identities/$identityId': typeof IdentitiesIdentityIdRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/sources/new': typeof SourcesNewRoute
   '/identities/': typeof IdentitiesIndexRoute
   '/sources/': typeof SourcesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/sources'
     | '/identities/$identityId'
     | '/sources/$sourceId'
+    | '/sources/new'
     | '/identities/'
     | '/sources/'
     | '/api/auth/$'
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/identities/$identityId'
     | '/sources/$sourceId'
+    | '/sources/new'
     | '/identities'
     | '/sources'
     | '/api/auth/$'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/sources'
     | '/identities/$identityId'
     | '/sources/$sourceId'
+    | '/sources/new'
     | '/identities/'
     | '/sources/'
     | '/api/auth/$'
@@ -257,6 +269,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SourcesSourceIdRouteImport
       parentRoute: typeof SourcesRoute
     }
+    '/sources/new': {
+      id: '/sources/new'
+      path: '/new'
+      fullPath: '/sources/new'
+      preLoaderRoute: typeof SourcesNewRouteImport
+      parentRoute: typeof SourcesRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -283,11 +302,13 @@ const IdentitiesRouteWithChildren = IdentitiesRoute._addFileChildren(
 
 interface SourcesRouteChildren {
   SourcesSourceIdRoute: typeof SourcesSourceIdRoute
+  SourcesNewRoute: typeof SourcesNewRoute
   SourcesIndexRoute: typeof SourcesIndexRoute
 }
 
 const SourcesRouteChildren: SourcesRouteChildren = {
   SourcesSourceIdRoute: SourcesSourceIdRoute,
+  SourcesNewRoute: SourcesNewRoute,
   SourcesIndexRoute: SourcesIndexRoute,
 }
 

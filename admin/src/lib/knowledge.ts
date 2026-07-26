@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { chunkMarkdown } from "@llm-team-kb/pipeline";
@@ -117,7 +117,7 @@ export const listSources = createServerFn({ method: "GET" })
       SELECT sources.id, sources.source_type, sources.status, sources.authority,
              sources.created_at, sources.deleted_at, sources.last_verified_at,
              revision.title, revision.revision_number, revision.content_updated_at,
-             author.display_name AS author,
+             COALESCE(author.display_name, 'administrator') AS author,
              COALESCE(
                (SELECT json_agg(source_tags.tag ORDER BY source_tags.tag)
                 FROM source_tags WHERE source_tags.source_id = sources.id),
@@ -153,7 +153,7 @@ export const listReviewQueue = createServerFn({ method: "GET" }).handler(async (
   const rows = await client`
     SELECT sources.id, sources.source_type, sources.authority, sources.created_at,
            sources.last_verified_at, revision.title, revision.revision_number,
-           revision.content_updated_at, author.display_name AS author,
+           revision.content_updated_at, COALESCE(author.display_name, 'administrator') AS author,
            sources.authority = 'unverified' AS is_unverified,
            (${IS_STALE}) AS is_stale
     FROM sources
@@ -203,7 +203,7 @@ export const getSourceDetail = createServerFn({ method: "GET" })
              sources.current_content_hash,
              revision.title, revision.revision_number, revision.markdown_content,
              revision.content_updated_at, revision.original_filename, revision.mime_type,
-             author.display_name AS author,
+             COALESCE(author.display_name, 'administrator') AS author,
              COALESCE(
                (SELECT json_agg(source_tags.tag ORDER BY source_tags.tag)
                 FROM source_tags WHERE source_tags.source_id = sources.id),
@@ -229,7 +229,7 @@ export const getSourceRevisions = createServerFn({ method: "GET" })
              source_revisions.created_at, source_revisions.title,
              length(source_revisions.markdown_content) AS content_length,
              source_revisions.id = sources.current_revision_id AS is_current,
-             author.display_name AS author
+             COALESCE(author.display_name, 'administrator') AS author
       FROM source_revisions
       JOIN sources ON sources.id = source_revisions.source_id
       LEFT JOIN users AS author ON author.id = source_revisions.created_by
@@ -464,7 +464,7 @@ export const searchSources = createServerFn({ method: "GET" })
       WITH terms AS (SELECT websearch_to_tsquery('english', ${data.query}) AS value)
       SELECT sources.id, sources.authority, sources.source_type, sources.status,
              sources.last_verified_at, revision.title, revision.revision_number,
-             revision.content_updated_at, author.display_name AS author,
+             revision.content_updated_at, COALESCE(author.display_name, 'administrator') AS author,
              (${IS_STALE}) AS is_stale,
              body.excerpt,
              strpos(lower(revision.title), lower(${data.query})) > 0 AS title_match
@@ -624,6 +624,98 @@ export const reviseSource = createServerFn({ method: "POST" })
       if ((cause as { code?: string })?.code === "23505") {
         throw new Error(
           "Another active source already holds exactly this content. Withdraw that one first, or make this revision differ from it",
+        );
+      }
+      throw cause;
+    }
+  });
+
+/* Creating a source from the browser, the other half of authoring.
+ *
+ * Lands `approved` with `last_verified_at` set, rather than `unverified` like an
+ * agent submission. The queue exists to get a human to look at text nobody has
+ * vouched for; text a human just wrote does not qualify, and putting it there
+ * would ask them to review their own writing. Canonical stays a separate,
+ * deliberate act — the same line trusted holders are held to.
+ *
+ * The two ids are generated up front because `sources.current_revision_id` and
+ * `source_revisions.source_id` point at each other. Migration 0004 defers that
+ * constraint precisely so the pair can be written in one transaction. */
+export const createSource = createServerFn({ method: "POST" })
+  .validator((value: unknown): { title: string; markdown: string; tags: string[] } => {
+    const input = (value ?? {}) as Partial<{ title: string; markdown: string; tags: unknown }>;
+    const title = input.title?.trim();
+    if (!title) throw new Error("A source needs a title.");
+    const markdown = input.markdown?.trim();
+    if (!markdown) throw new Error("A source cannot be empty.");
+    const tags = Array.isArray(input.tags)
+      ? [...new Set(input.tags.map((tag) => String(tag).trim()).filter(Boolean))]
+      : [];
+    return { title, markdown, tags };
+  })
+  .handler(async ({ data }) => {
+    const administrator = await adminId();
+
+    const chunks = chunkMarkdown(data.markdown);
+    if (chunks.length === 0) throw new Error("That text contains nothing indexable.");
+    const contentHash = createHash("sha256").update(data.markdown).digest("hex");
+    const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
+    const model = embeddingModel();
+
+    const sourceId = randomUUID();
+    const revisionId = randomUUID();
+
+    try {
+      return await client.begin(async (transaction) => {
+        const [workspace] = await transaction<{ id: string }[]>`
+          SELECT id FROM workspaces WHERE name = 'default'
+        `;
+        if (!workspace) throw new Error("Default workspace is unavailable");
+
+        await transaction`
+          INSERT INTO sources (
+            id, workspace_id, source_type, authority, current_revision_id,
+            current_content_hash, created_by, created_by_admin_id, last_verified_at
+          ) VALUES (
+            ${sourceId}, ${workspace.id}, 'note', 'approved', ${revisionId},
+            ${contentHash}, NULL, ${administrator}, now()
+          )
+        `;
+
+        await transaction`
+          INSERT INTO source_revisions (
+            id, source_id, revision_number, title, content_hash, markdown_content,
+            supersedes_revision_id, created_by, created_by_admin_id
+          ) VALUES (
+            ${revisionId}, ${sourceId}, 1, ${data.title}, ${contentHash}, ${data.markdown},
+            NULL, NULL, ${administrator}
+          )
+        `;
+
+        for (const [ordinal, chunk] of chunks.entries()) {
+          await transaction`
+            INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
+            VALUES (${sourceId}, ${revisionId}, ${ordinal}, ${chunk.heading}, ${chunk.content},
+                    ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(",")}]`}::vector, ${model})
+          `;
+        }
+
+        for (const tag of data.tags) {
+          await transaction`INSERT INTO source_tags (source_id, tag) VALUES (${sourceId}, ${tag})`;
+        }
+
+        await transaction`
+          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
+          VALUES (${workspace.id}, ${administrator}, 'source_submitted', ${sourceId},
+            ${JSON.stringify({ sourceType: "note", authority: "approved", revisionId, chunkCount: chunks.length })}::jsonb)
+        `;
+
+        return { sourceId, chunkCount: chunks.length };
+      });
+    } catch (cause) {
+      if ((cause as { code?: string })?.code === "23505") {
+        throw new Error(
+          "An active source already holds exactly this content. Open that one and revise it instead of creating a duplicate",
         );
       }
       throw cause;

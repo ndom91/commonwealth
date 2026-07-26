@@ -143,6 +143,11 @@ function Sources() {
         await authClient.signOut();
         router.navigate({ to: "/sign-in" });
       }}
+      actions={
+        <Link to="/sources/new" search={{}} className="btn btn--primary">
+          New source
+        </Link>
+      }
     >
       <div className="panes">
         <section className="index" aria-label="Source register">
