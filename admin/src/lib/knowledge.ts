@@ -407,9 +407,22 @@ export const listEventTypes = createServerFn({ method: "GET" }).handler(async ()
  * DATABASE_URL. Presenting these results as "search" without qualification
  * would misrepresent what an agent actually retrieves.
  *
- * `chunks.search_vector` is a generated tsvector with a GIN index, so this
- * costs nothing beyond the query. Ranking with ts_rank_cd rewards matches that
- * sit close together, and the best-scoring chunk stands for its source. */
+ * Two ways to match, because they fail in opposite directions:
+ *
+ * 1. Title substring. Full-text search matches whole stemmed words, so typing
+ *    "escala" finds nothing — "escalation" is indexed as the stem "escal", and
+ *    a prefix query on "escala" cannot reach it. Anyone half-remembering a
+ *    title types a fragment, so titles are matched by plain substring.
+ *    `strpos` rather than ILIKE: no wildcard characters to escape.
+ * 2. Body keywords. `chunks.search_vector` is a generated tsvector with a GIN
+ *    index, so this costs nothing beyond the query. ts_rank_cd rewards matches
+ *    that sit close together, and the best-scoring chunk stands for its source.
+ *
+ * A title hit outranks any body hit: naming the thing you want is a stronger
+ * signal than mentioning it. Matched body terms come back wrapped in STX/ETX
+ * control characters rather than markup. The client splits on them and renders
+ * each piece as a React child, so the highlight is real but no part of the body
+ * is ever parsed as HTML — the same rule the source bench follows. */
 export const searchSources = createServerFn({ method: "GET" })
   .validator((value: unknown): { query: string } => {
     const query = (value as { query?: string })?.query?.trim();
@@ -422,24 +435,33 @@ export const searchSources = createServerFn({ method: "GET" })
     return client`
       WITH terms AS (SELECT websearch_to_tsquery('english', ${data.query}) AS value)
       SELECT sources.id, sources.authority, sources.source_type, sources.status,
-             revision.title, revision.revision_number, revision.content_updated_at,
-             author.display_name AS author,
+             sources.last_verified_at, revision.title, revision.revision_number,
+             revision.content_updated_at, author.display_name AS author,
              (${IS_STALE}) AS is_stale,
-             max(ts_rank_cd(chunks.search_vector, terms.value)) AS rank,
-             ts_headline('english', (array_agg(chunks.content ORDER BY
-               ts_rank_cd(chunks.search_vector, terms.value) DESC))[1], terms.value,
-               'MaxFragments=1, MaxWords=28, MinWords=12,
-                 StartSel=\x02, StopSel=\x03') AS excerpt
-      FROM chunks
-      CROSS JOIN terms
-      JOIN source_revisions AS revision ON revision.id = chunks.source_revision_id
-      JOIN sources ON sources.current_revision_id = revision.id
+             body.excerpt,
+             strpos(lower(revision.title), lower(${data.query})) > 0 AS title_match
+      FROM sources
+      JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
       LEFT JOIN users AS author ON author.id = sources.created_by
-      WHERE sources.status = 'active' AND chunks.search_vector @@ terms.value
-      GROUP BY sources.id, sources.authority, sources.source_type, sources.status,
-               revision.title, revision.revision_number, revision.content_updated_at,
-               author.display_name, sources.last_verified_at, terms.value
-      ORDER BY rank DESC
+      CROSS JOIN terms
+      LEFT JOIN LATERAL (
+        SELECT max(ts_rank_cd(chunks.search_vector, terms.value)) AS rank,
+               ts_headline('english',
+                 (array_agg(chunks.content ORDER BY
+                    ts_rank_cd(chunks.search_vector, terms.value) DESC))[1],
+                 terms.value,
+                 'MaxFragments=1, MaxWords=28, MinWords=12,
+                  StartSel=\x02, StopSel=\x03') AS excerpt
+        FROM chunks
+        WHERE chunks.source_revision_id = revision.id
+          AND chunks.search_vector @@ terms.value
+        GROUP BY terms.value
+      ) AS body ON true
+      WHERE sources.status = 'active'
+        AND (body.rank IS NOT NULL OR strpos(lower(revision.title), lower(${data.query})) > 0)
+      ORDER BY (strpos(lower(revision.title), lower(${data.query})) > 0) DESC,
+               body.rank DESC NULLS LAST,
+               revision.content_updated_at DESC
       LIMIT 25
     `;
   });

@@ -363,20 +363,41 @@ consequence saying what the group means for agents right now. The groups are
 separate because they are different failures — nobody has looked, versus
 somebody looked and then the text moved underneath them.
 
-### Keyword search
-A single underline field above the register with its own tracked label, a
-`btn--sm` submit, and a Clear that appears only while a query is live. A query
-**replaces** the filter bar rather than joining it: ranking and filtering answer
-different questions, and leaving filter controls visible over a ranked list
-would claim they still apply.
+### Icon button
+A 30px square control for rows where a worded button would crowd out the field
+beside it. Hairline box, no fill, glyph in `{colors.ink-secondary}`; the `void`
+tone spends an oxide outline and never a fill, exactly as `btn--void` does.
 
-Results carry an excerpt in register type with matched terms marked in
+The label is never dropped — it moves to `aria-label` and `title`, so the
+control still names itself to a screen reader and on hover. Icon-only is
+reserved for actions a conventional glyph carries on its own. A magnifier is
+unambiguous; *withdraw* is not, and keeps its word.
+
+### Keyword search
+A single underline field above the register with its own tracked label, an
+icon-button submit, and an icon-button Clear that appears only while a query is
+live. The browser's own `type=search` clear is suppressed: the row already has
+a Clear that resets the URL too, and offering both invites the one that only
+empties the field.
+
+A query **replaces** the filter bar rather than joining it: ranking and
+filtering answer different questions, and leaving filter controls visible over
+a ranked list would claim they still apply.
+
+Two ways to match, because they fail in opposite directions. **Titles match by
+substring** — full-text search only matches whole stemmed words, so typing
+`escala` would otherwise miss *Support escalation ladder* entirely, and a
+half-remembered title is the commonest way anyone searches a register.
+**Bodies match by keyword**, ranked by term proximity. A title hit outranks any
+body hit: naming the thing you want is a stronger signal than mentioning it.
+
+Body results carry an excerpt in register type with matched terms marked in
 `{colors.mark}` — tag stock as ink, because a match is a mark on the record and
 not something issued. The excerpt arrives with terms delimited by control
 characters and is split into React children, so the highlight is real without
 any body text being parsed as HTML.
 
-Below the field sits one sentence saying the search is keyword-only. Agents
+Below the field sits one sentence saying exactly what is matched. Agents
 retrieve with meaning as well as words; presenting this as the same thing would
 misrepresent what an agent will actually get back.
 

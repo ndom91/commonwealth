@@ -2,7 +2,8 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouter } from 
 import { authClient } from "../lib/auth-client.js";
 import { getSession } from "../lib/session.js";
 import { getNavCounts, listSources, searchSources } from "../lib/knowledge.js";
-import { AppShell, SealChip, accessionOf, authoritySeal, stamp } from "../components/chrome.js";
+import { Search, X } from "lucide-react";
+import { AppShell, IconButton, SealChip, accessionOf, authoritySeal, stamp } from "../components/chrome.js";
 import { readFailure } from "../lib/read-failure.js";
 
 /* Filters live in the URL rather than component state: a filtered register is
@@ -142,24 +143,20 @@ function Sources() {
                 autoComplete="off"
               />
             </label>
-            <button type="submit" className="btn btn--quiet btn--sm">
-              Search
-            </button>
+            <IconButton type="submit" label="Search" icon={Search} />
             {searching && (
-              <button
-                type="button"
-                className="btn btn--quiet btn--sm"
+              <IconButton
+                label="Clear search"
+                icon={X}
                 onClick={() => void navigate({ search: {} })}
-              >
-                Clear
-              </button>
+              />
             )}
           </form>
 
           {searching ? (
             <p className="line__caption seek__note">
-              Keyword match only, ranked by term proximity. Agents retrieve with
-              meaning as well as words, so this can miss what{" "}
+              Matches titles containing this text, and bodies containing these
+              words. Agents retrieve by meaning as well, so this can miss what{" "}
               <code className="register">search_knowledge</code> would return.
             </p>
           ) : (
@@ -208,7 +205,10 @@ function Sources() {
           {!failure && sources.length === 0 && (
             <p className="empty index__note">
               {searching ? (
-                <>No source body contains those words. Try fewer, or clear the search to browse the register.</>
+                <>
+                  No title or source body matches. Try fewer words, or clear the
+                  search to browse the register.
+                </>
               ) : (
                 <>
                   No sources match. Agents submit knowledge over MCP with{" "}

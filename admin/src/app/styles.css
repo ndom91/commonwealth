@@ -579,7 +579,10 @@ select {
   display: grid;
   justify-items: start;
   gap: var(--s-snug);
-  padding-inline: var(--s-loose);
+  /* Block padding as well as inline: the note sits directly under a ruled
+     filter or search bar, and without it the sentence reads as part of the
+     control rather than as the register's answer. */
+  padding: var(--s-base) var(--s-loose);
 }
 
 /* ── Seal chips ──────────────────────────────────────────────────────────── */
@@ -1216,6 +1219,13 @@ select {
   color: var(--ink-dormant);
 }
 
+/* WebKit draws its own clear affordance inside type=search. The row already
+   has an explicit Clear that also resets the URL, and two of them invite the
+   one that only empties the field. */
+.seek__field input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
 .seek__field input:focus-visible {
   outline: none;
   border-bottom: 2px solid var(--ink);
@@ -1331,4 +1341,55 @@ select {
   background: none;
   color: var(--mark);
   font-weight: 600;
+}
+
+/* ── Icon button ────────────────────────────────────────────────────────────
+   For controls small enough to sit inside a field row. Square like every other
+   control in the system, and sized to the field it accompanies rather than to
+   the worded buttons, which would tower over an underline input. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--rule-hair);
+  border-radius: 0;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out,
+    border-color 120ms ease-out;
+}
+
+.icon-btn:hover {
+  background: var(--slate-raised);
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+
+.icon-btn:disabled {
+  color: var(--ink-dormant);
+  cursor: not-allowed;
+}
+
+.icon-btn:disabled:hover {
+  background: none;
+  border-color: var(--rule-hair);
+  color: var(--ink-dormant);
+}
+
+/* Oxide is spent on destruction only, never filled — the Reserved Seal Rule
+   applies to icon controls exactly as it does to worded ones. */
+.icon-btn--void {
+  border-color: var(--seal);
+  color: var(--seal);
+}
+
+.icon-btn--void:hover {
+  background: none;
+  border-color: var(--seal);
+  color: var(--seal);
 }

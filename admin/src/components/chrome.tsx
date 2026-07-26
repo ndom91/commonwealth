@@ -1,5 +1,6 @@
-import { type ReactNode } from "react";
+import { type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import type { LucideIcon } from "lucide-react";
 
 /* Application chrome for the Custody Bench. Every workbench screen mounts
    inside AppShell and reuses the index-and-bench split: a ruled register of
@@ -178,6 +179,37 @@ export type SealState = "unsealed" | "signed" | "sealed" | "suspended" | "void";
 
 export function SealChip({ state, children }: { state: SealState; children: ReactNode }) {
   return <span className={`chip chip--${state}`}>{children}</span>;
+}
+
+/* A control small enough to sit inside a field row, where a worded button would
+   crowd out the field itself. The label is never dropped — it moves to the
+   accessible name and the tooltip — so the control is still reachable by
+   screen reader and still explains itself on hover.
+ *
+ * Icon-only is reserved for actions whose meaning is carried entirely by a
+ * conventional glyph. Anything consequential keeps its word: a magnifier is
+ * unambiguous, "withdraw" is not. */
+export function IconButton({
+  label,
+  icon: Icon,
+  tone = "quiet",
+  ...button
+}: {
+  label: string;
+  icon: LucideIcon;
+  tone?: "quiet" | "void";
+} & Omit<ComponentPropsWithoutRef<"button">, "children" | "className" | "aria-label" | "title">) {
+  return (
+    <button
+      {...button}
+      type={button.type ?? "button"}
+      className={`icon-btn icon-btn--${tone}`}
+      aria-label={label}
+      title={label}
+    >
+      <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
+    </button>
+  );
 }
 
 /* Source authority maps onto the seal vocabulary with no new states: an
