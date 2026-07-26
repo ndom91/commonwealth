@@ -5,6 +5,7 @@ import {
   getSourceEvents,
   getSourceRevisions,
   restoreSource,
+  reviseSource,
   setSourceAuthority,
   withdrawSource,
 } from "../../lib/knowledge.js";
@@ -75,6 +76,9 @@ function SourceBench() {
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
   const [armWithdraw, setArmWithdraw] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftBody, setDraftBody] = useState("");
 
   const load = useCallback(async () => {
     setError(undefined);
@@ -102,7 +106,10 @@ function SourceBench() {
     setError(undefined);
     try {
       await action();
+      /* Reached only when the action did not throw, so a rejected revision
+         leaves the editor open with the text still in it. */
       setArmWithdraw(false);
+      setEditing(false);
       await load();
       /* The rail count and the register both reflect authority and status, so
          the whole route reloads rather than just this pane. */
@@ -267,17 +274,97 @@ function SourceBench() {
       </div>
 
       <div className="bench__section">
-        <span className="label">
-          Content · revision {detail.revision_number}
-          {detail.original_filename ? ` · ${detail.original_filename}` : ""}
-        </span>
-        {/* Rendered as text, never parsed to HTML. This is agent-submitted
-            content, and this surface can revoke credentials. */}
-        <pre className="source-body">{detail.markdown_content}</pre>
-        <p className="line__caption">
-          Shown as submitted. Markdown is never rendered here — source content is
-          untrusted input, and this surface holds credential controls.
-        </p>
+        <div className="bench__section-head">
+          <span className="label">
+            Content · revision {detail.revision_number}
+            {detail.original_filename ? ` · ${detail.original_filename}` : ""}
+          </span>
+          {/* An upload's revision holds text converted from a stored file, so
+              editing the text alone would leave the two disagreeing about what
+              the source is. The server refuses it; the button does not offer
+              it. */}
+          {!editing && !withdrawn && detail.source_type === "note" && (
+            <button
+              type="button"
+              className="btn btn--quiet"
+              onClick={() => {
+                setDraftTitle(detail.title);
+                setDraftBody(detail.markdown_content);
+                setError(undefined);
+                setEditing(true);
+              }}
+            >
+              Edit
+            </button>
+          )}
+        </div>
+
+        {editing ? (
+          <form
+            className="revise"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void act(
+                () => reviseSource({ data: { sourceId, title: draftTitle, markdown: draftBody } }),
+                "The revision could not be saved.",
+              );
+            }}
+          >
+            <label className="field">
+              <span className="label">Title</span>
+              <input
+                value={draftTitle}
+                onChange={(event) => setDraftTitle(event.target.value)}
+                disabled={pending}
+                required
+              />
+            </label>
+            <label className="field">
+              <span className="label">Markdown</span>
+              <textarea
+                className="revise__body register"
+                value={draftBody}
+                onChange={(event) => setDraftBody(event.target.value)}
+                disabled={pending}
+                rows={20}
+                spellCheck={false}
+                required
+              />
+            </label>
+            <p className="line__caption">
+              Saving writes a new revision rather than overwriting this one — the
+              current text is kept and stays readable below. The new text is
+              re-chunked and re-embedded, so agents retrieve your wording from
+              the next search onward, and the source counts as verified by you.
+            </p>
+            <div className="revise__actions">
+              <button type="submit" className="btn btn--primary" disabled={pending}>
+                {pending ? "Saving…" : "Save revision"}
+              </button>
+              <button
+                type="button"
+                className="btn btn--quiet"
+                disabled={pending}
+                onClick={() => {
+                  setEditing(false);
+                  setError(undefined);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            {/* Rendered as text, never parsed to HTML. This is agent-submitted
+                content, and this surface can revoke credentials. */}
+            <pre className="source-body">{detail.markdown_content}</pre>
+            <p className="line__caption">
+              Shown as submitted. Markdown is never rendered here — source content
+              is untrusted input, and this surface holds credential controls.
+            </p>
+          </>
+        )}
       </div>
 
       <div className="bench__section">

@@ -434,6 +434,44 @@ select {
 
 /* Agent-submitted Markdown, shown as submitted. Never parsed to HTML — this
    surface holds the credential controls. */
+/* The revision editor. It replaces the source body in place rather than opening
+   a dialog: the thing being corrected and the correction are the same object,
+   and a modal would hide the custody line and revision list a reviewer is
+   deciding against. */
+.revise {
+  display: grid;
+  gap: var(--s-base);
+}
+
+/* A box, unlike every other field in the product, which are underlines. The
+   underline convention reads a value; this is a working surface holding the
+   whole source, and it needs an edge to say where the document ends. It takes
+   the recessed ground of `.source-body` for the same reason — this is the same
+   text, now writable. */
+.revise__body {
+  width: 100%;
+  min-height: 18rem;
+  padding: var(--s-base);
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: var(--slate-ground);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.revise__body:focus-visible {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.revise__actions {
+  display: flex;
+  gap: var(--s-tight);
+}
+
 .source-body {
   max-height: 32rem;
   margin: 0;

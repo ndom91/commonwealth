@@ -27,12 +27,23 @@ services:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      # Editing a source rewrites its chunks, so the admin now embeds too. It
+      # must resolve to the same Ollama and the same model as `app`: chunks from
+      # two models in one index do not error, they quietly stop matching.
+      OLLAMA_URL: ${OLLAMA_URL}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       PORT: 3001
     depends_on:
       admin-migrate:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    # The same volume `app` mounts. Uploaded originals are addressed by content
+    # hash, so both services must look in one place or each sees only its own.
+    volumes:
+      - source_data:/app/storage
     ports:
       - "127.0.0.1:${ADMIN_PORT:-3001}:3001"
 

@@ -1,7 +1,10 @@
+import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import { chunkMarkdown } from "@llm-team-kb/pipeline";
 import { client } from "./db.js";
 import { auth } from "./auth.js";
+import { embeddingModel, embeddings } from "./pipeline.js";
 
 /* Read and curation access to the knowledge corpus.
  *
@@ -509,3 +512,120 @@ export const listSubmitters = createServerFn({ method: "GET" }).handler(async ()
   `;
   return rows.map((row) => ({ id: row.id, name: row.name, count: Number(row.count) }));
 });
+
+/* Authoring — the one thing the review queue could not do.
+ *
+ * `/review` names sources a human should look at, and until this the bench
+ * could only pass judgement on them: approve, unverify, withdraw. A reviewer
+ * who saw a mistake in a canonical source had to go and ask an agent to fix it.
+ *
+ * The work deliberately splits either side of the transaction. Chunking and
+ * embedding run first, outside it, because embedding is a network round trip to
+ * Ollama and holding `FOR UPDATE` on the source across it would block every
+ * agent writing to that same source for the duration. This mirrors how
+ * `prepareContent` is called before `sql.begin` in the MCP server.
+ *
+ * Chunks are inserted, never deleted. They are keyed to the revision that
+ * produced them, and retrieval reaches them through
+ * `sources.current_revision_id`, so superseded chunks fall out of search by
+ * construction while the old revision stays readable — principle 2, nothing in
+ * the product may make history unrecoverable. */
+export const reviseSource = createServerFn({ method: "POST" })
+  .validator((value: unknown): { sourceId: string; title: string; markdown: string } => {
+    const input = (value ?? {}) as Partial<{ sourceId: string; title: string; markdown: string }>;
+    const sourceId = input.sourceId?.trim();
+    if (!sourceId || !UUID.test(sourceId)) throw new Error("Invalid source");
+    const title = input.title?.trim();
+    if (!title) throw new Error("A revision needs a title.");
+    const markdown = input.markdown?.trim();
+    if (!markdown) throw new Error("A revision cannot be empty.");
+    return { sourceId, title, markdown };
+  })
+  .handler(async ({ data }) => {
+    const administrator = await adminId();
+
+    const chunks = chunkMarkdown(data.markdown);
+    if (chunks.length === 0) throw new Error("That text contains nothing indexable.");
+    const contentHash = createHash("sha256").update(data.markdown).digest("hex");
+    const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
+    const model = embeddingModel();
+
+    try {
+      return await client.begin(async (transaction) => {
+        const [source] = await transaction<
+          { workspace_id: string; current_revision_id: string; source_type: string; status: string }[]
+        >`
+          SELECT workspace_id, current_revision_id, source_type, status
+          FROM sources WHERE id = ${data.sourceId} FOR UPDATE
+        `;
+        if (!source) throw new Error("That source no longer exists");
+        if (source.status !== "active") {
+          throw new Error("Restore this source before revising it");
+        }
+        /* Same rule the MCP server enforces: an upload's revision carries the
+           converted text of a stored file, so replacing the text alone would
+           leave the two disagreeing about what the source is. */
+        if (source.source_type === "upload") {
+          throw new Error("Uploaded sources cannot be revised as Markdown. Withdraw it and upload a corrected file");
+        }
+
+        const [current] = await transaction<{ revision_number: number; content_hash: string }[]>`
+          SELECT revision_number, content_hash FROM source_revisions WHERE id = ${source.current_revision_id}
+        `;
+        if (!current) throw new Error("That source has no current revision");
+        if (current.content_hash === contentHash) throw new Error("Nothing changed in that text");
+
+        const revisionNumber = current.revision_number + 1;
+        const [revision] = await transaction<{ id: string }[]>`
+          INSERT INTO source_revisions (
+            source_id, revision_number, title, content_hash, markdown_content,
+            supersedes_revision_id, created_by, created_by_admin_id
+          ) VALUES (
+            ${data.sourceId}, ${revisionNumber}, ${data.title}, ${contentHash}, ${data.markdown},
+            ${source.current_revision_id}, NULL, ${administrator}
+          ) RETURNING id
+        `;
+        if (!revision) throw new Error("Unable to record the revision");
+
+        for (const [ordinal, chunk] of chunks.entries()) {
+          await transaction`
+            INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
+            VALUES (${data.sourceId}, ${revision.id}, ${ordinal}, ${chunk.heading}, ${chunk.content},
+                    ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(",")}]`}::vector, ${model})
+          `;
+        }
+
+        /* A person who rewrites the text is vouching for it by the act, so
+           verification moves with the revision. Without this the source would
+           reappear in the review queue immediately, stale against a version the
+           reviewer had just written themselves. Authority is untouched: writing
+           is not the same as promoting. */
+        await transaction`
+          UPDATE sources
+          SET current_revision_id = ${revision.id}, current_content_hash = ${contentHash},
+              last_verified_at = now()
+          WHERE id = ${data.sourceId}
+        `;
+
+        await transaction`
+          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
+          VALUES (${source.workspace_id}, ${administrator}, 'source_revised', ${data.sourceId},
+            ${JSON.stringify({
+              previousRevisionId: source.current_revision_id,
+              revisionId: revision.id,
+              revisionNumber,
+              chunkCount: chunks.length,
+            })}::jsonb)
+        `;
+
+        return { sourceId: data.sourceId, revisionNumber, chunkCount: chunks.length };
+      });
+    } catch (cause) {
+      if ((cause as { code?: string })?.code === "23505") {
+        throw new Error(
+          "Another active source already holds exactly this content. Withdraw that one first, or make this revision differ from it",
+        );
+      }
+      throw cause;
+    }
+  });
