@@ -1,4 +1,9 @@
-import { createFileRoute, Link, useLoaderData, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  useLoaderData,
+  useRouter,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import {
   issueCredential,
@@ -6,7 +11,12 @@ import {
   setIdentityDisabled,
   updateIdentity,
 } from "../../lib/management.js";
-import { SealChip, accessionOf, stamp, stampAt } from "../../components/chrome.js";
+import {
+  SealChip,
+  accessionOf,
+  stamp,
+  stampAt,
+} from "../../components/chrome.js";
 import {
   CredentialTag,
   ROLES,
@@ -21,7 +31,12 @@ export const Route = createFileRoute("/identities/$identityId")({
   component: HolderBench,
 });
 
-type Amendment = { name: string; role: Role; description: string | null; autoApprove: boolean };
+type Amendment = {
+  name: string;
+  role: Role;
+  description: string | null;
+  autoApprove: boolean;
+};
 
 function HolderBench() {
   const { identityId } = Route.useParams();
@@ -34,7 +49,9 @@ function HolderBench() {
   const { page } = useLoaderData({ from: "/identities" }) as {
     page: { identities: Identity[] } | undefined;
   };
-  const identity = (page?.identities ?? []).find((entry) => entry.id === identityId);
+  const identity = (page?.identities ?? []).find(
+    (entry) => entry.id === identityId,
+  );
 
   const [arming, setArming] = useState<string>();
   const [adding, setAdding] = useState(false);
@@ -78,7 +95,8 @@ function HolderBench() {
     } catch {
       setFailed({
         id: keyId,
-        message: "The credential is still live — it could not be voided. Try again.",
+        message:
+          "The credential is still live — it could not be voided. Try again.",
       });
     } finally {
       setVoiding(undefined);
@@ -90,7 +108,9 @@ function HolderBench() {
     setIssuePending(true);
     setIssueError(undefined);
     try {
-      setIssued(await issueCredential({ data: { identityId, keyLabel: newLabel } }));
+      setIssued(
+        await issueCredential({ data: { identityId, keyLabel: newLabel } }),
+      );
       setNewLabel("");
       setAdding(false);
       await router.invalidate();
@@ -161,7 +181,9 @@ function HolderBench() {
               autoFocus
               aria-invalid={amendError ? true : undefined}
               value={amend.name}
-              onChange={(event) => setAmend({ ...amend, name: event.target.value })}
+              onChange={(event) =>
+                setAmend({ ...amend, name: event.target.value })
+              }
             />
           </label>
 
@@ -169,7 +191,9 @@ function HolderBench() {
             <span className="label">Role</span>
             <select
               value={amend.role}
-              onChange={(event) => setAmend({ ...amend, role: event.target.value as Role })}
+              onChange={(event) =>
+                setAmend({ ...amend, role: event.target.value as Role })
+              }
             >
               {ROLES.map((value) => (
                 <option key={value} value={value}>
@@ -183,7 +207,8 @@ function HolderBench() {
             <p className="amend__consequence">
               Every credential this holder owns changes from{" "}
               <span className="role">{identity.role}</span> to{" "}
-              <span className="role">{amend.role}</span> the moment this is saved.
+              <span className="role">{amend.role}</span> the moment this is
+              saved.
             </p>
           )}
 
@@ -191,7 +216,12 @@ function HolderBench() {
             <span className="label">Submissions</span>
             <select
               value={amend.autoApprove ? "auto" : "review"}
-              onChange={(event) => setAmend({ ...amend, autoApprove: event.target.value === "auto" })}
+              onChange={(event) =>
+                setAmend({
+                  ...amend,
+                  autoApprove: event.target.value === "auto",
+                })
+              }
             >
               <option value="review">Held for review</option>
               <option value="auto">Approved automatically</option>
@@ -210,7 +240,9 @@ function HolderBench() {
             <span className="label">Administrator note</span>
             <input
               value={amend.description ?? ""}
-              onChange={(event) => setAmend({ ...amend, description: event.target.value || null })}
+              onChange={(event) =>
+                setAmend({ ...amend, description: event.target.value || null })
+              }
               placeholder="What this holder is for. Not shown to agents."
             />
           </label>
@@ -244,17 +276,24 @@ function HolderBench() {
 
   return (
     <>
-      {issued && <CredentialTag issued={issued} onDismiss={() => setIssued(undefined)} />}
+      {issued && (
+        <CredentialTag issued={issued} onDismiss={() => setIssued(undefined)} />
+      )}
 
       <div className="bench__head">
         <div>
           <span className="label">
-            Holder · {accessionOf(identity.id)} · registered {stamp(identity.created_at)}
+            Holder · {accessionOf(identity.id)} · registered{" "}
+            {stamp(identity.created_at)}
           </span>
           <h2>{identity.name}</h2>
         </div>
         <div className="bench__seal">
-          {disabled && <SealChip state="suspended">Disabled {stamp(identity.disabled_at)}</SealChip>}
+          {disabled && (
+            <SealChip state="suspended">
+              Disabled {stamp(identity.disabled_at)}
+            </SealChip>
+          )}
           {identity.auto_approve && <SealChip state="signed">Trusted</SealChip>}
           <span className="role">{identity.role}</span>
           <button
@@ -301,7 +340,11 @@ function HolderBench() {
               </button>
             </>
           ) : (
-            <button type="button" className="btn btn--void" onClick={() => setArmDisable(true)}>
+            <button
+              type="button"
+              className="btn btn--void"
+              onClick={() => setArmDisable(true)}
+            >
               Disable
             </button>
           )}
@@ -322,7 +365,9 @@ function HolderBench() {
         </p>
       )}
 
-      {identity.description && <p className="bench__note prose">{identity.description}</p>}
+      {identity.description && (
+        <p className="bench__note prose">{identity.description}</p>
+      )}
 
       <div className="bench__section">
         <div className="bench__section-head">
@@ -330,7 +375,11 @@ function HolderBench() {
             Credentials · {live} live of {identity.keys.length}
           </span>
           {!adding && (
-            <button type="button" className="btn btn--quiet" onClick={() => setAdding(true)}>
+            <button
+              type="button"
+              className="btn btn--quiet"
+              onClick={() => setAdding(true)}
+            >
               Issue credential
             </button>
           )}
@@ -386,12 +435,14 @@ function HolderBench() {
               <div className="stub" key={key.id}>
                 <span className="stub__label">{labelOf(key)}</span>
                 <span className="stub__meta register">
-                  <b>{key.prefix}…</b> · issued {stamp(key.createdAt)} · last presented{" "}
-                  {key.lastUsedAt ? stamp(key.lastUsedAt) : "never"}
+                  <b>{key.prefix}…</b> · issued {stamp(key.createdAt)} · last
+                  presented {key.lastUsedAt ? stamp(key.lastUsedAt) : "never"}
                 </span>
                 <span className="stub__action">
                   {key.revokedAt ? (
-                    <SealChip state="void">Void {stamp(key.revokedAt)}</SealChip>
+                    <SealChip state="void">
+                      Void {stamp(key.revokedAt)}
+                    </SealChip>
                   ) : arming === key.id ? (
                     <>
                       <button
@@ -442,11 +493,6 @@ function HolderBench() {
             </li>
           ))}
         </ul>
-        <p className="line__caption">
-          Derived from credential timestamps.{" "}
-          <Link to="/activity">The full event log</Link> records every change
-          with the person or agent who made it.
-        </p>
       </div>
     </>
   );

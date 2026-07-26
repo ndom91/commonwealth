@@ -57,14 +57,7 @@ type Event = {
   actor: string | null;
 };
 
-/* The chip states what a source *is*; these buttons say what a person would be
-   doing to it. Labelling them with the state names made them read as a status
-   display rather than three things a reviewer can do. */
-const AUTHORITY_ACTIONS: Array<{ value: Authority; action: string }> = [
-  { value: "unverified", action: "Unverify" },
-  { value: "approved", action: "Approve" },
-  { value: "canonical", action: "Mark canonical" },
-];
+const AUTHORITIES: Authority[] = ["unverified", "approved", "canonical"];
 
 function SourceBench() {
   const { sourceId } = Route.useParams();
@@ -180,38 +173,45 @@ function SourceBench() {
         </div>
       )}
 
-      <div className="bench__section">
-        <div className="bench__section-head">
-          <span className="label">
+        <div className="bench__section">
+          <div className="bench__section-head">
+            <span className="label">
             Authority
             {detail.last_verified_at
               ? ` · last verified ${stamp(detail.last_verified_at)}`
               : " · never verified by a human"}
-          </span>
-        </div>
-        <div className="authority-set">
-          {AUTHORITY_ACTIONS.map(({ value, action }) => {
-            const current = value === detail.authority;
-            return (
-              <button
-                key={value}
-                type="button"
-                className={`btn ${current ? "btn--current" : "btn--quiet"}`}
-                disabled={pending || withdrawn || current}
-                /* The disabled control is the one already in force, which a
-                   verb alone no longer conveys. */
-                title={current ? `Already ${value}` : undefined}
-                onClick={() =>
-                  void act(
-                    () => setSourceAuthority({ data: { sourceId, authority: value } }),
-                    "The authority could not be changed.",
-                  )
-                }
-              >
-                {action}
-              </button>
-            );
-          })}
+            </span>
+            <div className="authority-current">
+              <span className="label">Current authority</span>
+              <SealChip state={authoritySeal(detail.authority)}>{detail.authority}</SealChip>
+            </div>
+          </div>
+          <div className="authority-set">
+            <div className="authority-control">
+              <span className="label">Set authority to</span>
+              <div className="authority-control__choices" role="group" aria-label="Set authority to">
+                {AUTHORITIES.map((value) => {
+                  const current = value === detail.authority;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`btn ${current ? "btn--current" : "btn--quiet"}`}
+                      aria-pressed={current}
+                      disabled={pending || withdrawn || current}
+                      onClick={() =>
+                        void act(
+                          () => setSourceAuthority({ data: { sourceId, authority: value } }),
+                          "The authority could not be changed.",
+                        )
+                      }
+                    >
+                      {value}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           <span className="authority-set__spacer" />
           {withdrawn ? (
             <button
