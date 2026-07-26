@@ -21,6 +21,24 @@ The admin app is different: `pnpm dev` in `admin/` is a Vite dev server and
 picks changes up on save. Server functions occasionally need a manual reload
 of the page to re-run.
 
+## The shared pipeline is TypeScript source, not a build
+
+`@llm-team-kb/pipeline` (`packages/pipeline/`) holds chunking, embedding and
+document conversion — the parts the MCP server and the admin must never
+implement twice, because two embedders disagreeing on model or dimension
+silently poisons the index rather than raising anything.
+
+Its `exports` point at `.ts` files, so there is no build step to sequence in
+either Dockerfile. In exchange, **only a TypeScript-aware runtime can import
+it**: the server runs under `tsx`, the admin under Vite, tests under
+`node --import tsx`. A throwaway script run with bare `node` fails with
+`ERR_MODULE_NOT_FOUND` on `packages/pipeline/src/chunking.js` — the barrel's
+`.js` specifier that only exists as `.ts`. Use `node --import tsx`.
+
+Deliberately *not* shared: `knowledge-repository.ts`. It writes jsonb (see
+below) and is bound to the MCP `Actor` permission model, so sharing it would be
+wrong on the admin side in two separate ways. Each package keeps its own SQL.
+
 ## Two Postgres clients that behave differently
 
 Both packages use postgres.js against the same database, but the admin hands

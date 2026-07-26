@@ -1,6 +1,13 @@
-import type { Config } from "./config.js";
-
+/* Not an option. The dimension is fixed here because the `chunks.embedding`
+   column is `vector(1024)` and because a caller free to pass its own number is
+   a caller free to disagree with the other one. Changing it means changing the
+   migration and reindexing every chunk — see `PLAN.md`. */
 export const EMBEDDING_DIMENSIONS = 1024;
+
+export type EmbeddingOptions = {
+  ollamaUrl: string;
+  model: string;
+};
 
 type OllamaEmbeddingResponse = {
   embeddings?: number[][];
@@ -8,13 +15,13 @@ type OllamaEmbeddingResponse = {
 };
 
 export class Embeddings {
-  constructor(private readonly config: Config) {}
+  constructor(private readonly options: EmbeddingOptions) {}
 
   async embed(texts: string[]): Promise<number[][]> {
-    const response = await fetch(`${this.config.OLLAMA_URL}/api/embed`, {
+    const response = await fetch(`${this.options.ollamaUrl}/api/embed`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: this.config.EMBEDDING_MODEL, input: texts }),
+      body: JSON.stringify({ model: this.options.model, input: texts }),
       signal: AbortSignal.timeout(30_000),
     });
 

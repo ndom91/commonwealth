@@ -8,5 +8,9 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src", "test"]
+  // The shared pipeline is checked from here rather than carrying its own
+  // tsconfig and devDependencies: it has no runtime deps, and checking it under
+  // the strictest options in the repo means the looser admin build cannot be
+  // the first place a problem in it surfaces.
+  "include": ["src", "test", "packages/pipeline/src"]
 }

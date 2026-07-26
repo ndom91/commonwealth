@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Config } from "./config.js";
 
 const allowedMimeTypes = new Set([
   "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -10,6 +9,15 @@ const allowedMimeTypes = new Set([
   "text/csv", "text/html", "text/markdown", "text/plain",
 ]);
 
+export type DocumentIngestionOptions = {
+  markitdownUrl: string;
+  /* Both callers must point at the same directory, or one will convert a
+     document the other cannot find on disk. In compose this is the shared
+     `source_data` volume. */
+  storagePath: string;
+  maxUploadBytes: number;
+};
+
 export type ConvertedDocument = {
   markdown: string;
   contentHash: string;
@@ -17,17 +25,17 @@ export type ConvertedDocument = {
 };
 
 export class DocumentIngestion {
-  constructor(private readonly config: Config) {}
+  constructor(private readonly options: DocumentIngestionOptions) {}
 
   async ingest(input: { filename: string; mimeType: string; bytes: Uint8Array }): Promise<ConvertedDocument> {
-    if (input.bytes.byteLength > this.config.MAX_UPLOAD_BYTES) {
-      throw new Error(`Document exceeds the ${this.config.MAX_UPLOAD_BYTES} byte upload limit`);
+    if (input.bytes.byteLength > this.options.maxUploadBytes) {
+      throw new Error(`Document exceeds the ${this.options.maxUploadBytes} byte upload limit`);
     }
     if (!allowedMimeTypes.has(input.mimeType)) throw new Error("Unsupported document MIME type");
 
     const form = new FormData();
     form.append("file", new Blob([Buffer.from(input.bytes)], { type: input.mimeType }), input.filename);
-    const response = await fetch(`${this.config.MARKITDOWN_URL}/convert`, {
+    const response = await fetch(`${this.options.markitdownUrl}/convert`, {
       method: "POST", body: form, signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error("Document conversion failed");
@@ -35,8 +43,8 @@ export class DocumentIngestion {
     if (!payload.markdown?.trim()) throw new Error("Document conversion produced no text");
 
     const contentHash = digest(input.bytes);
-    const storagePath = join(this.config.SOURCE_STORAGE_PATH, contentHash);
-    await mkdir(this.config.SOURCE_STORAGE_PATH, { recursive: true });
+    const storagePath = join(this.options.storagePath, contentHash);
+    await mkdir(this.options.storagePath, { recursive: true });
     try {
       await writeFile(storagePath, input.bytes, { flag: "wx" });
     } catch (error) {

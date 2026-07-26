@@ -1,11 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import postgres, { type JSONValue, type Sql, type TransactionSql } from "postgres";
+import { chunkMarkdown, DocumentIngestion, type Embeddings } from "@llm-team-kb/pipeline";
 import { requirePermission } from "./access-service.js";
-import { chunkMarkdown } from "./chunking.js";
 import type { Config } from "./config.js";
 import type { Actor, Authority, SearchInput, SourceType } from "./domain.js";
-import { DocumentIngestion } from "./document-ingestion.js";
-import type { Embeddings } from "./embeddings.js";
 import { DomainError } from "./errors.js";
 type SourceRow = {
   id: string;
@@ -37,7 +35,11 @@ export class KnowledgeRepository {
   constructor(
     private readonly config: Config,
     private readonly embeddings: Pick<Embeddings, "embed">,
-    private readonly documentIngestion = new DocumentIngestion(config),
+    private readonly documentIngestion = new DocumentIngestion({
+      markitdownUrl: config.MARKITDOWN_URL,
+      storagePath: config.SOURCE_STORAGE_PATH,
+      maxUploadBytes: config.MAX_UPLOAD_BYTES,
+    }),
   ) {
     this.sql = postgres(config.DATABASE_URL);
   }

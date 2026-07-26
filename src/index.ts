@@ -2,15 +2,18 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import { Embeddings } from "@llm-team-kb/pipeline";
 import { loadConfig } from "./config.js";
 import { AccessService } from "./access-service.js";
 import type { Actor } from "./domain.js";
-import { Embeddings } from "./embeddings.js";
 import { DomainError } from "./errors.js";
 import { KnowledgeRepository } from "./knowledge-repository.js";
 
 const config = loadConfig();
-const knowledge = new KnowledgeRepository(config, new Embeddings(config));
+const knowledge = new KnowledgeRepository(
+  config,
+  new Embeddings({ ollamaUrl: config.OLLAMA_URL, model: config.EMBEDDING_MODEL }),
+);
 const access = new AccessService(knowledge.sql);
 
 function text(value: unknown) {

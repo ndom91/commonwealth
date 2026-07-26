@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chunkMarkdown } from "../src/chunking.js";
+import { chunkMarkdown } from "@llm-team-kb/pipeline";
 
 test("chunks Markdown by section while retaining headings", () => {
   const chunks = chunkMarkdown("# Product\n\nThe product is documented here.\n\n## Billing\n\nBilling uses invoices.");
