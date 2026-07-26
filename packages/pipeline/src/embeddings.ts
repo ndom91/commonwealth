@@ -46,17 +46,19 @@ export class Embeddings {
        names neither the service nor the stage, which is useless when a request
        makes two long network calls in sequence. Say which one gave up. */
     const response = await fetch(`${this.options.ollamaUrl}/api/embed`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ model: this.options.model, input: texts }),
       signal: AbortSignal.timeout(30_000),
     }).catch((cause: unknown) => {
-      if (cause instanceof Error && cause.name === "TimeoutError") {
+      if (cause instanceof Error && cause.name === 'TimeoutError') {
         throw new Error(
-          `Embedding ${texts.length} chunk(s) with ${this.options.model} timed out after 30s. The model may be loading, or the host may be slow.`,
+          `Embedding ${texts.length} chunk(s) with ${this.options.model} timed out after 30s. The model may be loading, or the host may be slow.`
         );
       }
-      throw new Error(`Could not reach the embedding service at ${this.options.ollamaUrl}`, { cause });
+      throw new Error(`Could not reach the embedding service at ${this.options.ollamaUrl}`, {
+        cause,
+      });
     });
 
     if (!response.ok) {
@@ -66,10 +68,18 @@ export class Embeddings {
     const payload = (await response.json()) as OllamaEmbeddingResponse;
     const embeddings = payload.embeddings ?? (payload.embedding ? [payload.embedding] : undefined);
     if (!embeddings || embeddings.length !== texts.length) {
-      throw new Error("Embedding provider returned an invalid response");
+      throw new Error('Embedding provider returned an invalid response');
     }
-    if (embeddings.some((embedding) => embedding.length !== EMBEDDING_DIMENSIONS || embedding.some((value) => !Number.isFinite(value)))) {
-      throw new Error(`Embedding provider must return ${EMBEDDING_DIMENSIONS} finite values per vector`);
+    if (
+      embeddings.some(
+        (embedding) =>
+          embedding.length !== EMBEDDING_DIMENSIONS ||
+          embedding.some((value) => !Number.isFinite(value))
+      )
+    ) {
+      throw new Error(
+        `Embedding provider must return ${EMBEDDING_DIMENSIONS} finite values per vector`
+      );
     }
 
     return embeddings;

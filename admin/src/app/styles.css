@@ -50,11 +50,9 @@
   --scrollbar-track: var(--slate-cabinet);
 
   --font-ui:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-register:
-    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono",
-    monospace;
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   --s-hair: 4px;
   --s-tight: 8px;
@@ -66,8 +64,7 @@
 
   --rail: 236px;
   --index: 340px;
-  --issued-lift:
-    0 10px 28px -6px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(0, 0, 0, 0.4);
+  --issued-lift: 0 10px 28px -6px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 
 @media (prefers-color-scheme: light) {
@@ -138,42 +135,18 @@ body {
 }
 
 @supports not (scrollbar-color: auto) {
-  :where(
-      html,
-      .cabinet,
-      .index,
-      .detail,
-      .source-body,
-      .queue,
-      .log
-    )::-webkit-scrollbar {
+  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
 
-  :where(
-      html,
-      .cabinet,
-      .index,
-      .detail,
-      .source-body,
-      .queue,
-      .log
-    )::-webkit-scrollbar-thumb {
+  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar-thumb {
     border: 2px solid var(--scrollbar-track);
     border-radius: 8px;
     background: var(--scrollbar-thumb);
   }
 
-  :where(
-      html,
-      .cabinet,
-      .index,
-      .detail,
-      .source-body,
-      .queue,
-      .log
-    )::-webkit-scrollbar-track {
+  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar-track {
     background: var(--scrollbar-track);
   }
 }

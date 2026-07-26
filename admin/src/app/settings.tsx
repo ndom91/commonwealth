@@ -1,11 +1,11 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
-import { authClient } from "../lib/auth-client.js";
-import { getSession } from "../lib/session.js";
-import { getNavCounts } from "../lib/knowledge.js";
-import { createAdministrator, listAdministrators, type Administrator } from "../lib/management.js";
-import { AppShell, stampAt } from "../components/chrome.js";
-import { readFailure } from "../lib/read-failure.js";
+import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
+import { useState } from 'react';
+import { AppShell, stampAt } from '../components/chrome.js';
+import { authClient } from '../lib/auth-client.js';
+import { getNavCounts } from '../lib/knowledge.js';
+import { type Administrator, createAdministrator, listAdministrators } from '../lib/management.js';
+import { readFailure } from '../lib/read-failure.js';
+import { getSession } from '../lib/session.js';
 
 /* The only surface that is about the people holding keys to the cabinet rather
    than about what is in it. Two concerns, one page, because they answer the
@@ -14,13 +14,13 @@ import { readFailure } from "../lib/read-failure.js";
  * A single bench rather than the register/bench split used by Sources and
  * Identities: there is nothing here to browse. Administrators are a handful of
  * people, listed in full. */
-export const Route = createFileRoute("/settings")({
+export const Route = createFileRoute('/settings')({
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session) throw redirect({ to: "/sign-in" });
+    if (!session) throw redirect({ to: '/sign-in' });
     return {
       holder: session.user.name ?? session.user.email ?? undefined,
-      account: { name: session.user.name ?? "", email: session.user.email ?? "" },
+      account: { name: session.user.name ?? '', email: session.user.email ?? '' },
     };
   },
   loader: async () => {
@@ -28,7 +28,11 @@ export const Route = createFileRoute("/settings")({
     try {
       return { counts, administrators: await listAdministrators(), failure: undefined };
     } catch (cause) {
-      return { counts, administrators: [] as Administrator[], failure: readFailure(cause, "The administrator list") };
+      return {
+        counts,
+        administrators: [] as Administrator[],
+        failure: readFailure(cause, 'The administrator list'),
+      };
     }
   },
   component: Settings,
@@ -47,7 +51,7 @@ function Settings() {
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
-        router.navigate({ to: "/sign-in" });
+        router.navigate({ to: '/sign-in' });
       }}
     >
       <section className="detail" aria-label="Settings">
@@ -84,7 +88,7 @@ function DisplayName({ current }: { current: string }) {
     const result = await authClient.updateUser({ name: name.trim() });
     setPending(false);
     if (result.error) {
-      setError(result.error.message ?? "That name could not be saved. Nothing was changed.");
+      setError(result.error.message ?? 'That name could not be saved. Nothing was changed.');
       return;
     }
     setSaved(true);
@@ -95,7 +99,7 @@ function DisplayName({ current }: { current: string }) {
     <div className="bench__section">
       <span className="label">Display name</span>
       <form className="bench__form" onSubmit={submit}>
-        <label className={`field${error ? " field--error" : ""}`}>
+        <label className={`field${error ? ' field--error' : ''}`}>
           <span className="label">Name</span>
           <input
             required
@@ -109,8 +113,8 @@ function DisplayName({ current }: { current: string }) {
           />
         </label>
         <p className="line__caption">
-          Printed on every source and revision you author, and in the cabinet
-          foot. Agent holders have names of their own — this one is yours.
+          Printed on every source and revision you author, and in the cabinet foot. Agent holders
+          have names of their own — this one is yours.
         </p>
         {error && (
           <p className="notice" role="alert">
@@ -118,10 +122,17 @@ function DisplayName({ current }: { current: string }) {
           </p>
         )}
         <div className="bench__controls">
-          <button className="btn btn--primary" disabled={pending || !name.trim() || name.trim() === current}>
-            {pending ? "Saving…" : "Save name"}
+          <button
+            className="btn btn--primary"
+            disabled={pending || !name.trim() || name.trim() === current}
+          >
+            {pending ? 'Saving…' : 'Save name'}
           </button>
-          {saved && <span className="line__caption" role="status">Saved.</span>}
+          {saved && (
+            <span className="line__caption" role="status">
+              Saved.
+            </span>
+          )}
         </div>
       </form>
     </div>
@@ -132,9 +143,9 @@ function DisplayName({ current }: { current: string }) {
    usually a response to a leak, and changing the secret while leaving the
    leaked session signed in would only look like security. */
 function Password() {
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [confirm, setConfirm] = useState("");
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [changed, setChanged] = useState(false);
@@ -144,13 +155,13 @@ function Password() {
     setError(undefined);
     setChanged(false);
     if (next !== confirm) {
-      setError("The new password and its confirmation do not match.");
+      setError('The new password and its confirmation do not match.');
       return;
     }
     /* Matches better-auth's `minPasswordLength` default, which is what actually
        enforces this — checking here only saves a round trip. */
     if (next.length < 8) {
-      setError("Use at least 8 characters.");
+      setError('Use at least 8 characters.');
       return;
     }
     setPending(true);
@@ -161,12 +172,12 @@ function Password() {
     });
     setPending(false);
     if (result.error) {
-      setError(result.error.message ?? "That password could not be changed. Nothing was changed.");
+      setError(result.error.message ?? 'That password could not be changed. Nothing was changed.');
       return;
     }
-    setCurrent("");
-    setNext("");
-    setConfirm("");
+    setCurrent('');
+    setNext('');
+    setConfirm('');
     setChanged(true);
   }
 
@@ -174,7 +185,7 @@ function Password() {
     <div className="bench__section">
       <span className="label">Password</span>
       <form className="bench__form" onSubmit={submit}>
-        <label className={`field${error ? " field--error" : ""}`}>
+        <label className={`field${error ? ' field--error' : ''}`}>
           <span className="label">Current password</span>
           <input
             required
@@ -209,8 +220,8 @@ function Password() {
         </label>
         <p className="line__caption">
           Signs out every other session. If this instance was bootstrapped from
-          <code> BOOTSTRAP_ADMIN_PASSWORD</code>, that value is still sitting in
-          your <code>.env</code> — changing it here is what retires it.
+          <code> BOOTSTRAP_ADMIN_PASSWORD</code>, that value is still sitting in your{' '}
+          <code>.env</code> — changing it here is what retires it.
         </p>
         {error && (
           <p className="notice" role="alert">
@@ -219,16 +230,26 @@ function Password() {
         )}
         <div className="bench__controls">
           <button className="btn btn--primary" disabled={pending}>
-            {pending ? "Changing…" : "Change password"}
+            {pending ? 'Changing…' : 'Change password'}
           </button>
-          {changed && <span className="line__caption" role="status">Password changed. Other sessions signed out.</span>}
+          {changed && (
+            <span className="line__caption" role="status">
+              Password changed. Other sessions signed out.
+            </span>
+          )}
         </div>
       </form>
     </div>
   );
 }
 
-function Administrators({ administrators, failure }: { administrators: Administrator[]; failure: string | undefined }) {
+function Administrators({
+  administrators,
+  failure,
+}: {
+  administrators: Administrator[];
+  failure: string | undefined;
+}) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
 
@@ -236,8 +257,12 @@ function Administrators({ administrators, failure }: { administrators: Administr
     <div className="bench__section">
       <div className="bench__section-head">
         <span className="label">Administrators</span>
-        <button type="button" className="btn btn--sm btn--quiet" onClick={() => setAdding((open) => !open)}>
-          {adding ? "Cancel" : "Add administrator"}
+        <button
+          type="button"
+          className="btn btn--sm btn--quiet"
+          onClick={() => setAdding((open) => !open)}
+        >
+          {adding ? 'Cancel' : 'Add administrator'}
         </button>
       </div>
 
@@ -262,7 +287,7 @@ function Administrators({ administrators, failure }: { administrators: Administr
             <div className="stub" key={administrator.id}>
               <span className="stub__label">
                 {administrator.name}
-                {administrator.isYou && " — you"}
+                {administrator.isYou && ' — you'}
               </span>
               <span className="stub__meta register">
                 {administrator.email} · since {stampAt(administrator.createdAt)}
@@ -273,9 +298,8 @@ function Administrators({ administrators, failure }: { administrators: Administr
       )}
 
       <p className="line__caption">
-        Everyone who can sign in to this surface. Sign-up stays closed —
-        administrators are only created here. Removing one is not yet possible
-        from the browser.
+        Everyone who can sign in to this surface. Sign-up stays closed — administrators are only
+        created here. Removing one is not yet possible from the browser.
       </p>
     </div>
   );
@@ -286,9 +310,9 @@ function Administrators({ administrators, failure }: { administrators: Administr
    is, and the recipient replaces it from the section above — which is what
    keeps a password the issuer has seen from being permanent. */
 function AddAdministrator({ onAdded }: { onAdded: () => Promise<void> }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -303,7 +327,7 @@ function AddAdministrator({ onAdded }: { onAdded: () => Promise<void> }) {
       setError(
         cause instanceof Error && cause.message
           ? `${cause.message} Nothing was changed.`
-          : "The administrator could not be added. Nothing was changed.",
+          : 'The administrator could not be added. Nothing was changed.'
       );
       setPending(false);
     }
@@ -311,9 +335,15 @@ function AddAdministrator({ onAdded }: { onAdded: () => Promise<void> }) {
 
   return (
     <form className="bench__inline" onSubmit={submit}>
-      <label className={`field${error ? " field--error" : ""}`}>
+      <label className={`field${error ? ' field--error' : ''}`}>
         <span className="label">Name</span>
-        <input required autoFocus value={name} disabled={pending} onChange={(event) => setName(event.target.value)} />
+        <input
+          required
+          autoFocus
+          value={name}
+          disabled={pending}
+          onChange={(event) => setName(event.target.value)}
+        />
       </label>
       <label className="field">
         <span className="label">Email</span>
@@ -339,9 +369,8 @@ function AddAdministrator({ onAdded }: { onAdded: () => Promise<void> }) {
         />
       </label>
       <p className="line__caption">
-        Shown as text so you can copy it once and pass it on. They should change
-        it as soon as they sign in. An address that already has an account is
-        promoted rather than recreated.
+        Shown as text so you can copy it once and pass it on. They should change it as soon as they
+        sign in. An address that already has an account is promoted rather than recreated.
       </p>
       {error && (
         <p className="notice" role="alert">
@@ -350,7 +379,7 @@ function AddAdministrator({ onAdded }: { onAdded: () => Promise<void> }) {
       )}
       <div className="bench__controls">
         <button className="btn btn--primary" disabled={pending}>
-          {pending ? "Adding…" : "Add administrator"}
+          {pending ? 'Adding…' : 'Add administrator'}
         </button>
       </div>
     </form>

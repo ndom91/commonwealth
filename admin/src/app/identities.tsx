@@ -1,12 +1,25 @@
-import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
-import { authClient } from "../lib/auth-client.js";
-import { createIdentity, listIdentities } from "../lib/management.js";
-import { getNavCounts } from "../lib/knowledge.js";
-import { getSession } from "../lib/session.js";
-import { readFailure } from "../lib/read-failure.js";
-import { AppShell, SealChip, accessionOf } from "../components/chrome.js";
-import { CredentialTag, ROLES, type Identity, type Issued, type Role } from "../components/identity.js";
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  redirect,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router';
+import { useState } from 'react';
+import { AppShell, accessionOf, SealChip } from '../components/chrome.js';
+import {
+  CredentialTag,
+  type Identity,
+  type Issued,
+  ROLES,
+  type Role,
+} from '../components/identity.js';
+import { authClient } from '../lib/auth-client.js';
+import { getNavCounts } from '../lib/knowledge.js';
+import { createIdentity, listIdentities } from '../lib/management.js';
+import { readFailure } from '../lib/read-failure.js';
+import { getSession } from '../lib/session.js';
 
 export type IdentitySearch = { after?: string };
 
@@ -16,7 +29,7 @@ export type IdentitySearch = { after?: string };
    first page — a bad cursor should show the register, not an error. */
 function parseCursor(after: string | undefined) {
   if (!after) return null;
-  const separator = after.indexOf("|");
+  const separator = after.indexOf('|');
   const createdAt = after.slice(0, separator);
   const id = after.slice(separator + 1);
   return createdAt && id ? { createdAt, id } : null;
@@ -29,17 +42,18 @@ function parseCursor(after: string | undefined) {
  * send another, and one `router.invalidate()` after a mutation refreshes the
  * register, the bench and the rail count together — the old route kept its own
  * effect-driven refetch, so there were two ways to reload one page. */
-export const Route = createFileRoute("/identities")({
+export const Route = createFileRoute('/identities')({
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session) throw redirect({ to: "/sign-in" });
+    if (!session) throw redirect({ to: '/sign-in' });
     return { holder: session.user.name ?? session.user.email ?? undefined };
   },
   /* The cursor lives in the URL like every other register state, so a page of
      the register is linkable and a reload does not silently jump back to the
      newest holders. */
   validateSearch: (search: Record<string, unknown>): IdentitySearch => ({
-    after: typeof search.after === "string" && search.after.includes("|") ? search.after : undefined,
+    after:
+      typeof search.after === 'string' && search.after.includes('|') ? search.after : undefined,
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
@@ -51,7 +65,7 @@ export const Route = createFileRoute("/identities")({
       const page = await listIdentities({ data: { cursor } });
       return { counts, page, failure: undefined };
     } catch (cause) {
-      return { counts, page: undefined, failure: readFailure(cause, "The register") };
+      return { counts, page: undefined, failure: readFailure(cause, 'The register') };
     }
   },
   component: IdentitiesLayout,
@@ -77,9 +91,9 @@ function IdentitiesLayout() {
   const [issued, setIssued] = useState<Issued>();
   const [issuing, setIssuing] = useState(false);
 
-  const [name, setName] = useState("");
-  const [role, setRole] = useState<Role>("writer");
-  const [keyLabel, setKeyLabel] = useState("");
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<Role>('writer');
+  const [keyLabel, setKeyLabel] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -91,15 +105,15 @@ function IdentitiesLayout() {
       const result = await createIdentity({ data: { name, role, keyLabel } });
       setIssued(result);
       setIssuing(false);
-      setName("");
-      setKeyLabel("");
+      setName('');
+      setKeyLabel('');
       await router.invalidate();
-      await navigate({ to: "/identities/$identityId", params: { identityId: result.identityId } });
+      await navigate({ to: '/identities/$identityId', params: { identityId: result.identityId } });
     } catch (cause) {
       setError(
         cause instanceof Error && cause.message
           ? `${cause.message}. Nothing was issued — adjust the details and try again.`
-          : "The identity could not be created. Nothing was issued — try again.",
+          : 'The identity could not be created. Nothing was issued — try again.'
       );
     } finally {
       setPending(false);
@@ -114,7 +128,7 @@ function IdentitiesLayout() {
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
-        router.navigate({ to: "/sign-in" });
+        router.navigate({ to: '/sign-in' });
       }}
       actions={
         <button
@@ -141,7 +155,11 @@ function IdentitiesLayout() {
               <p className="notice" role="alert">
                 {failure}
               </p>
-              <button type="button" className="btn btn--quiet" onClick={() => void router.invalidate()}>
+              <button
+                type="button"
+                className="btn btn--quiet"
+                onClick={() => void router.invalidate()}
+              >
                 Retry
               </button>
             </div>
@@ -149,8 +167,8 @@ function IdentitiesLayout() {
 
           {!failure && identities.length === 0 && (
             <p className="empty index__note">
-              No identities yet. Issue one to give an agent a credential it can
-              present at <code className="register">/mcp</code>.
+              No identities yet. Issue one to give an agent a credential it can present at{' '}
+              <code className="register">/mcp</code>.
             </p>
           )}
 
@@ -162,8 +180,8 @@ function IdentitiesLayout() {
                   <Link
                     to="/identities/$identityId"
                     params={{ identityId: identity.id }}
-                    className={`entry${identity.disabled_at ? " entry--disabled" : ""}`}
-                    activeProps={{ "aria-current": "page" }}
+                    className={`entry${identity.disabled_at ? ' entry--disabled' : ''}`}
+                    activeProps={{ 'aria-current': 'page' }}
                     onClick={() => setIssuing(false)}
                   >
                     <span className="entry__name">{identity.name}</span>
@@ -224,7 +242,7 @@ function IdentitiesLayout() {
               </div>
 
               <div className="bench__section bench__form">
-                <label className={`field${error ? " field--error" : ""}`}>
+                <label className={`field${error ? ' field--error' : ''}`}>
                   <span className="label">Holder name</span>
                   <input
                     required
@@ -247,7 +265,7 @@ function IdentitiesLayout() {
                   </select>
                 </label>
 
-                <label className={`field${error ? " field--error" : ""}`}>
+                <label className={`field${error ? ' field--error' : ''}`}>
                   <span className="label">Credential label</span>
                   <input
                     required
@@ -266,7 +284,7 @@ function IdentitiesLayout() {
 
                 <div className="bench__controls">
                   <button className="btn btn--primary" disabled={pending}>
-                    {pending ? "Issuing…" : "Issue identity and credential"}
+                    {pending ? 'Issuing…' : 'Issue identity and credential'}
                   </button>
                   <button
                     type="button"

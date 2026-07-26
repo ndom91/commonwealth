@@ -1,10 +1,11 @@
-import { createHash, randomUUID } from "node:crypto";
-import postgres, { type JSONValue, type Sql, type TransactionSql } from "postgres";
-import { chunkMarkdown, DocumentIngestion, type Embeddings } from "@llm-team-kb/pipeline";
-import { requirePermission } from "./access-service.js";
-import type { Config } from "./config.js";
-import type { Actor, Authority, SearchInput, SourceType } from "./domain.js";
-import { DomainError } from "./errors.js";
+import { createHash, randomUUID } from 'node:crypto';
+import { chunkMarkdown, DocumentIngestion, type Embeddings } from '@llm-team-kb/pipeline';
+import postgres, { type JSONValue, type Sql, type TransactionSql } from 'postgres';
+import { requirePermission } from './access-service.js';
+import type { Config } from './config.js';
+import type { Actor, Authority, SearchInput, SourceType } from './domain.js';
+import { DomainError } from './errors.js';
+
 type SourceRow = {
   id: string;
   created_by: string;
@@ -27,19 +28,19 @@ type PreparedContent = {
   chunks: ReturnType<typeof chunkMarkdown>;
   vectors: number[][];
 };
-type PreparedRevision = Omit<RevisionInput, "contentHash" | "markdown"> & PreparedContent;
+type PreparedRevision = Omit<RevisionInput, 'contentHash' | 'markdown'> & PreparedContent;
 
 export class KnowledgeRepository {
   readonly sql: Sql;
 
   constructor(
     private readonly config: Config,
-    private readonly embeddings: Pick<Embeddings, "embed">,
+    private readonly embeddings: Pick<Embeddings, 'embed'>,
     private readonly documentIngestion = new DocumentIngestion({
       markitdownUrl: config.MARKITDOWN_URL,
       storagePath: config.SOURCE_STORAGE_PATH,
       maxUploadBytes: config.MAX_UPLOAD_BYTES,
-    }),
+    })
   ) {
     this.sql = postgres(config.DATABASE_URL);
   }
@@ -48,13 +49,19 @@ export class KnowledgeRepository {
     await this.sql.end();
   }
 
-  async submitNote(actor: Actor, input: { title: string; markdown: string; tags: string[] }): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
-    requirePermission(actor, "write");
-    return this.createSource(actor, { ...input, sourceType: "note" });
+  async submitNote(
+    actor: Actor,
+    input: { title: string; markdown: string; tags: string[] }
+  ): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
+    requirePermission(actor, 'write');
+    return this.createSource(actor, { ...input, sourceType: 'note' });
   }
 
-  async submitDocument(actor: Actor, input: { title: string; filename: string; mimeType: string; bytes: Uint8Array; tags: string[] }): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
-    requirePermission(actor, "write");
+  async submitDocument(
+    actor: Actor,
+    input: { title: string; filename: string; mimeType: string; bytes: Uint8Array; tags: string[] }
+  ): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
+    requirePermission(actor, 'write');
     const document = await this.documentIngestion.ingest(input);
 
     try {
@@ -62,20 +69,27 @@ export class KnowledgeRepository {
         title: input.title,
         markdown: document.markdown,
         tags: input.tags,
-        sourceType: "upload",
+        sourceType: 'upload',
         originalFilename: input.filename,
         mimeType: input.mimeType,
         storagePath: document.storagePath,
         contentHash: document.contentHash,
       });
     } catch (error) {
-      console.error("Document indexing failed; retaining content-addressed blob for safe cleanup", error);
+      console.error(
+        'Document indexing failed; retaining content-addressed blob for safe cleanup',
+        error
+      );
       throw error;
     }
   }
 
-  async updateSource(actor: Actor, sourceId: string, input: { markdown: string; title?: string; tags?: string[] }): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
-    requirePermission(actor, "write");
+  async updateSource(
+    actor: Actor,
+    sourceId: string,
+    input: { markdown: string; title?: string; tags?: string[] }
+  ): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
+    requirePermission(actor, 'write');
     const content = await this.prepareContent(input.markdown);
     return this.sql.begin(async (transaction) => {
       const [source] = await transaction<SourceRow[]>`
@@ -85,46 +99,60 @@ export class KnowledgeRepository {
         WHERE sources.id = ${sourceId} AND sources.workspace_id = ${actor.workspaceId} AND sources.status = 'active'
         FOR UPDATE OF sources
       `;
-      if (!source) throw new DomainError("Source not found");
-      if (actor.role === "writer" && source.created_by !== actor.id) {
-        throw new DomainError("Writers can only revise sources they created");
+      if (!source) throw new DomainError('Source not found');
+      if (actor.role === 'writer' && source.created_by !== actor.id) {
+        throw new DomainError('Writers can only revise sources they created');
       }
-      if (source.source_type === "upload") {
-        throw new DomainError("Uploaded sources require binary replacement; Markdown revisions are not supported yet");
+      if (source.source_type === 'upload') {
+        throw new DomainError(
+          'Uploaded sources require binary replacement; Markdown revisions are not supported yet'
+        );
       }
       /* A trusted holder is exempt from the reviewer gate, otherwise trusting a
          writer would promote its first submission to approved and then lock
          that same agent out of revising it. The writer `created_by` check above
          still applies, so a trusted writer may only revise its own work. */
       if (
-        source.authority !== "unverified" &&
+        source.authority !== 'unverified' &&
         !actor.autoApprove &&
-        actor.role !== "reviewer" &&
-        actor.role !== "admin"
+        actor.role !== 'reviewer' &&
+        actor.role !== 'admin'
       ) {
-        throw new DomainError("Reviewer access is required to revise approved or canonical sources");
+        throw new DomainError(
+          'Reviewer access is required to revise approved or canonical sources'
+        );
       }
 
       const revision = this.prepareRevision(content, { title: input.title ?? source.title });
 
-      const [currentRevision] = await transaction<{ revision_number: number; content_hash: string }[]>`
+      const [currentRevision] = await transaction<
+        { revision_number: number; content_hash: string }[]
+      >`
         SELECT revision_number, content_hash
         FROM source_revisions WHERE id = ${source.current_revision_id}
       `;
-      if (!currentRevision) throw new DomainError("Source has no current revision");
+      if (!currentRevision) throw new DomainError('Source has no current revision');
       if (currentRevision.content_hash === revision.contentHash) {
-        throw new DomainError("Revision content matches the current source revision");
+        throw new DomainError('Revision content matches the current source revision');
       }
 
       const nextRevisionNumber = currentRevision.revision_number + 1;
-      const revisionId = await this.insertRevision(transaction, source.id, randomUUID(), nextRevisionNumber, source.current_revision_id, actor, revision);
+      const revisionId = await this.insertRevision(
+        transaction,
+        source.id,
+        randomUUID(),
+        nextRevisionNumber,
+        source.current_revision_id,
+        actor,
+        revision
+      );
       /* A trusted holder vouches for what they write, but trust only ever raises
          standing: an already approved or canonical source keeps its authority and
          merely has its verification moved forward. */
-      const promoted = actor.autoApprove && source.authority === "unverified";
+      const promoted = actor.autoApprove && source.authority === 'unverified';
       await transaction`
         UPDATE sources SET current_revision_id = ${revisionId}, current_content_hash = ${revision.contentHash},
-          authority = ${promoted ? "approved" : source.authority},
+          authority = ${promoted ? 'approved' : source.authority},
           last_verified_at = CASE WHEN ${actor.autoApprove}::boolean THEN now() ELSE last_verified_at END
         WHERE id = ${source.id}
       `;
@@ -140,17 +168,21 @@ export class KnowledgeRepository {
         await transaction`
           INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
           VALUES (${actor.workspaceId}, ${actor.id}, 'source_authority_changed', ${source.id},
-            ${transaction.json({ authority: "approved", auto: true })})
+            ${transaction.json({ authority: 'approved', auto: true })})
         `;
       }
-      return { id: source.id, revisionNumber: nextRevisionNumber, chunkCount: revision.chunks.length };
+      return {
+        id: source.id,
+        revisionNumber: nextRevisionNumber,
+        chunkCount: revision.chunks.length,
+      };
     });
   }
 
   async search(actor: Actor, input: SearchInput): Promise<unknown[]> {
-    requirePermission(actor, "read");
+    requirePermission(actor, 'read');
     const [embedding] = await this.embeddings.embed([input.query]);
-    if (!embedding) throw new Error("Embedding provider returned no query embedding");
+    if (!embedding) throw new Error('Embedding provider returned no query embedding');
     const vector = toVector(embedding);
     const tags = input.tags.length === 0 ? null : input.tags;
     const candidateLimit = Math.max(input.limit * 10, 50);
@@ -208,14 +240,16 @@ export class KnowledgeRepository {
       ORDER BY final_score DESC, source_revisions.content_updated_at DESC, chunks.id
       LIMIT ${input.limit}
     `;
-    await this.event(actor, "search", null, { query: input.query, resultCount: rows.length }).catch((error) => {
-      console.error("Unable to record search event", error);
-    });
+    await this.event(actor, 'search', null, { query: input.query, resultCount: rows.length }).catch(
+      (error) => {
+        console.error('Unable to record search event', error);
+      }
+    );
     return rows.map((row) => formatSearchResult(row, input.explain));
   }
 
   async getSource(actor: Actor, sourceId: string, revisionNumber?: number): Promise<unknown> {
-    requirePermission(actor, "read");
+    requirePermission(actor, 'read');
     const [source] = await this.sql`
       SELECT sources.id, source_revisions.title, sources.source_type, sources.authority,
              source_revisions.revision_number, source_revisions.markdown_content,
@@ -229,12 +263,12 @@ export class KnowledgeRepository {
       LEFT JOIN users ON users.id = source_revisions.created_by
       WHERE sources.id = ${sourceId} AND sources.workspace_id = ${actor.workspaceId} AND sources.status = 'active'
     `;
-    if (!source) throw new DomainError("Source not found");
+    if (!source) throw new DomainError('Source not found');
     return source;
   }
 
   async getSourceHistory(actor: Actor, sourceId: string): Promise<unknown[]> {
-    requirePermission(actor, "read");
+    requirePermission(actor, 'read');
     const revisions = await this.sql`
       SELECT source_revisions.id, source_revisions.revision_number, source_revisions.content_hash,
              source_revisions.content_updated_at, source_revisions.created_at,
@@ -246,18 +280,18 @@ export class KnowledgeRepository {
       WHERE sources.id = ${sourceId} AND sources.workspace_id = ${actor.workspaceId} AND sources.status = 'active'
       ORDER BY source_revisions.revision_number DESC
     `;
-    if (revisions.length === 0) throw new DomainError("Source not found");
+    if (revisions.length === 0) throw new DomainError('Source not found');
     return revisions;
   }
 
   async setAuthority(actor: Actor, sourceId: string, authority: Authority): Promise<void> {
-    requirePermission(actor, "review");
+    requirePermission(actor, 'review');
     await this.sql.begin(async (transaction) => {
       const updated = await transaction`
         UPDATE sources SET authority = ${authority}
         WHERE id = ${sourceId} AND workspace_id = ${actor.workspaceId} AND status = 'active' RETURNING id
       `;
-      if (updated.length === 0) throw new Error("Source not found");
+      if (updated.length === 0) throw new Error('Source not found');
       await transaction`
         INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
         VALUES (${actor.workspaceId}, ${actor.id}, 'source_authority_changed', ${sourceId}, ${transaction.json({ authority })})
@@ -266,13 +300,13 @@ export class KnowledgeRepository {
   }
 
   async deleteSource(actor: Actor, sourceId: string): Promise<void> {
-    requirePermission(actor, "review");
+    requirePermission(actor, 'review');
     await this.sql.begin(async (transaction) => {
       const updated = await transaction`
         UPDATE sources SET status = 'deleted', deleted_at = now()
         WHERE id = ${sourceId} AND workspace_id = ${actor.workspaceId} AND status = 'active' RETURNING id
       `;
-      if (updated.length === 0) throw new Error("Source not found");
+      if (updated.length === 0) throw new Error('Source not found');
       await transaction`
         INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
         VALUES (${actor.workspaceId}, ${actor.id}, 'source_deleted', ${sourceId}, '{}'::jsonb)
@@ -280,10 +314,19 @@ export class KnowledgeRepository {
     });
   }
 
-  private async createSource(actor: Actor, input: {
-    title: string; markdown: string; tags: string[]; sourceType: SourceType;
-    originalFilename?: string; mimeType?: string; storagePath?: string; contentHash?: string;
-  }): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
+  private async createSource(
+    actor: Actor,
+    input: {
+      title: string;
+      markdown: string;
+      tags: string[];
+      sourceType: SourceType;
+      originalFilename?: string;
+      mimeType?: string;
+      storagePath?: string;
+      contentHash?: string;
+    }
+  ): Promise<{ id: string; revisionNumber: number; chunkCount: number }> {
     const content = await this.prepareContent(input.markdown, input.contentHash);
     const revision = this.prepareRevision(content, {
       title: input.title,
@@ -291,7 +334,7 @@ export class KnowledgeRepository {
       mimeType: input.mimeType,
       storagePath: input.storagePath,
     });
-    const authority: Authority = actor.autoApprove ? "approved" : "unverified";
+    const authority: Authority = actor.autoApprove ? 'approved' : 'unverified';
     return this.sql.begin(async (transaction) => {
       const sourceId = randomUUID();
       const revisionId = randomUUID();
@@ -301,7 +344,7 @@ export class KnowledgeRepository {
                 CASE WHEN ${actor.autoApprove}::boolean THEN now() END)
         RETURNING id
       `;
-      if (!source) throw new Error("Unable to create source");
+      if (!source) throw new Error('Unable to create source');
       await this.insertRevision(transaction, source.id, revisionId, 1, null, actor, revision);
       await this.replaceTags(transaction, source.id, input.tags);
       await transaction`
@@ -313,27 +356,41 @@ export class KnowledgeRepository {
         await transaction`
           INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
           VALUES (${actor.workspaceId}, ${actor.id}, 'source_authority_changed', ${source.id},
-            ${transaction.json({ authority: "approved", auto: true })})
+            ${transaction.json({ authority: 'approved', auto: true })})
         `;
       }
       return { id: source.id, revisionNumber: 1, chunkCount: revision.chunks.length };
     });
   }
 
-  private async prepareContent(markdownInput: string, contentHash?: string): Promise<PreparedContent> {
+  private async prepareContent(
+    markdownInput: string,
+    contentHash?: string
+  ): Promise<PreparedContent> {
     const markdown = markdownInput.trim();
-    if (!markdown) throw new Error("Knowledge source cannot be empty");
+    if (!markdown) throw new Error('Knowledge source cannot be empty');
     const chunks = chunkMarkdown(markdown);
-    if (chunks.length === 0) throw new Error("Knowledge source does not contain indexable text");
+    if (chunks.length === 0) throw new Error('Knowledge source does not contain indexable text');
     const vectors = await this.embeddings.embed(chunks.map((chunk) => chunk.content));
     return { markdown, contentHash: contentHash ?? digest(markdown), chunks, vectors };
   }
 
-  private prepareRevision(content: PreparedContent, input: Omit<RevisionInput, "markdown" | "contentHash">): PreparedRevision {
+  private prepareRevision(
+    content: PreparedContent,
+    input: Omit<RevisionInput, 'markdown' | 'contentHash'>
+  ): PreparedRevision {
     return { ...content, ...input };
   }
 
-  private async insertRevision(transaction: TransactionSql, sourceId: string, revisionId: string, revisionNumber: number, supersedesRevisionId: string | null, actor: Actor, revision: PreparedRevision): Promise<string> {
+  private async insertRevision(
+    transaction: TransactionSql,
+    sourceId: string,
+    revisionId: string,
+    revisionNumber: number,
+    supersedesRevisionId: string | null,
+    actor: Actor,
+    revision: PreparedRevision
+  ): Promise<string> {
     const [created] = await transaction<{ id: string }[]>`
       INSERT INTO source_revisions (
         id, source_id, revision_number, title, content_hash, markdown_content, original_filename, mime_type,
@@ -344,7 +401,7 @@ export class KnowledgeRepository {
         ${supersedesRevisionId}, ${actor.id}
       ) RETURNING id
     `;
-    if (!created) throw new Error("Unable to create source revision");
+    if (!created) throw new Error('Unable to create source revision');
     for (const [ordinal, chunk] of revision.chunks.entries()) {
       await transaction`
         INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
@@ -355,7 +412,11 @@ export class KnowledgeRepository {
     return created.id;
   }
 
-  private async replaceTags(transaction: TransactionSql, sourceId: string, tags: string[]): Promise<void> {
+  private async replaceTags(
+    transaction: TransactionSql,
+    sourceId: string,
+    tags: string[]
+  ): Promise<void> {
     await transaction`DELETE FROM source_tags WHERE source_id = ${sourceId}`;
     for (const tag of uniqueTags(tags)) {
       await transaction`INSERT INTO source_tags (source_id, tag) VALUES (${sourceId}, ${tag})`;
@@ -367,7 +428,12 @@ export class KnowledgeRepository {
      *string* instead of an object, which reads back as unusable. The admin app
      must use the opposite form because Drizzle replaces the serializer on the
      client it wraps; see admin/src/lib/db.ts. */
-  private async event(actor: Actor, eventType: string, sourceId: string | null, metadata: JSONValue): Promise<void> {
+  private async event(
+    actor: Actor,
+    eventType: string,
+    sourceId: string | null,
+    metadata: JSONValue
+  ): Promise<void> {
     await this.sql`
       INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
       VALUES (${actor.workspaceId}, ${actor.id}, ${eventType}, ${sourceId}, ${this.sql.json(metadata)})
@@ -375,7 +441,10 @@ export class KnowledgeRepository {
   }
 }
 
-export function formatSearchResult(row: Record<string, unknown>, explain: boolean): Record<string, unknown> {
+export function formatSearchResult(
+  row: Record<string, unknown>,
+  explain: boolean
+): Record<string, unknown> {
   const result = {
     sourceId: row.source_id,
     revisionNumber: row.revision_number,
@@ -395,13 +464,21 @@ export function formatSearchResult(row: Record<string, unknown>, explain: boolea
   const freshnessBoost = Number(row.freshness_boost);
   return {
     ...result,
-    scores: { semanticScore, keywordScore, authorityBoost, freshnessBoost, finalScore: Number(row.final_score) },
+    scores: {
+      semanticScore,
+      keywordScore,
+      authorityBoost,
+      freshnessBoost,
+      finalScore: Number(row.final_score),
+    },
     explanation: [
-      semanticScore > 0 ? "semantic match" : null,
-      keywordScore > 0 ? "exact keyword match" : null,
+      semanticScore > 0 ? 'semantic match' : null,
+      keywordScore > 0 ? 'exact keyword match' : null,
       authorityBoost > 0 ? `${String(row.authority)} source` : null,
-      freshnessBoost > 0 ? "recently updated" : null,
-    ].filter(Boolean).join("; "),
+      freshnessBoost > 0 ? 'recently updated' : null,
+    ]
+      .filter(Boolean)
+      .join('; '),
   };
 }
 
@@ -410,9 +487,9 @@ function uniqueTags(tags: string[]): string[] {
 }
 
 function digest(value: string | Uint8Array): string {
-  return createHash("sha256").update(value).digest("hex");
+  return createHash('sha256').update(value).digest('hex');
 }
 
 function toVector(vector: number[]): string {
-  return `[${vector.join(",")}]`;
+  return `[${vector.join(',')}]`;
 }

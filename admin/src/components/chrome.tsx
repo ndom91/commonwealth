@@ -1,12 +1,12 @@
-import { type ComponentPropsWithoutRef, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
-import { UserRoundCog, type LucideIcon } from "lucide-react";
+import { Link } from '@tanstack/react-router';
+import { type LucideIcon, UserRoundCog } from 'lucide-react';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 
 /* Application chrome for the Custody Bench. Every workbench screen mounts
    inside AppShell and reuses the index-and-bench split: a ruled register of
    objects on the left, the selected object on the bench to its right. */
 
-type Mark = "sources" | "review" | "identities" | "activity";
+type Mark = 'sources' | 'review' | 'identities' | 'activity';
 
 /* Marks are drawn in the world's own grammar — filing tabs, seals, tags and
    custody lines — rather than borrowed from a generic icon set. */
@@ -14,28 +14,28 @@ function DrawerMark({ mark }: { mark: Mark }) {
   const common = {
     width: 14,
     height: 14,
-    viewBox: "0 0 14 14",
-    fill: "none",
-    stroke: "currentColor",
+    viewBox: '0 0 14 14',
+    fill: 'none',
+    stroke: 'currentColor',
     strokeWidth: 1.25,
-    "aria-hidden": true,
-    className: "drawer__mark",
+    'aria-hidden': true,
+    className: 'drawer__mark',
   } as const;
-  if (mark === "sources")
+  if (mark === 'sources')
     return (
       <svg {...common}>
         <path d="M1.5 3.5h4l1 1.5h6v6h-11z" />
         <path d="M1.5 6.5h11" />
       </svg>
     );
-  if (mark === "review")
+  if (mark === 'review')
     return (
       <svg {...common}>
         <circle cx="7" cy="7" r="4.5" strokeDasharray="2 1.6" />
         <path d="M5 7.2 6.4 8.6 9 5.8" />
       </svg>
     );
-  if (mark === "identities")
+  if (mark === 'identities')
     return (
       <svg {...common}>
         <path d="M2 4.2h6l4 2.8-4 2.8H2z" />
@@ -61,19 +61,19 @@ export type NavCounts = { identities: number; sources: number; review: number };
 function drawerGroups(counts: NavCounts | undefined): DrawerGroup[] {
   return [
     {
-      label: "Knowledge",
+      label: 'Knowledge',
       items: [
-        { mark: "sources", label: "Sources", to: "/sources", count: counts?.sources },
-        { mark: "review", label: "Review queue", to: "/review", count: counts?.review },
+        { mark: 'sources', label: 'Sources', to: '/sources', count: counts?.sources },
+        { mark: 'review', label: 'Review queue', to: '/review', count: counts?.review },
       ],
     },
     {
-      label: "Access",
+      label: 'Access',
       items: [
-        { mark: "identities", label: "Identities", to: "/identities", count: counts?.identities },
+        { mark: 'identities', label: 'Identities', to: '/identities', count: counts?.identities },
       ],
     },
-    { label: "Custody", items: [{ mark: "activity", label: "Activity", to: "/activity" }] },
+    { label: 'Custody', items: [{ mark: 'activity', label: 'Activity', to: '/activity' }] },
   ];
 }
 
@@ -123,7 +123,7 @@ export function AppShell({
                     key={item.label}
                     to={item.to}
                     className="drawer"
-                    activeProps={{ "aria-current": "page" }}
+                    activeProps={{ 'aria-current': 'page' }}
                   >
                     <DrawerMark mark={item.mark} />
                     {item.label}
@@ -145,7 +145,7 @@ export function AppShell({
                     </span>
                     <span className="drawer__count">Pending</span>
                   </button>
-                ),
+                )
               )}
             </div>
           ))}
@@ -174,7 +174,7 @@ export function AppShell({
                 className="icon-btn"
                 aria-label="Settings"
                 title="Settings"
-                activeProps={{ "aria-current": "page" }}
+                activeProps={{ 'aria-current': 'page' }}
               >
                 <UserRoundCog size={15} strokeWidth={1.75} aria-hidden="true" />
               </Link>
@@ -208,7 +208,7 @@ export function AppShell({
    a dashed outline, signed is a solid outline, sealed is filled oxide, a
    suspended object is outlined in oxide but intact, and a voided one is struck
    through yet never removed. */
-export type SealState = "unsealed" | "signed" | "sealed" | "suspended" | "void";
+export type SealState = 'unsealed' | 'signed' | 'sealed' | 'suspended' | 'void';
 
 export function SealChip({ state, children }: { state: SealState; children: ReactNode }) {
   return <span className={`chip chip--${state}`}>{children}</span>;
@@ -225,17 +225,17 @@ export function SealChip({ state, children }: { state: SealState; children: Reac
 export function IconButton({
   label,
   icon: Icon,
-  tone = "quiet",
+  tone = 'quiet',
   ...button
 }: {
   label: string;
   icon: LucideIcon;
-  tone?: "quiet" | "void";
-} & Omit<ComponentPropsWithoutRef<"button">, "children" | "className" | "aria-label" | "title">) {
+  tone?: 'quiet' | 'void';
+} & Omit<ComponentPropsWithoutRef<'button'>, 'children' | 'className' | 'aria-label' | 'title'>) {
   return (
     <button
       {...button}
-      type={button.type ?? "button"}
+      type={button.type ?? 'button'}
       className={`icon-btn icon-btn--${tone}`}
       aria-label={label}
       title={label}
@@ -249,31 +249,31 @@ export function IconButton({
    unverified source is unsealed, an approved one is signed, a canonical one is
    sealed. */
 export function authoritySeal(authority: string): SealState {
-  if (authority === "canonical") return "sealed";
-  if (authority === "approved") return "signed";
-  return "unsealed";
+  if (authority === 'canonical') return 'sealed';
+  if (authority === 'approved') return 'signed';
+  return 'unsealed';
 }
 
 /* Records dates are rendered from the ISO string in UTC so the server and the
    client always agree, and so the column stays sortable by eye. */
 export function stamp(value: string | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return '—';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toISOString().slice(0, 10);
+  return Number.isNaN(date.getTime()) ? '—' : date.toISOString().slice(0, 10);
 }
 
 /* Same-day custody entries are common, so the line needs the clock as well as
    the date or its ordering cannot be checked by eye. */
 export function stampAt(value: string | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime())
-    ? "—"
+    ? '—'
     : `${date.toISOString().slice(0, 10)} ${date.toISOString().slice(11, 16)}`;
 }
 
 /* An accession is a short, stable handle derived from the record's own id;
    nothing is invented. */
 export function accessionOf(id: string): string {
-  return id.replace(/-/g, "").slice(0, 8).toUpperCase();
+  return id.replace(/-/g, '').slice(0, 8).toUpperCase();
 }

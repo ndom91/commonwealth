@@ -1,4 +1,4 @@
-import { DocumentIngestion, Embeddings } from "@llm-team-kb/pipeline";
+import { DocumentIngestion, Embeddings } from '@llm-team-kb/pipeline';
 
 /* The admin's half of the shared pipeline. Chunking is a pure function and
    needs nothing from here; embedding needs Ollama, which the admin service
@@ -15,14 +15,17 @@ function required(name: string): string {
   const value = process.env[name];
   if (!value?.trim()) {
     throw new Error(
-      `${name} is not configured, so this instance cannot re-embed a revision. Add it to the admin service and restart.`,
+      `${name} is not configured, so this instance cannot re-embed a revision. Add it to the admin service and restart.`
     );
   }
   return value.trim();
 }
 
 export function embeddings(): Embeddings {
-  cached ??= new Embeddings({ ollamaUrl: required("OLLAMA_URL"), model: required("EMBEDDING_MODEL") });
+  cached ??= new Embeddings({
+    ollamaUrl: required('OLLAMA_URL'),
+    model: required('EMBEDDING_MODEL'),
+  });
   return cached;
 }
 
@@ -30,7 +33,7 @@ export function embeddings(): Embeddings {
    whichever model wrote them, so this must be the same value the MCP server
    uses or the index quietly holds two incompatible vector spaces. */
 export function embeddingModel(): string {
-  return required("EMBEDDING_MODEL");
+  return required('EMBEDDING_MODEL');
 }
 
 export function maxUploadBytes(): number {
@@ -46,8 +49,8 @@ let ingestion: DocumentIngestion | undefined;
 
 export function documentIngestion(): DocumentIngestion {
   ingestion ??= new DocumentIngestion({
-    markitdownUrl: required("MARKITDOWN_URL"),
-    storagePath: required("SOURCE_STORAGE_PATH"),
+    markitdownUrl: required('MARKITDOWN_URL'),
+    storagePath: required('SOURCE_STORAGE_PATH'),
     maxUploadBytes: maxUploadBytes(),
   });
   return ingestion;

@@ -1,29 +1,29 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-import type { Config } from "../src/config.js";
-import { AccessService } from "../src/access-service.js";
-import { hashApiKey, keyPrefix } from "../src/auth.js";
-import { runMigrations } from "../src/migrations.js";
-import { KnowledgeRepository } from "../src/knowledge-repository.js";
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { AccessService } from '../src/access-service.js';
+import { hashApiKey, keyPrefix } from '../src/auth.js';
+import type { Config } from '../src/config.js';
+import { KnowledgeRepository } from '../src/knowledge-repository.js';
+import { runMigrations } from '../src/migrations.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseName = databaseUrl ? new URL(databaseUrl).pathname.slice(1) : undefined;
 
 if (!databaseUrl) {
-  test.skip("database integration tests require TEST_DATABASE_URL");
-} else if (databaseName !== "llm_team_kb_test") {
-  test("database integration tests require the dedicated llm_team_kb_test database", () => {
-    throw new Error("TEST_DATABASE_URL must target the dedicated llm_team_kb_test database");
+  test.skip('database integration tests require TEST_DATABASE_URL');
+} else if (databaseName !== 'llm_team_kb_test') {
+  test('database integration tests require the dedicated llm_team_kb_test database', () => {
+    throw new Error('TEST_DATABASE_URL must target the dedicated llm_team_kb_test database');
   });
 } else {
-  test("migrates, revises, filters, and retrieves knowledge", async () => {
+  test('migrates, revises, filters, and retrieves knowledge', async () => {
     const config: Config = {
       DATABASE_URL: databaseUrl,
-      OLLAMA_URL: "http://unused",
-      EMBEDDING_MODEL: "test-embedding-model",
+      OLLAMA_URL: 'http://unused',
+      EMBEDDING_MODEL: 'test-embedding-model',
       PORT: 3000,
-      MARKITDOWN_URL: "http://unused",
-      SOURCE_STORAGE_PATH: "/tmp/llm-team-kb-test",
+      MARKITDOWN_URL: 'http://unused',
+      SOURCE_STORAGE_PATH: '/tmp/llm-team-kb-test',
       MAX_UPLOAD_BYTES: 1024,
       MAX_REQUEST_BYTES: 4096,
     };
@@ -34,10 +34,10 @@ if (!databaseUrl) {
     };
     const knowledge = new KnowledgeRepository(config, embeddings);
     const access = new AccessService(knowledge.sql);
-    const bootstrapKey = "test-bootstrap-key-that-is-long-enough";
+    const bootstrapKey = 'test-bootstrap-key-that-is-long-enough';
 
     try {
-      await knowledge.sql.unsafe("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
+      await knowledge.sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
       await runMigrations(knowledge.sql);
       const [workspace] = await knowledge.sql<{ id: string }[]>`
         INSERT INTO workspaces (name) VALUES ('test') RETURNING id
@@ -53,22 +53,25 @@ if (!databaseUrl) {
       assert.ok(actor);
 
       const source = await knowledge.submitNote(actor, {
-        title: "Billing API",
-        markdown: "# Billing\n\nInvoices return error code BILLING_REQUIRED.",
-        tags: ["billing"],
+        title: 'Billing API',
+        markdown: '# Billing\n\nInvoices return error code BILLING_REQUIRED.',
+        tags: ['billing'],
       });
       const revision = await knowledge.updateSource(actor, source.id, {
-        title: "Billing API v2",
-        markdown: "# Billing\n\nInvoices return error code PAYMENT_REQUIRED.",
+        title: 'Billing API v2',
+        markdown: '# Billing\n\nInvoices return error code PAYMENT_REQUIRED.',
       });
-      const history = await knowledge.getSourceHistory(actor, source.id) as Array<{ revision_number: number; is_current: boolean }>;
-      const results = await knowledge.search(actor, {
-        query: "PAYMENT_REQUIRED",
-        tags: ["billing"],
+      const history = (await knowledge.getSourceHistory(actor, source.id)) as Array<{
+        revision_number: number;
+        is_current: boolean;
+      }>;
+      const results = (await knowledge.search(actor, {
+        query: 'PAYMENT_REQUIRED',
+        tags: ['billing'],
         limit: 5,
-        sourceType: "note",
+        sourceType: 'note',
         explain: true,
-      }) as Array<{ sourceId: string; revisionNumber: number; scores: { keywordScore: number } }>;
+      })) as Array<{ sourceId: string; revisionNumber: number; scores: { keywordScore: number } }>;
 
       assert.equal(revision.revisionNumber, 2);
       assert.equal(history.length, 2);

@@ -1,5 +1,6 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { createFileRoute, useRouter } from '@tanstack/react-router';
+import { useCallback, useEffect, useState } from 'react';
+import { accessionOf, authoritySeal, SealChip, stamp, stampAt } from '../../components/chrome.js';
 import {
   getSourceDetail,
   getSourceEvents,
@@ -8,19 +9,18 @@ import {
   reviseSource,
   setSourceAuthority,
   withdrawSource,
-} from "../../lib/knowledge.js";
-import { SealChip, accessionOf, authoritySeal, stamp, stampAt } from "../../components/chrome.js";
+} from '../../lib/knowledge.js';
 
-export const Route = createFileRoute("/sources/$sourceId")({
+export const Route = createFileRoute('/sources/$sourceId')({
   component: SourceBench,
 });
 
-type Authority = "unverified" | "approved" | "canonical";
+type Authority = 'unverified' | 'approved' | 'canonical';
 
 type Detail = {
   id: string;
-  source_type: "note" | "upload";
-  status: "active" | "deleted" | "failed";
+  source_type: 'note' | 'upload';
+  status: 'active' | 'deleted' | 'failed';
   authority: Authority;
   created_at: string;
   deleted_at: string | null;
@@ -57,7 +57,7 @@ type Event = {
   actor: string | null;
 };
 
-const AUTHORITIES: Authority[] = ["unverified", "approved", "canonical"];
+const AUTHORITIES: Authority[] = ['unverified', 'approved', 'canonical'];
 
 function SourceBench() {
   const { sourceId } = Route.useParams();
@@ -70,8 +70,8 @@ function SourceBench() {
   const [pending, setPending] = useState(false);
   const [armWithdraw, setArmWithdraw] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [draftTitle, setDraftTitle] = useState("");
-  const [draftBody, setDraftBody] = useState("");
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftBody, setDraftBody] = useState('');
 
   const load = useCallback(async () => {
     setError(undefined);
@@ -85,7 +85,7 @@ function SourceBench() {
       setRevisions(nextRevisions as unknown as Revision[]);
       setEvents(nextEvents as unknown as Event[]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "This source could not be read.");
+      setError(cause instanceof Error ? cause.message : 'This source could not be read.');
     }
   }, [sourceId]);
 
@@ -132,16 +132,16 @@ function SourceBench() {
     );
   }
 
-  const withdrawn = detail.status === "deleted";
+  const withdrawn = detail.status === 'deleted';
 
   return (
     <section className="detail" aria-label="Selected source">
       <div className="bench__head">
         <div>
           <span className="label">
-            {detail.source_type} · {accessionOf(detail.id)} · revision{" "}
-            {detail.revision_number} · updated {stamp(detail.content_updated_at)}
-            {detail.author ? ` · ${detail.author}` : ""}
+            {detail.source_type} · {accessionOf(detail.id)} · revision {detail.revision_number} ·
+            updated {stamp(detail.content_updated_at)}
+            {detail.author ? ` · ${detail.author}` : ''}
           </span>
           <h2>{detail.title}</h2>
         </div>
@@ -157,9 +157,9 @@ function SourceBench() {
 
       {detail.is_stale && !withdrawn && (
         <p className="bench__consequence">
-          Revised {stamp(detail.content_updated_at)}, after it was last verified
-          on {stamp(detail.last_verified_at)}. Agents are being served content no
-          human has vouched for.
+          Revised {stamp(detail.content_updated_at)}, after it was last verified on{' '}
+          {stamp(detail.last_verified_at)}. Agents are being served content no human has vouched
+          for.
         </p>
       )}
 
@@ -173,45 +173,45 @@ function SourceBench() {
         </div>
       )}
 
-        <div className="bench__section">
-          <div className="bench__section-head">
-            <span className="label">
+      <div className="bench__section">
+        <div className="bench__section-head">
+          <span className="label">
             Authority
             {detail.last_verified_at
               ? ` · last verified ${stamp(detail.last_verified_at)}`
-              : " · never verified by a human"}
-            </span>
-            <div className="authority-current">
-              <span className="label">Current authority</span>
-              <SealChip state={authoritySeal(detail.authority)}>{detail.authority}</SealChip>
+              : ' · never verified by a human'}
+          </span>
+          <div className="authority-current">
+            <span className="label">Current authority</span>
+            <SealChip state={authoritySeal(detail.authority)}>{detail.authority}</SealChip>
+          </div>
+        </div>
+        <div className="authority-set">
+          <div className="authority-control">
+            <span className="label">Set authority to</span>
+            <div className="authority-control__choices" role="group" aria-label="Set authority to">
+              {AUTHORITIES.map((value) => {
+                const current = value === detail.authority;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`btn ${current ? 'btn--current' : 'btn--quiet'}`}
+                    aria-pressed={current}
+                    disabled={pending || withdrawn || current}
+                    onClick={() =>
+                      void act(
+                        () => setSourceAuthority({ data: { sourceId, authority: value } }),
+                        'The authority could not be changed.'
+                      )
+                    }
+                  >
+                    {value}
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <div className="authority-set">
-            <div className="authority-control">
-              <span className="label">Set authority to</span>
-              <div className="authority-control__choices" role="group" aria-label="Set authority to">
-                {AUTHORITIES.map((value) => {
-                  const current = value === detail.authority;
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`btn ${current ? "btn--current" : "btn--quiet"}`}
-                      aria-pressed={current}
-                      disabled={pending || withdrawn || current}
-                      onClick={() =>
-                        void act(
-                          () => setSourceAuthority({ data: { sourceId, authority: value } }),
-                          "The authority could not be changed.",
-                        )
-                      }
-                    >
-                      {value}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           <span className="authority-set__spacer" />
           {withdrawn ? (
             <button
@@ -221,11 +221,11 @@ function SourceBench() {
               onClick={() =>
                 void act(
                   () => restoreSource({ data: { sourceId } }),
-                  "The source could not be restored.",
+                  'The source could not be restored.'
                 )
               }
             >
-              {pending ? "Restoring…" : "Restore"}
+              {pending ? 'Restoring…' : 'Restore'}
             </button>
           ) : armWithdraw ? (
             <>
@@ -236,11 +236,11 @@ function SourceBench() {
                 onClick={() =>
                   void act(
                     () => withdrawSource({ data: { sourceId } }),
-                    "The source could not be withdrawn.",
+                    'The source could not be withdrawn.'
                   )
                 }
               >
-                {pending ? "Withdrawing…" : "Confirm withdraw"}
+                {pending ? 'Withdrawing…' : 'Confirm withdraw'}
               </button>
               <button
                 type="button"
@@ -260,9 +260,8 @@ function SourceBench() {
 
         {armWithdraw && !withdrawn && (
           <p className="bench__consequence">
-            Withdrawing hides this source from every MCP read immediately.
-            Nothing is destroyed — its revisions are kept and it can be restored
-            from here.
+            Withdrawing hides this source from every MCP read immediately. Nothing is destroyed —
+            its revisions are kept and it can be restored from here.
           </p>
         )}
 
@@ -277,13 +276,13 @@ function SourceBench() {
         <div className="bench__section-head">
           <span className="label">
             Content · revision {detail.revision_number}
-            {detail.original_filename ? ` · ${detail.original_filename}` : ""}
+            {detail.original_filename ? ` · ${detail.original_filename}` : ''}
           </span>
           {/* An upload's revision holds text converted from a stored file, so
               editing the text alone would leave the two disagreeing about what
               the source is. The server refuses it; the button does not offer
               it. */}
-          {!editing && !withdrawn && detail.source_type === "note" && (
+          {!editing && !withdrawn && detail.source_type === 'note' && (
             <button
               type="button"
               className="btn btn--quiet"
@@ -306,7 +305,7 @@ function SourceBench() {
               event.preventDefault();
               void act(
                 () => reviseSource({ data: { sourceId, title: draftTitle, markdown: draftBody } }),
-                "The revision could not be saved.",
+                'The revision could not be saved.'
               );
             }}
           >
@@ -332,14 +331,14 @@ function SourceBench() {
               />
             </label>
             <p className="line__caption">
-              Saving writes a new revision rather than overwriting this one — the
-              current text is kept and stays readable below. The new text is
-              re-chunked and re-embedded, so agents retrieve your wording from
-              the next search onward, and the source counts as verified by you.
+              Saving writes a new revision rather than overwriting this one — the current text is
+              kept and stays readable below. The new text is re-chunked and re-embedded, so agents
+              retrieve your wording from the next search onward, and the source counts as verified
+              by you.
             </p>
             <div className="revise__actions">
               <button type="submit" className="btn btn--primary" disabled={pending}>
-                {pending ? "Saving…" : "Save revision"}
+                {pending ? 'Saving…' : 'Save revision'}
               </button>
               <button
                 type="button"
@@ -360,8 +359,8 @@ function SourceBench() {
                 content, and this surface can revoke credentials. */}
             <pre className="source-body">{detail.markdown_content}</pre>
             <p className="line__caption">
-              Shown as submitted. Markdown is never rendered here — source content
-              is untrusted input, and this surface holds credential controls.
+              Shown as submitted. Markdown is never rendered here — source content is untrusted
+              input, and this surface holds credential controls.
             </p>
           </>
         )}
@@ -376,9 +375,9 @@ function SourceBench() {
                 r{revision.revision_number} · {revision.title}
               </span>
               <span className="stub__meta register">
-                <b>{revision.content_hash.slice(0, 12)}…</b> ·{" "}
+                <b>{revision.content_hash.slice(0, 12)}…</b> ·{' '}
                 {stampAt(revision.content_updated_at)} · {revision.content_length} chars
-                {revision.author ? ` · ${revision.author}` : ""}
+                {revision.author ? ` · ${revision.author}` : ''}
               </span>
               <span className="stub__action">
                 {revision.is_current && <SealChip state="signed">Current</SealChip>}
@@ -399,8 +398,8 @@ function SourceBench() {
                 <time dateTime={event.created_at}>{stampAt(event.created_at)}</time>
                 <span>
                   {event.event_type}
-                  {event.actor ? ` — ${event.actor}` : ""}
-                  {event.metadata?.auto ? " (auto)" : ""}
+                  {event.actor ? ` — ${event.actor}` : ''}
+                  {event.metadata?.auto ? ' (auto)' : ''}
                 </span>
               </li>
             ))}

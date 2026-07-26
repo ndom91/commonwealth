@@ -10,6 +10,10 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "lint": "pnpm biome check",
+    "lint:fix": "pnpm run lint --write",
+    "format": "biome check .",
+    "format:fix": "biome check --write .",
     "migrate": "pnpm --filter @llm-team-kb/admin migrate",
     "db:studio": "pnpm --filter @llm-team-kb/admin db:studio"
   },
@@ -22,6 +26,7 @@
     "valibot": "^1.4.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.5",
     "@types/node": "^24.0.3",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"

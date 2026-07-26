@@ -1,10 +1,10 @@
-import { createHash, randomUUID } from "node:crypto";
-import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { chunkMarkdown } from "@llm-team-kb/pipeline";
-import { client } from "./db.js";
-import { auth } from "./auth.js";
-import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from "./pipeline.js";
+import { createHash, randomUUID } from 'node:crypto';
+import { chunkMarkdown } from '@llm-team-kb/pipeline';
+import { createServerFn } from '@tanstack/react-start';
+import { getRequest } from '@tanstack/react-start/server';
+import { auth } from './auth.js';
+import { client } from './db.js';
+import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from './pipeline.js';
 
 /* Read and curation access to the knowledge corpus.
  *
@@ -17,9 +17,9 @@ import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from ".
  *    place one can be seen or restored, so `status` is a filter here, never a
  *    hardcoded predicate. */
 
-const AUTHORITIES = ["unverified", "approved", "canonical"] as const;
-const SOURCE_TYPES = ["note", "upload"] as const;
-const STATUSES = ["active", "deleted", "failed"] as const;
+const AUTHORITIES = ['unverified', 'approved', 'canonical'] as const;
+const SOURCE_TYPES = ['note', 'upload'] as const;
+const STATUSES = ['active', 'deleted', 'failed'] as const;
 
 type Authority = (typeof AUTHORITIES)[number];
 type SourceType = (typeof SOURCE_TYPES)[number];
@@ -50,15 +50,22 @@ const NEEDS_REVIEW = client`
 
 async function adminId(): Promise<string> {
   const session = await auth.api.getSession({ headers: getRequest().headers });
-  if (!session) throw new Error("Unauthorized");
-  const [role] = await client<{ user_id: string }[]>`SELECT user_id FROM admin_role WHERE user_id = ${session.user.id}`;
-  if (!role) throw new Error("Forbidden");
+  if (!session) throw new Error('Unauthorized');
+  const [role] = await client<
+    { user_id: string }[]
+  >`SELECT user_id FROM admin_role WHERE user_id = ${session.user.id}`;
+  if (!role) throw new Error('Forbidden');
   return role.user_id;
 }
 
-function optionalOneOf<T extends string>(value: unknown, allowed: readonly T[], field: string): T | null {
-  if (value === undefined || value === null || value === "") return null;
-  if (typeof value !== "string" || !allowed.includes(value as T)) throw new Error(`Invalid ${field}`);
+function optionalOneOf<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  field: string
+): T | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !allowed.includes(value as T))
+    throw new Error(`Invalid ${field}`);
   return value as T;
 }
 
@@ -68,8 +75,8 @@ function optionalOneOf<T extends string>(value: unknown, allowed: readonly T[], 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function optionalId(value: unknown, field: string): string | null {
-  if (value === undefined || value === null || value === "") return null;
-  if (typeof value !== "string" || !UUID.test(value)) throw new Error(`Invalid ${field}`);
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !UUID.test(value)) throw new Error(`Invalid ${field}`);
   return value;
 }
 
@@ -85,10 +92,10 @@ type SourceFilters = {
 
 function validateFilters(input: Record<string, unknown>): SourceFilters {
   return {
-    authority: optionalOneOf(input.authority, AUTHORITIES, "authority"),
-    sourceType: optionalOneOf(input.sourceType, SOURCE_TYPES, "source type"),
-    status: optionalOneOf(input.status, STATUSES, "status"),
-    submitter: optionalId(input.submitter, "submitter"),
+    authority: optionalOneOf(input.authority, AUTHORITIES, 'authority'),
+    sourceType: optionalOneOf(input.sourceType, SOURCE_TYPES, 'source type'),
+    status: optionalOneOf(input.status, STATUSES, 'status'),
+    submitter: optionalId(input.submitter, 'submitter'),
   };
 }
 
@@ -101,15 +108,15 @@ type ListInput = SourceFilters & {
 function validateList(value: unknown): ListInput {
   const input = (value ?? {}) as Record<string, unknown>;
   const cursorInput = input.cursor as { createdAt?: string; id?: string } | undefined;
-  let cursor: ListInput["cursor"] = null;
+  let cursor: ListInput['cursor'] = null;
   if (cursorInput) {
-    if (!cursorInput.createdAt || !cursorInput.id) throw new Error("Invalid cursor");
+    if (!cursorInput.createdAt || !cursorInput.id) throw new Error('Invalid cursor');
     cursor = { createdAt: cursorInput.createdAt, id: cursorInput.id };
   }
   return { ...validateFilters(input), cursor };
 }
 
-export const listSources = createServerFn({ method: "GET" })
+export const listSources = createServerFn({ method: 'GET' })
   .validator(validateList)
   .handler(async ({ data }) => {
     await adminId();
@@ -149,7 +156,7 @@ export const listSources = createServerFn({ method: "GET" })
 /* The review queue is two populations, not one: sources nobody has vouched for,
    and sources that changed after someone did. The second is the one a
    provenance product must not let slip. */
-export const listReviewQueue = createServerFn({ method: "GET" }).handler(async () => {
+export const listReviewQueue = createServerFn({ method: 'GET' }).handler(async () => {
   await adminId();
   const rows = await client`
     SELECT sources.id, sources.source_type, sources.authority, sources.created_at,
@@ -171,7 +178,7 @@ export const listReviewQueue = createServerFn({ method: "GET" }).handler(async (
 /* The rail shows a live count against each section. One round trip keeps the
    chrome consistent across routes instead of each page counting what it
    happens to have already fetched. */
-export const getNavCounts = createServerFn({ method: "GET" }).handler(async () => {
+export const getNavCounts = createServerFn({ method: 'GET' }).handler(async () => {
   await adminId();
   const [row] = await client<{ identities: string; sources: string; review: string }[]>`
     SELECT
@@ -191,11 +198,11 @@ export const getNavCounts = createServerFn({ method: "GET" }).handler(async () =
 
 function validateSourceId(value: unknown): { sourceId: string } {
   const sourceId = (value as { sourceId?: string })?.sourceId?.trim();
-  if (!sourceId) throw new Error("Invalid source");
+  if (!sourceId) throw new Error('Invalid source');
   return { sourceId };
 }
 
-export const getSourceDetail = createServerFn({ method: "GET" })
+export const getSourceDetail = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
     await adminId();
@@ -218,11 +225,11 @@ export const getSourceDetail = createServerFn({ method: "GET" })
       LEFT JOIN "user" AS admin_author ON admin_author.id = sources.created_by_admin_id
       WHERE sources.id = ${data.sourceId}
     `;
-    if (!source) throw new Error("That source no longer exists");
+    if (!source) throw new Error('That source no longer exists');
     return source;
   });
 
-export const getSourceRevisions = createServerFn({ method: "GET" })
+export const getSourceRevisions = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
     await adminId();
@@ -251,17 +258,17 @@ export const getSourceRevisions = createServerFn({ method: "GET" })
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 function eventMetadata(raw: unknown): Record<string, JsonValue> {
-  if (raw && typeof raw === "object") return raw as Record<string, JsonValue>;
-  if (typeof raw !== "string") return {};
+  if (raw && typeof raw === 'object') return raw as Record<string, JsonValue>;
+  if (typeof raw !== 'string') return {};
   try {
     const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, JsonValue>) : {};
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, JsonValue>) : {};
   } catch {
     return {};
   }
 }
 
-export const getSourceEvents = createServerFn({ method: "GET" })
+export const getSourceEvents = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
     await adminId();
@@ -280,11 +287,11 @@ export const getSourceEvents = createServerFn({ method: "GET" })
 /* Every human review action moves last_verified_at. That timestamp is what the
    review queue measures staleness against, so a decision that did not record
    when it was made would leave the source permanently in the queue. */
-export const setSourceAuthority = createServerFn({ method: "POST" })
+export const setSourceAuthority = createServerFn({ method: 'POST' })
   .validator((value: unknown): { sourceId: string; authority: Authority } => {
     const input = value as Partial<{ sourceId: string; authority: string }>;
-    if (!input.sourceId?.trim()) throw new Error("Invalid source");
-    if (!AUTHORITIES.includes(input.authority as Authority)) throw new Error("Invalid authority");
+    if (!input.sourceId?.trim()) throw new Error('Invalid source');
+    if (!AUTHORITIES.includes(input.authority as Authority)) throw new Error('Invalid authority');
     return { sourceId: input.sourceId.trim(), authority: input.authority as Authority };
   })
   .handler(async ({ data }) => {
@@ -293,7 +300,7 @@ export const setSourceAuthority = createServerFn({ method: "POST" })
       const [source] = await transaction<{ workspace_id: string; authority: string }[]>`
         SELECT workspace_id, authority FROM sources WHERE id = ${data.sourceId}
       `;
-      if (!source) throw new Error("That source no longer exists");
+      if (!source) throw new Error('That source no longer exists');
       await transaction`
         UPDATE sources
         SET authority = ${data.authority}, last_verified_at = now()
@@ -310,7 +317,7 @@ export const setSourceAuthority = createServerFn({ method: "POST" })
     return { sourceId: data.sourceId, authority: data.authority };
   });
 
-export const withdrawSource = createServerFn({ method: "POST" })
+export const withdrawSource = createServerFn({ method: 'POST' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
     const administrator = await adminId();
@@ -318,8 +325,8 @@ export const withdrawSource = createServerFn({ method: "POST" })
       const [source] = await transaction<{ workspace_id: string; status: string }[]>`
         SELECT workspace_id, status FROM sources WHERE id = ${data.sourceId}
       `;
-      if (!source) throw new Error("That source no longer exists");
-      if (source.status === "deleted") return;
+      if (!source) throw new Error('That source no longer exists');
+      if (source.status === 'deleted') return;
       await transaction`
         UPDATE sources SET status = 'deleted', deleted_at = now() WHERE id = ${data.sourceId}
       `;
@@ -328,7 +335,7 @@ export const withdrawSource = createServerFn({ method: "POST" })
         VALUES (${source.workspace_id}, ${administrator}, 'source_deleted', ${data.sourceId}, '{}'::jsonb)
       `;
     });
-    return { sourceId: data.sourceId, status: "deleted" as const };
+    return { sourceId: data.sourceId, status: 'deleted' as const };
   });
 
 /* Restoring is the counterpart the MCP layer never had — deleteSource is
@@ -336,7 +343,7 @@ export const withdrawSource = createServerFn({ method: "POST" })
    active source per content hash per workspace, so if an identical source was
    submitted while this one was withdrawn, the restore collides. That is a real
    answer, not an internal error, so it is reported as one. */
-export const restoreSource = createServerFn({ method: "POST" })
+export const restoreSource = createServerFn({ method: 'POST' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
     const administrator = await adminId();
@@ -345,8 +352,8 @@ export const restoreSource = createServerFn({ method: "POST" })
         const [source] = await transaction<{ workspace_id: string; status: string }[]>`
           SELECT workspace_id, status FROM sources WHERE id = ${data.sourceId}
         `;
-        if (!source) throw new Error("That source no longer exists");
-        if (source.status === "active") return;
+        if (!source) throw new Error('That source no longer exists');
+        if (source.status === 'active') return;
         await transaction`
           UPDATE sources SET status = 'active', deleted_at = NULL WHERE id = ${data.sourceId}
         `;
@@ -357,14 +364,14 @@ export const restoreSource = createServerFn({ method: "POST" })
       });
     } catch (cause) {
       const code = (cause as { code?: string })?.code;
-      if (code === "23505") {
+      if (code === '23505') {
         throw new Error(
-          "An active source with identical content already exists. Withdraw that one first, or leave this one withdrawn",
+          'An active source with identical content already exists. Withdraw that one first, or leave this one withdrawn'
         );
       }
       throw cause;
     }
-    return { sourceId: data.sourceId, status: "active" as const };
+    return { sourceId: data.sourceId, status: 'active' as const };
   });
 
 /* The workspace-wide event log.
@@ -373,21 +380,28 @@ export const restoreSource = createServerFn({ method: "POST" })
  * acted over MCP, `actor_admin_id` the signed-in administrator who acted here.
  * Rows written before 0004 carry neither, which reads as "unattributed" rather
  * than being hidden — the log is append-only and does not get retconned. */
-export const listEvents = createServerFn({ method: "GET" })
-  .validator((value: unknown): { eventType: string | null; cursor: { createdAt: string; id: string } | null } => {
-    const input = (value ?? {}) as Partial<{ eventType: string; cursor: { createdAt?: string; id?: string } }>;
-    let cursor: { createdAt: string; id: string } | null = null;
-    if (input.cursor) {
-      if (!input.cursor.createdAt || !input.cursor.id) throw new Error("Invalid cursor");
-      cursor = { createdAt: input.cursor.createdAt, id: input.cursor.id };
-    }
-    const eventType = input.eventType?.trim() || null;
-    /* An allowlist would go stale every time a new event type is written, so
+export const listEvents = createServerFn({ method: 'GET' })
+  .validator(
+    (
+      value: unknown
+    ): { eventType: string | null; cursor: { createdAt: string; id: string } | null } => {
+      const input = (value ?? {}) as Partial<{
+        eventType: string;
+        cursor: { createdAt?: string; id?: string };
+      }>;
+      let cursor: { createdAt: string; id: string } | null = null;
+      if (input.cursor) {
+        if (!input.cursor.createdAt || !input.cursor.id) throw new Error('Invalid cursor');
+        cursor = { createdAt: input.cursor.createdAt, id: input.cursor.id };
+      }
+      const eventType = input.eventType?.trim() || null;
+      /* An allowlist would go stale every time a new event type is written, so
        the shape is constrained instead: the filter is matched exactly against
        a column, and anything that is not a bare event-type token is refused. */
-    if (eventType && !/^[a-z_]{1,64}$/.test(eventType)) throw new Error("Invalid event type");
-    return { eventType, cursor };
-  })
+      if (eventType && !/^[a-z_]{1,64}$/.test(eventType)) throw new Error('Invalid event type');
+      return { eventType, cursor };
+    }
+  )
   .handler(async ({ data }) => {
     await adminId();
     const rows = await client`
@@ -410,14 +424,16 @@ export const listEvents = createServerFn({ method: "GET" })
       LIMIT ${PAGE_SIZE + 1}
     `;
     return {
-      events: rows.slice(0, PAGE_SIZE).map((row) => ({ ...row, metadata: eventMetadata(row.metadata) })),
+      events: rows
+        .slice(0, PAGE_SIZE)
+        .map((row) => ({ ...row, metadata: eventMetadata(row.metadata) })),
       hasMore: rows.length > PAGE_SIZE,
     };
   });
 
 /* The distinct event types actually present, so the filter offers what this
    workspace has rather than a hardcoded list that drifts from the writers. */
-export const listEventTypes = createServerFn({ method: "GET" }).handler(async () => {
+export const listEventTypes = createServerFn({ method: 'GET' }).handler(async () => {
   await adminId();
   const rows = await client<{ event_type: string; count: string }[]>`
     SELECT event_type, count(*) AS count FROM events GROUP BY event_type ORDER BY event_type
@@ -454,12 +470,12 @@ export const listEventTypes = createServerFn({ method: "GET" }).handler(async ()
  * than replacing it: "everything this agent submitted, about deployments" is a
  * question people actually have, and answering only half of it would send them
  * to scroll a ranked list by eye. */
-export const searchSources = createServerFn({ method: "GET" })
+export const searchSources = createServerFn({ method: 'GET' })
   .validator((value: unknown): SourceFilters & { query: string } => {
     const input = (value ?? {}) as Record<string, unknown>;
-    const query = typeof input.query === "string" ? input.query.trim() : "";
-    if (!query) throw new Error("Enter something to search for");
-    if (query.length > 200) throw new Error("That search is too long");
+    const query = typeof input.query === 'string' ? input.query.trim() : '';
+    if (!query) throw new Error('Enter something to search for');
+    if (query.length > 200) throw new Error('That search is too long');
     return { ...validateFilters(input), query };
   })
   .handler(async ({ data }) => {
@@ -506,7 +522,7 @@ export const searchSources = createServerFn({ method: "GET" })
    submitter filter. Counts every status, not just active: a submitter whose
    only sources were withdrawn must stay selectable, or the Withdrawn status
    filter has nobody to combine with. */
-export const listSubmitters = createServerFn({ method: "GET" }).handler(async () => {
+export const listSubmitters = createServerFn({ method: 'GET' }).handler(async () => {
   await adminId();
   const rows = await client<{ id: string; name: string; count: string }[]>`
     SELECT users.id, users.display_name AS name, count(*) AS count
@@ -535,50 +551,57 @@ export const listSubmitters = createServerFn({ method: "GET" }).handler(async ()
  * `sources.current_revision_id`, so superseded chunks fall out of search by
  * construction while the old revision stays readable — principle 2, nothing in
  * the product may make history unrecoverable. */
-export const reviseSource = createServerFn({ method: "POST" })
+export const reviseSource = createServerFn({ method: 'POST' })
   .validator((value: unknown): { sourceId: string; title: string; markdown: string } => {
     const input = (value ?? {}) as Partial<{ sourceId: string; title: string; markdown: string }>;
     const sourceId = input.sourceId?.trim();
-    if (!sourceId || !UUID.test(sourceId)) throw new Error("Invalid source");
+    if (!sourceId || !UUID.test(sourceId)) throw new Error('Invalid source');
     const title = input.title?.trim();
-    if (!title) throw new Error("A revision needs a title.");
+    if (!title) throw new Error('A revision needs a title.');
     const markdown = input.markdown?.trim();
-    if (!markdown) throw new Error("A revision cannot be empty.");
+    if (!markdown) throw new Error('A revision cannot be empty.');
     return { sourceId, title, markdown };
   })
   .handler(async ({ data }) => {
     const administrator = await adminId();
 
     const chunks = chunkMarkdown(data.markdown);
-    if (chunks.length === 0) throw new Error("That text contains nothing indexable.");
-    const contentHash = createHash("sha256").update(data.markdown).digest("hex");
+    if (chunks.length === 0) throw new Error('That text contains nothing indexable.');
+    const contentHash = createHash('sha256').update(data.markdown).digest('hex');
     const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
     const model = embeddingModel();
 
     try {
       return await client.begin(async (transaction) => {
         const [source] = await transaction<
-          { workspace_id: string; current_revision_id: string; source_type: string; status: string }[]
+          {
+            workspace_id: string;
+            current_revision_id: string;
+            source_type: string;
+            status: string;
+          }[]
         >`
           SELECT workspace_id, current_revision_id, source_type, status
           FROM sources WHERE id = ${data.sourceId} FOR UPDATE
         `;
-        if (!source) throw new Error("That source no longer exists");
-        if (source.status !== "active") {
-          throw new Error("Restore this source before revising it");
+        if (!source) throw new Error('That source no longer exists');
+        if (source.status !== 'active') {
+          throw new Error('Restore this source before revising it');
         }
         /* Same rule the MCP server enforces: an upload's revision carries the
            converted text of a stored file, so replacing the text alone would
            leave the two disagreeing about what the source is. */
-        if (source.source_type === "upload") {
-          throw new Error("Uploaded sources cannot be revised as Markdown. Withdraw it and upload a corrected file");
+        if (source.source_type === 'upload') {
+          throw new Error(
+            'Uploaded sources cannot be revised as Markdown. Withdraw it and upload a corrected file'
+          );
         }
 
         const [current] = await transaction<{ revision_number: number; content_hash: string }[]>`
           SELECT revision_number, content_hash FROM source_revisions WHERE id = ${source.current_revision_id}
         `;
-        if (!current) throw new Error("That source has no current revision");
-        if (current.content_hash === contentHash) throw new Error("Nothing changed in that text");
+        if (!current) throw new Error('That source has no current revision');
+        if (current.content_hash === contentHash) throw new Error('Nothing changed in that text');
 
         const revisionNumber = current.revision_number + 1;
         const [revision] = await transaction<{ id: string }[]>`
@@ -590,13 +613,13 @@ export const reviseSource = createServerFn({ method: "POST" })
             ${source.current_revision_id}, NULL, ${administrator}
           ) RETURNING id
         `;
-        if (!revision) throw new Error("Unable to record the revision");
+        if (!revision) throw new Error('Unable to record the revision');
 
         for (const [ordinal, chunk] of chunks.entries()) {
           await transaction`
             INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
             VALUES (${data.sourceId}, ${revision.id}, ${ordinal}, ${chunk.heading}, ${chunk.content},
-                    ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(",")}]`}::vector, ${model})
+                    ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(',')}]`}::vector, ${model})
           `;
         }
 
@@ -626,9 +649,9 @@ export const reviseSource = createServerFn({ method: "POST" })
         return { sourceId: data.sourceId, revisionNumber, chunkCount: chunks.length };
       });
     } catch (cause) {
-      if ((cause as { code?: string })?.code === "23505") {
+      if ((cause as { code?: string })?.code === '23505') {
         throw new Error(
-          "Another active source already holds exactly this content. Withdraw that one first, or make this revision differ from it",
+          'Another active source already holds exactly this content. Withdraw that one first, or make this revision differ from it'
         );
       }
       throw cause;
@@ -646,21 +669,19 @@ export const reviseSource = createServerFn({ method: "POST" })
  * The two ids are generated up front because `sources.current_revision_id` and
  * `source_revisions.source_id` point at each other. Migration 0004 defers that
  * constraint precisely so the pair can be written in one transaction. */
-export const createSource = createServerFn({ method: "POST" })
+export const createSource = createServerFn({ method: 'POST' })
   .validator((value: unknown): { title: string; markdown: string; tags: string[] } => {
     const input = (value ?? {}) as Partial<{ title: string; markdown: string; tags: unknown }>;
     const title = input.title?.trim();
-    if (!title) throw new Error("A source needs a title.");
+    if (!title) throw new Error('A source needs a title.');
     const markdown = input.markdown?.trim();
-    if (!markdown) throw new Error("A source cannot be empty.");
+    if (!markdown) throw new Error('A source cannot be empty.');
     const tags = Array.isArray(input.tags)
       ? [...new Set(input.tags.map((tag) => String(tag).trim()).filter(Boolean))]
       : [];
     return { title, markdown, tags };
   })
-  .handler(async ({ data }) =>
-    writeNewSource(await adminId(), { ...data, sourceType: "note" }),
-  );
+  .handler(async ({ data }) => writeNewSource(await adminId(), { ...data, sourceType: 'note' }));
 
 /* The single writer for a source an administrator creates, whether they typed
    the Markdown or uploaded a document that MarkItDown converted. The two paths
@@ -678,16 +699,17 @@ async function writeNewSource(
     title: string;
     markdown: string;
     tags: string[];
-    sourceType: "note" | "upload";
+    sourceType: 'note' | 'upload';
     originalFilename?: string;
     mimeType?: string;
     storagePath?: string;
     contentHash?: string;
-  },
+  }
 ) {
   const chunks = chunkMarkdown(input.markdown);
-  if (chunks.length === 0) throw new Error("That text contains nothing indexable.");
-  const contentHash = input.contentHash ?? createHash("sha256").update(input.markdown).digest("hex");
+  if (chunks.length === 0) throw new Error('That text contains nothing indexable.');
+  const contentHash =
+    input.contentHash ?? createHash('sha256').update(input.markdown).digest('hex');
   const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
   const model = embeddingModel();
 
@@ -699,7 +721,7 @@ async function writeNewSource(
       const [workspace] = await transaction<{ id: string }[]>`
         SELECT id FROM workspaces WHERE name = 'default'
       `;
-      if (!workspace) throw new Error("Default workspace is unavailable");
+      if (!workspace) throw new Error('Default workspace is unavailable');
 
       await transaction`
         INSERT INTO sources (
@@ -727,7 +749,7 @@ async function writeNewSource(
         await transaction`
           INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
           VALUES (${sourceId}, ${revisionId}, ${ordinal}, ${chunk.heading}, ${chunk.content},
-                  ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(",")}]`}::vector, ${model})
+                  ${chunk.tokenCount}, ${`[${vectors[ordinal]!.join(',')}]`}::vector, ${model})
         `;
       }
 
@@ -738,15 +760,15 @@ async function writeNewSource(
       await transaction`
         INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
         VALUES (${workspace.id}, ${administrator}, 'source_submitted', ${sourceId},
-          ${JSON.stringify({ sourceType: input.sourceType, authority: "approved", revisionId, chunkCount: chunks.length })}::jsonb)
+          ${JSON.stringify({ sourceType: input.sourceType, authority: 'approved', revisionId, chunkCount: chunks.length })}::jsonb)
       `;
 
       return { sourceId, chunkCount: chunks.length };
     });
   } catch (cause) {
-    if ((cause as { code?: string })?.code === "23505") {
+    if ((cause as { code?: string })?.code === '23505') {
       throw new Error(
-        "An active source already holds exactly this content. Open that one and revise it instead of creating a duplicate",
+        'An active source already holds exactly this content. Open that one and revise it instead of creating a duplicate'
       );
     }
     throw cause;
@@ -761,19 +783,19 @@ async function writeNewSource(
  * the database write then fails, the blob is left behind deliberately — it is
  * content-addressed, so a retry finds it rather than duplicating it, and an
  * orphan is recoverable where a lost original is not. */
-export const uploadSource = createServerFn({ method: "POST" })
+export const uploadSource = createServerFn({ method: 'POST' })
   .validator((value: unknown): { file: File; title: string; tags: string[] } => {
-    if (!(value instanceof FormData)) throw new Error("Expected a file upload");
-    const file = value.get("file");
-    if (!(file instanceof File) || file.size === 0) throw new Error("Choose a document to upload.");
-    const title = String(value.get("title") ?? "").trim();
-    if (!title) throw new Error("A source needs a title.");
+    if (!(value instanceof FormData)) throw new Error('Expected a file upload');
+    const file = value.get('file');
+    if (!(file instanceof File) || file.size === 0) throw new Error('Choose a document to upload.');
+    const title = String(value.get('title') ?? '').trim();
+    if (!title) throw new Error('A source needs a title.');
     const tags = [
       ...new Set(
-        String(value.get("tags") ?? "")
-          .split(",")
+        String(value.get('tags') ?? '')
+          .split(',')
           .map((tag) => tag.trim())
-          .filter(Boolean),
+          .filter(Boolean)
       ),
     ];
     return { file, title, tags };
@@ -782,7 +804,9 @@ export const uploadSource = createServerFn({ method: "POST" })
     const administrator = await adminId();
     const limit = maxUploadBytes();
     if (data.file.size > limit) {
-      throw new Error(`That file is larger than the ${Math.floor(limit / 1_000_000)} MB upload limit.`);
+      throw new Error(
+        `That file is larger than the ${Math.floor(limit / 1_000_000)} MB upload limit.`
+      );
     }
 
     const document = await documentIngestion().ingest({
@@ -795,7 +819,7 @@ export const uploadSource = createServerFn({ method: "POST" })
       title: data.title,
       markdown: document.markdown,
       tags: data.tags,
-      sourceType: "upload",
+      sourceType: 'upload',
       originalFilename: data.file.name,
       mimeType: data.file.type,
       storagePath: document.storagePath,

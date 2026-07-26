@@ -9,7 +9,7 @@ export type Chunk = {
 
 export function chunkMarkdown(markdown: string): Chunk[] {
   const sections = markdown
-    .replace(/\r\n/g, "\n")
+    .replace(/\r\n/g, '\n')
     .split(/(?=^#{1,6}\s+)/m)
     .map((section) => section.trim())
     .filter(Boolean);
@@ -23,7 +23,7 @@ export function chunkMarkdown(markdown: string): Chunk[] {
       const window = words.slice(start, start + MAX_CHUNK_WORDS);
       if (window.length === 0) break;
       chunks.push({
-        content: window.join(" "),
+        content: window.join(' '),
         heading,
         tokenCount: window.length,
       });

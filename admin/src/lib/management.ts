@@ -1,19 +1,26 @@
-import { randomBytes, randomUUID, scryptSync } from "node:crypto";
-import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { client } from "./db.js";
-import { auth, provisioning } from "./auth.js";
-import { PAGE_SIZE } from "./knowledge.js";
+import { randomBytes, randomUUID, scryptSync } from 'node:crypto';
+import { createServerFn } from '@tanstack/react-start';
+import { getRequest } from '@tanstack/react-start/server';
+import { auth, provisioning } from './auth.js';
+import { client } from './db.js';
+import { PAGE_SIZE } from './knowledge.js';
 
-type Role = "reader" | "writer" | "reviewer" | "admin";
+type Role = 'reader' | 'writer' | 'reviewer' | 'admin';
 type IdentityInput = { name: string; role: Role; keyLabel: string };
-type IdentityAmendment = { name: string; role: Role; description: string | null; autoApprove: boolean };
+type IdentityAmendment = {
+  name: string;
+  role: Role;
+  description: string | null;
+  autoApprove: boolean;
+};
 
 async function adminId(): Promise<string> {
   const session = await auth.api.getSession({ headers: getRequest().headers });
-  if (!session) throw new Error("Unauthorized");
-  const [role] = await client<{ user_id: string }[]>`SELECT user_id FROM admin_role WHERE user_id = ${session.user.id}`;
-  if (!role) throw new Error("Forbidden");
+  if (!session) throw new Error('Unauthorized');
+  const [role] = await client<
+    { user_id: string }[]
+  >`SELECT user_id FROM admin_role WHERE user_id = ${session.user.id}`;
+  if (!role) throw new Error('Forbidden');
   return role.user_id;
 }
 
@@ -27,11 +34,11 @@ async function adminId(): Promise<string> {
  * Bounding matters more than the row count suggests — each row carries a
  * json_agg of every credential that holder has ever owned, so the payload grows
  * with key churn, not just with headcount. */
-export const listIdentities = createServerFn({ method: "GET" })
+export const listIdentities = createServerFn({ method: 'GET' })
   .validator((value: unknown): { cursor: { createdAt: string; id: string } | null } => {
     const input = (value ?? {}) as { cursor?: { createdAt?: string; id?: string } };
     if (!input.cursor) return { cursor: null };
-    if (!input.cursor.createdAt || !input.cursor.id) throw new Error("Invalid cursor");
+    if (!input.cursor.createdAt || !input.cursor.id) throw new Error('Invalid cursor');
     return { cursor: { createdAt: input.cursor.createdAt, id: input.cursor.id } };
   })
   .handler(async ({ data }) => {
@@ -59,17 +66,26 @@ export const listIdentities = createServerFn({ method: "GET" })
     return { identities: rows.slice(0, PAGE_SIZE), hasMore };
   });
 
-export const createIdentity = createServerFn({ method: "POST" })
+export const createIdentity = createServerFn({ method: 'POST' })
   .validator((value: unknown): IdentityInput => {
     const input = value as Partial<IdentityInput>;
-    if (!input.name?.trim() || !input.keyLabel?.trim() || !["reader", "writer", "reviewer", "admin"].includes(input.role ?? "")) throw new Error("Invalid identity details");
-    return { name: input.name.trim(), keyLabel: input.keyLabel.trim(), role: input.role as IdentityInput["role"] };
+    if (
+      !input.name?.trim() ||
+      !input.keyLabel?.trim() ||
+      !['reader', 'writer', 'reviewer', 'admin'].includes(input.role ?? '')
+    )
+      throw new Error('Invalid identity details');
+    return {
+      name: input.name.trim(),
+      keyLabel: input.keyLabel.trim(),
+      role: input.role as IdentityInput['role'],
+    };
   })
   .handler(async ({ data }) => {
     const createdByAdminId = await adminId();
-    const secret = `tkb_${randomBytes(32).toString("base64url")}`;
-    const salt = randomBytes(16).toString("hex");
-    const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString("hex")}`;
+    const secret = `tkb_${randomBytes(32).toString('base64url')}`;
+    const salt = randomBytes(16).toString('hex');
+    const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
     const keyId = randomUUID();
     let identityId: string | undefined;
     await client.begin(async (transaction) => {
@@ -78,7 +94,7 @@ export const createIdentity = createServerFn({ method: "POST" })
         SELECT id, ${data.name}, ${data.role} FROM workspaces WHERE name = 'default'
         RETURNING id
       `;
-      if (!identity) throw new Error("Default workspace is unavailable");
+      if (!identity) throw new Error('Default workspace is unavailable');
       identityId = identity.id;
       await transaction`
         INSERT INTO api_keys (id, user_id, key_prefix, secret_hash)
@@ -95,14 +111,14 @@ export const createIdentity = createServerFn({ method: "POST" })
         FROM workspaces WHERE name = 'default'
       `;
     });
-    if (!identityId) throw new Error("Unable to create identity");
+    if (!identityId) throw new Error('Unable to create identity');
     return { identityId, key: secret, prefix: secret.slice(0, 12) };
   });
 
 /* Amend a holder's record. Role changes alter what every credential this
    holder owns is permitted to do, so the change is written to the event log
    alongside the values it replaced. */
-export const updateIdentity = createServerFn({ method: "POST" })
+export const updateIdentity = createServerFn({ method: 'POST' })
   .validator((value: unknown): { identityId: string } & IdentityAmendment => {
     const input = value as Partial<{
       identityId: string;
@@ -111,14 +127,15 @@ export const updateIdentity = createServerFn({ method: "POST" })
       description: string;
       autoApprove: boolean;
     }>;
-    if (!input.identityId?.trim()) throw new Error("Invalid identity");
-    if (!input.name?.trim()) throw new Error("A holder name is required");
-    if (!["reader", "writer", "reviewer", "admin"].includes(input.role ?? "")) throw new Error("Invalid role");
-    if (typeof input.autoApprove !== "boolean") throw new Error("Invalid trusted-holder setting");
+    if (!input.identityId?.trim()) throw new Error('Invalid identity');
+    if (!input.name?.trim()) throw new Error('A holder name is required');
+    if (!['reader', 'writer', 'reviewer', 'admin'].includes(input.role ?? ''))
+      throw new Error('Invalid role');
+    if (typeof input.autoApprove !== 'boolean') throw new Error('Invalid trusted-holder setting');
     return {
       identityId: input.identityId.trim(),
       name: input.name.trim(),
-      role: input.role as IdentityAmendment["role"],
+      role: input.role as IdentityAmendment['role'],
       description: input.description?.trim() || null,
       autoApprove: input.autoApprove,
     };
@@ -138,7 +155,7 @@ export const updateIdentity = createServerFn({ method: "POST" })
         SELECT workspace_id, display_name, role, description, auto_approve
         FROM users WHERE id = ${data.identityId}
       `;
-      if (!before) throw new Error("That identity no longer exists");
+      if (!before) throw new Error('That identity no longer exists');
       await transaction`
         UPDATE users
         SET display_name = ${data.name}, role = ${data.role}, description = ${data.description},
@@ -148,8 +165,12 @@ export const updateIdentity = createServerFn({ method: "POST" })
       /* Values are narrowed to what jsonb can carry rather than `unknown`, so
          the compiler — not a runtime surprise — catches a field that cannot be
          written to the event log. */
-      const changed: Record<string, { from: string | boolean | null; to: string | boolean | null }> = {};
-      if (before.display_name !== data.name) changed.name = { from: before.display_name, to: data.name };
+      const changed: Record<
+        string,
+        { from: string | boolean | null; to: string | boolean | null }
+      > = {};
+      if (before.display_name !== data.name)
+        changed.name = { from: before.display_name, to: data.name };
       if (before.role !== data.role) changed.role = { from: before.role, to: data.role };
       if ((before.description ?? null) !== data.description)
         changed.description = { from: before.description, to: data.description };
@@ -172,11 +193,11 @@ export const updateIdentity = createServerFn({ method: "POST" })
    keys whose holder has `disabled_at IS NULL`, so disabling blocks every
    credential this holder owns at the MCP boundary immediately — and, unlike
    revoking, it is reversible and destroys nothing. */
-export const setIdentityDisabled = createServerFn({ method: "POST" })
+export const setIdentityDisabled = createServerFn({ method: 'POST' })
   .validator((value: unknown): { identityId: string; disabled: boolean } => {
     const input = value as Partial<{ identityId: string; disabled: boolean }>;
-    if (!input.identityId?.trim()) throw new Error("Invalid identity");
-    if (typeof input.disabled !== "boolean") throw new Error("Invalid state");
+    if (!input.identityId?.trim()) throw new Error('Invalid identity');
+    if (typeof input.disabled !== 'boolean') throw new Error('Invalid state');
     return { identityId: input.identityId.trim(), disabled: input.disabled };
   })
   .handler(async ({ data }) => {
@@ -185,7 +206,7 @@ export const setIdentityDisabled = createServerFn({ method: "POST" })
       const [identity] = await transaction<{ workspace_id: string; disabled_at: string | null }[]>`
         SELECT workspace_id, disabled_at FROM users WHERE id = ${data.identityId}
       `;
-      if (!identity) throw new Error("That identity no longer exists");
+      if (!identity) throw new Error('That identity no longer exists');
       if (data.disabled === Boolean(identity.disabled_at)) return;
       /* Branch rather than interpolating a `now()` fragment: a fragment built
          from the pooled client is not the transaction's handle, and the write
@@ -198,7 +219,7 @@ export const setIdentityDisabled = createServerFn({ method: "POST" })
       await transaction`
         INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
         VALUES (${identity.workspace_id}, ${administrator},
-          ${data.disabled ? "identity_disabled" : "identity_enabled"},
+          ${data.disabled ? 'identity_disabled' : 'identity_enabled'},
           ${JSON.stringify({ identityId: data.identityId })}::jsonb)
       `;
     });
@@ -208,23 +229,24 @@ export const setIdentityDisabled = createServerFn({ method: "POST" })
 /* Issue an additional credential to an existing holder. Rotation is a normal
    custody operation: a holder outlives any one credential, so voiding a key
    must never strand the identity that held it. */
-export const issueCredential = createServerFn({ method: "POST" })
+export const issueCredential = createServerFn({ method: 'POST' })
   .validator((value: unknown): { identityId: string; keyLabel: string } => {
     const input = value as Partial<{ identityId: string; keyLabel: string }>;
-    if (!input.identityId?.trim() || !input.keyLabel?.trim()) throw new Error("Invalid credential details");
+    if (!input.identityId?.trim() || !input.keyLabel?.trim())
+      throw new Error('Invalid credential details');
     return { identityId: input.identityId.trim(), keyLabel: input.keyLabel.trim() };
   })
   .handler(async ({ data }) => {
     const createdByAdminId = await adminId();
-    const secret = `tkb_${randomBytes(32).toString("base64url")}`;
-    const salt = randomBytes(16).toString("hex");
-    const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString("hex")}`;
+    const secret = `tkb_${randomBytes(32).toString('base64url')}`;
+    const salt = randomBytes(16).toString('hex');
+    const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
     const keyId = randomUUID();
     await client.begin(async (transaction) => {
       const [identity] = await transaction<{ id: string; workspace_id: string }[]>`
         SELECT id, workspace_id FROM users WHERE id = ${data.identityId}
       `;
-      if (!identity) throw new Error("That identity no longer exists");
+      if (!identity) throw new Error('That identity no longer exists');
       await transaction`
         INSERT INTO api_keys (id, user_id, key_prefix, secret_hash)
         VALUES (${keyId}, ${identity.id}, ${secret.slice(0, 12)}, ${secretHash})
@@ -242,10 +264,10 @@ export const issueCredential = createServerFn({ method: "POST" })
     return { identityId: data.identityId, key: secret, prefix: secret.slice(0, 12) };
   });
 
-export const revokeKey = createServerFn({ method: "POST" })
+export const revokeKey = createServerFn({ method: 'POST' })
   .validator((value: unknown): { keyId: string } => {
     const keyId = (value as { keyId?: string }).keyId;
-    if (!keyId) throw new Error("Invalid key");
+    if (!keyId) throw new Error('Invalid key');
     return { keyId };
   })
   .handler(async ({ data }) => {
@@ -287,32 +309,40 @@ export const revokeKey = createServerFn({ method: "POST" })
  * schema (`users`, uuid), these are better-auth accounts (`"user"`, text) that
  * hold a row in `admin_role`. The two never mix, which is why the register can
  * show a holder called "Admin" that is nobody's colleague. */
-export type Administrator = { id: string; name: string; email: string; createdAt: string; isYou: boolean };
+export type Administrator = {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  isYou: boolean;
+};
 
 /* Unpaginated on purpose, unlike `listIdentities`. Administrators are people
    with a password to this instance; if that list ever needs a cursor, something
    has gone wrong that pagination would only hide. */
-export const listAdministrators = createServerFn({ method: "GET" }).handler(async (): Promise<Administrator[]> => {
-  const you = await adminId();
-  /* `created_at` comes back as a string, not a Date. `drizzle()` mutates the
+export const listAdministrators = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Administrator[]> => {
+    const you = await adminId();
+    /* `created_at` comes back as a string, not a Date. `drizzle()` mutates the
      client it is handed (see `db.ts`) and that extends to its date parsers, so
      this client hands back raw Postgres timestamps while a bare postgres.js
      client would give you a Date. Pass it through untouched and let `stampAt`
      format it, which is what every other register here already does. */
-  const rows = await client<{ id: string; name: string; email: string; created_at: string }[]>`
+    const rows = await client<{ id: string; name: string; email: string; created_at: string }[]>`
     SELECT "user".id, "user".name, "user".email, admin_role.created_at
     FROM admin_role
     JOIN "user" ON "user".id = admin_role.user_id
     ORDER BY admin_role.created_at ASC, "user".email ASC
   `;
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    createdAt: row.created_at,
-    isYou: row.id === you,
-  }));
-});
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.created_at,
+      isYou: row.id === you,
+    }));
+  }
+);
 
 /* Mirrors the bootstrap at `admin/scripts/migrate.ts:81-87`, the only other
    place an administrator is created.
@@ -326,25 +356,28 @@ export const listAdministrators = createServerFn({ method: "GET" }).handler(asyn
  * better-auth answers an already-registered email generically, so a duplicate
  * would otherwise look like success. Checking first also lets an existing
  * account be promoted instead of refused. */
-export const createAdministrator = createServerFn({ method: "POST" })
+export const createAdministrator = createServerFn({ method: 'POST' })
   .validator((value: unknown): { name: string; email: string; password: string } => {
     const input = (value ?? {}) as Partial<{ name: string; email: string; password: string }>;
     const email = input.email?.trim().toLowerCase();
     const name = input.name?.trim();
-    if (!name) throw new Error("A name is required.");
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("That does not look like an email address.");
+    if (!name) throw new Error('A name is required.');
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+      throw new Error('That does not look like an email address.');
     /* Eight is better-auth's own `minPasswordLength` default, so this adds no
        rule of its own — it just fails here, with a sentence, rather than as a
        provider error once the account is half-made. */
     if (!input.password || input.password.length < 8) {
-      throw new Error("Use at least 8 characters for the initial password.");
+      throw new Error('Use at least 8 characters for the initial password.');
     }
     return { name, email, password: input.password };
   })
   .handler(async ({ data }) => {
     await adminId();
 
-    const [existing] = await client<{ id: string }[]>`SELECT id FROM "user" WHERE lower(email) = ${data.email}`;
+    const [existing] = await client<
+      { id: string }[]
+    >`SELECT id FROM "user" WHERE lower(email) = ${data.email}`;
     if (existing) {
       const [already] = await client<{ user_id: string }[]>`
         SELECT user_id FROM admin_role WHERE user_id = ${existing.id}
@@ -354,9 +387,13 @@ export const createAdministrator = createServerFn({ method: "POST" })
       return { email: data.email, promoted: true };
     }
 
-    await provisioning.api.signUpEmail({ body: { name: data.name, email: data.email, password: data.password } });
-    const [created] = await client<{ id: string }[]>`SELECT id FROM "user" WHERE lower(email) = ${data.email}`;
-    if (!created) throw new Error("The account could not be created. Nothing was changed.");
+    await provisioning.api.signUpEmail({
+      body: { name: data.name, email: data.email, password: data.password },
+    });
+    const [created] = await client<
+      { id: string }[]
+    >`SELECT id FROM "user" WHERE lower(email) = ${data.email}`;
+    if (!created) throw new Error('The account could not be created. Nothing was changed.');
     await client`INSERT INTO admin_role (user_id) VALUES (${created.id}) ON CONFLICT DO NOTHING`;
     return { email: data.email, promoted: false };
   });

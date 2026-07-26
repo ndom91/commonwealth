@@ -1,8 +1,8 @@
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
-import { createSource, uploadSource } from "../../lib/knowledge.js";
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
+import { useState } from 'react';
+import { createSource, uploadSource } from '../../lib/knowledge.js';
 
-export const Route = createFileRoute("/sources/new")({
+export const Route = createFileRoute('/sources/new')({
   component: NewSource,
 });
 
@@ -10,16 +10,16 @@ export const Route = createFileRoute("/sources/new")({
    and its original kept, addressed by content hash. They are presented as one
    screen with a mode rather than two routes, because the decision is "what am I
    holding" — not a different task. */
-type Mode = "note" | "upload";
+type Mode = 'note' | 'upload';
 
 function NewSource() {
   const router = useRouter();
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState<Mode>("note");
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [tags, setTags] = useState("");
+  const [mode, setMode] = useState<Mode>('note');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [tags, setTags] = useState('');
   const [file, setFile] = useState<File>();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
@@ -30,27 +30,38 @@ function NewSource() {
     setError(undefined);
     try {
       let result: { sourceId: string };
-      if (mode === "upload") {
-        if (!file) throw new Error("Choose a document to upload.");
+      if (mode === 'upload') {
+        if (!file) throw new Error('Choose a document to upload.');
         /* FormData rather than base64: a 10 MB document would otherwise become
            a 13 MB string held on both sides of the request. */
         const payload = new FormData();
-        payload.set("file", file);
-        payload.set("title", title);
-        payload.set("tags", tags);
+        payload.set('file', file);
+        payload.set('title', title);
+        payload.set('tags', tags);
         result = await uploadSource({ data: payload });
       } else {
         result = await createSource({
-          data: { title, markdown: body, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean) },
+          data: {
+            title,
+            markdown: body,
+            tags: tags
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+          },
         });
       }
       await router.invalidate();
-      await navigate({ to: "/sources/$sourceId", params: { sourceId: result.sourceId }, search: {} });
+      await navigate({
+        to: '/sources/$sourceId',
+        params: { sourceId: result.sourceId },
+        search: {},
+      });
     } catch (cause) {
       setError(
         cause instanceof Error && cause.message
           ? `${cause.message} Nothing was written — adjust it and try again.`
-          : "The source could not be created. Nothing was written — try again.",
+          : 'The source could not be created. Nothing was written — try again.'
       );
     } finally {
       setPending(false);
@@ -63,28 +74,28 @@ function NewSource() {
         <div className="bench__head">
           <div>
             <span className="label">New source</span>
-            <h2>{mode === "upload" ? "Upload a document" : "Write a note"}</h2>
+            <h2>{mode === 'upload' ? 'Upload a document' : 'Write a note'}</h2>
           </div>
           <div className="bench__seal">
-            {(["note", "upload"] as Mode[]).map((value) => (
+            {(['note', 'upload'] as Mode[]).map((value) => (
               <button
                 key={value}
                 type="button"
-                className={`btn ${mode === value ? "btn--current" : "btn--quiet"}`}
+                className={`btn ${mode === value ? 'btn--current' : 'btn--quiet'}`}
                 disabled={pending}
                 onClick={() => {
                   setMode(value);
                   setError(undefined);
                 }}
               >
-                {value === "note" ? "Write" : "Upload"}
+                {value === 'note' ? 'Write' : 'Upload'}
               </button>
             ))}
           </div>
         </div>
 
         <div className="bench__section revise">
-          <label className={`field${error ? " field--error" : ""}`}>
+          <label className={`field${error ? ' field--error' : ''}`}>
             <span className="label">Title</span>
             <input
               required
@@ -96,7 +107,7 @@ function NewSource() {
             />
           </label>
 
-          {mode === "upload" ? (
+          {mode === 'upload' ? (
             <label className="field">
               <span className="label">Document</span>
               <input
@@ -133,9 +144,9 @@ function NewSource() {
           </label>
 
           <p className="line__caption">
-            {mode === "upload"
-              ? "The document is converted to Markdown for indexing and the original is kept, addressed by its content hash. Uploads cannot be edited as text afterwards — replace the file instead."
-              : "Written by you, so it lands approved and verified rather than queuing for review — the queue is for text nobody has vouched for. Marking it canonical stays a separate decision."}
+            {mode === 'upload'
+              ? 'The document is converted to Markdown for indexing and the original is kept, addressed by its content hash. Uploads cannot be edited as text afterwards — replace the file instead.'
+              : 'Written by you, so it lands approved and verified rather than queuing for review — the queue is for text nobody has vouched for. Marking it canonical stays a separate decision.'}
           </p>
 
           {error && (
@@ -147,18 +158,18 @@ function NewSource() {
           <div className="bench__controls">
             <button className="btn btn--primary" disabled={pending}>
               {pending
-                ? mode === "upload"
-                  ? "Converting…"
-                  : "Writing…"
-                : mode === "upload"
-                  ? "Upload document"
-                  : "Create source"}
+                ? mode === 'upload'
+                  ? 'Converting…'
+                  : 'Writing…'
+                : mode === 'upload'
+                  ? 'Upload document'
+                  : 'Create source'}
             </button>
             <button
               type="button"
               className="btn btn--quiet"
               disabled={pending}
-              onClick={() => void navigate({ to: "/sources", search: {} })}
+              onClick={() => void navigate({ to: '/sources', search: {} })}
             >
               Cancel
             </button>

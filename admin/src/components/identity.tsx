@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState } from 'react';
 
 /* Shared between the identity register and the holder bench, which are separate
    routes now that a holder is addressable by URL. Types, the custody-line
    derivation and the one-time credential reveal all sit on the boundary between
    the two, so they live here rather than being imported across routes. */
 
-export type Role = "reader" | "writer" | "reviewer" | "admin";
+export type Role = 'reader' | 'writer' | 'reviewer' | 'admin';
 
-export const ROLES: Role[] = ["reader", "writer", "reviewer", "admin"];
+export const ROLES: Role[] = ['reader', 'writer', 'reviewer', 'admin'];
 
 export type Credential = {
   id: string;
@@ -47,7 +47,7 @@ export const labelOf = (key: Credential) => key.label?.trim() || `Unlabelled · 
    agent presented the key, so it stays on the credential stub instead. */
 export function custodyLine(identity: Identity) {
   const entries: Array<{ at: string; what: string }> = [
-    { at: identity.created_at, what: "Holder registered" },
+    { at: identity.created_at, what: 'Holder registered' },
   ];
   for (const key of identity.keys) {
     const label = labelOf(key);
@@ -63,7 +63,7 @@ export function custodyLine(identity: Identity) {
    is on the bench; dismissing it drops the credential to the stub, which is
    all the database keeps. */
 export function CredentialTag({ issued, onDismiss }: { issued: Issued; onDismiss: () => void }) {
-  const [copy, setCopy] = useState<"idle" | "copied" | "unavailable">("idle");
+  const [copy, setCopy] = useState<'idle' | 'copied' | 'unavailable'>('idle');
 
   /* The clipboard API is absent on insecure origins, and the documented
      default deployment is plain HTTP with Caddy optional. Never report a copy
@@ -73,9 +73,9 @@ export function CredentialTag({ issued, onDismiss }: { issued: Issued; onDismiss
       ?.writeText(issued.key)
       .then(() => true)
       .catch(() => false);
-    setCopy(ok ? "copied" : "unavailable");
+    setCopy(ok ? 'copied' : 'unavailable');
     if (!ok) {
-      const node = document.getElementById("credential-secret");
+      const node = document.getElementById('credential-secret');
       if (node) getSelection()?.selectAllChildren(node);
     }
   }
@@ -99,11 +99,11 @@ export function CredentialTag({ issued, onDismiss }: { issued: Issued; onDismiss
 
       <div className="credential__foot">
         <p className="credential__note">
-          {copy === "copied"
-            ? "Copied to clipboard."
-            : copy === "unavailable"
-              ? "Clipboard unavailable over http — the key is selected, copy it manually before redacting."
-              : "Click to copy. It is not stored and cannot be shown again."}
+          {copy === 'copied'
+            ? 'Copied to clipboard.'
+            : copy === 'unavailable'
+              ? 'Clipboard unavailable over http — the key is selected, copy it manually before redacting.'
+              : 'Click to copy. It is not stored and cannot be shown again.'}
         </p>
         <button type="button" className="credential__dismiss" onClick={onDismiss}>
           Redact

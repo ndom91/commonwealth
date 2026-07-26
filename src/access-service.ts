@@ -1,21 +1,21 @@
-import type { Sql } from "postgres";
-import { keyPrefix, verifyApiKey } from "./auth.js";
-import type { Actor, Role } from "./domain.js";
-import { DomainError } from "./errors.js";
+import type { Sql } from 'postgres';
+import { keyPrefix, verifyApiKey } from './auth.js';
+import type { Actor, Role } from './domain.js';
+import { DomainError } from './errors.js';
 
 type KeyRow = Actor & { secret_hash: string };
-type Permission = "read" | "write" | "review" | "admin";
+type Permission = 'read' | 'write' | 'review' | 'admin';
 
 const permissions: Record<Role, readonly Permission[]> = {
-  reader: ["read"],
-  writer: ["read", "write"],
-  reviewer: ["read", "write", "review"],
-  admin: ["read", "write", "review", "admin"],
+  reader: ['read'],
+  writer: ['read', 'write'],
+  reviewer: ['read', 'write', 'review'],
+  admin: ['read', 'write', 'review', 'admin'],
 };
 
 export function requirePermission(actor: Actor, permission: Permission): void {
   if (!permissions[actor.role].includes(permission)) {
-    throw new DomainError("Your API key does not have permission for this operation");
+    throw new DomainError('Your API key does not have permission for this operation');
   }
 }
 
@@ -32,7 +32,14 @@ export class AccessService {
     `;
     const match = keys.find((candidate) => verifyApiKey(key, candidate.secret_hash));
     if (!match) return null;
-    await this.sql`UPDATE api_keys SET last_used_at = now() WHERE secret_hash = ${match.secret_hash}`;
-    return { id: match.id, workspaceId: match.workspaceId, name: match.name, role: match.role, autoApprove: match.autoApprove };
+    await this
+      .sql`UPDATE api_keys SET last_used_at = now() WHERE secret_hash = ${match.secret_hash}`;
+    return {
+      id: match.id,
+      workspaceId: match.workspaceId,
+      name: match.name,
+      role: match.role,
+      autoApprove: match.autoApprove,
+    };
   }
 }

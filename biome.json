@@ -1,0 +1,77 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 100,
+    "attributePosition": "auto"
+  },
+  "javascript": {
+    "formatter": {
+      "jsxQuoteStyle": "double",
+      "quoteProperties": "asNeeded",
+      "trailingCommas": "es5",
+      "semicolons": "always",
+      "arrowParentheses": "always",
+      "bracketSpacing": true,
+      "bracketSameLine": false,
+      "quoteStyle": "single",
+      "attributePosition": "auto"
+    }
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!node_modules",
+      "!.next",
+      "!.certs",
+      "!packages/graphql/types.ts",
+      "!packages/linear-api/graphql/types.ts",
+      "!test-results",
+      "!playroom/dist",
+      "!ui/theme/colors/source"
+    ]
+  },
+  "linter": {
+    "rules": {
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error",
+        "useHookAtTopLevel": "error"
+      },
+      "complexity": {
+        "noForEach": "off"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "off",
+        "useKeyWithClickEvents": "off",
+        "useButtonType": "off",
+        "noAutofocus": "off",
+        "noLabelWithoutControl": "off"
+      },
+      "performance": {
+        "noDelete": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off",
+        "noConsole": {
+          "level": "error",
+          "fix": "none"
+        },
+        "noControlCharactersInRegex": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
+      }
+    }
+  }
+}

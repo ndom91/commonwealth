@@ -1,33 +1,23 @@
+import { createFileRoute, Link, useLoaderData, useRouter } from '@tanstack/react-router';
+import { useState } from 'react';
+import { accessionOf, SealChip, stamp, stampAt } from '../../components/chrome.js';
 import {
-  createFileRoute,
-  Link,
-  useLoaderData,
-  useRouter,
-} from "@tanstack/react-router";
-import { useState } from "react";
+  CredentialTag,
+  custodyLine,
+  type Identity,
+  type Issued,
+  labelOf,
+  ROLES,
+  type Role,
+} from '../../components/identity.js';
 import {
   issueCredential,
   revokeKey,
   setIdentityDisabled,
   updateIdentity,
-} from "../../lib/management.js";
-import {
-  SealChip,
-  accessionOf,
-  stamp,
-  stampAt,
-} from "../../components/chrome.js";
-import {
-  CredentialTag,
-  ROLES,
-  custodyLine,
-  labelOf,
-  type Identity,
-  type Issued,
-  type Role,
-} from "../../components/identity.js";
+} from '../../lib/management.js';
 
-export const Route = createFileRoute("/identities/$identityId")({
+export const Route = createFileRoute('/identities/$identityId')({
   component: HolderBench,
 });
 
@@ -46,12 +36,10 @@ function HolderBench() {
      already holds every holder, and one `router.invalidate()` after a mutation
      refreshes the register, this bench and the rail count from a single
      round trip. */
-  const { page } = useLoaderData({ from: "/identities" }) as {
+  const { page } = useLoaderData({ from: '/identities' }) as {
     page: { identities: Identity[] } | undefined;
   };
-  const identity = (page?.identities ?? []).find(
-    (entry) => entry.id === identityId,
-  );
+  const identity = (page?.identities ?? []).find((entry) => entry.id === identityId);
 
   const [arming, setArming] = useState<string>();
   const [adding, setAdding] = useState(false);
@@ -61,7 +49,7 @@ function HolderBench() {
   const [toggleError, setToggleError] = useState<string>();
   const [amendPending, setAmendPending] = useState(false);
   const [amendError, setAmendError] = useState<string>();
-  const [newLabel, setNewLabel] = useState("");
+  const [newLabel, setNewLabel] = useState('');
   const [issuePending, setIssuePending] = useState(false);
   const [issueError, setIssueError] = useState<string>();
   const [issued, setIssued] = useState<Issued>();
@@ -74,9 +62,8 @@ function HolderBench() {
        possibilities rather than declaring the link dead. */
     return (
       <p className="empty prose">
-        That holder is not on this page of the register. Page back through
-        earlier holders to reach them, or check the link — they may have been
-        removed.
+        That holder is not on this page of the register. Page back through earlier holders to reach
+        them, or check the link — they may have been removed.
       </p>
     );
   }
@@ -95,8 +82,7 @@ function HolderBench() {
     } catch {
       setFailed({
         id: keyId,
-        message:
-          "The credential is still live — it could not be voided. Try again.",
+        message: 'The credential is still live — it could not be voided. Try again.',
       });
     } finally {
       setVoiding(undefined);
@@ -108,17 +94,15 @@ function HolderBench() {
     setIssuePending(true);
     setIssueError(undefined);
     try {
-      setIssued(
-        await issueCredential({ data: { identityId, keyLabel: newLabel } }),
-      );
-      setNewLabel("");
+      setIssued(await issueCredential({ data: { identityId, keyLabel: newLabel } }));
+      setNewLabel('');
       setAdding(false);
       await router.invalidate();
     } catch (cause) {
       setIssueError(
         cause instanceof Error && cause.message
           ? `${cause.message}. Nothing was issued — try again.`
-          : "The credential could not be issued. Nothing was issued — try again.",
+          : 'The credential could not be issued. Nothing was issued — try again.'
       );
     } finally {
       setIssuePending(false);
@@ -138,7 +122,7 @@ function HolderBench() {
       setAmendError(
         cause instanceof Error && cause.message
           ? `${cause.message}. Nothing was changed — try again.`
-          : "The record could not be saved. Nothing was changed — try again.",
+          : 'The record could not be saved. Nothing was changed — try again.'
       );
     } finally {
       setAmendPending(false);
@@ -156,7 +140,7 @@ function HolderBench() {
       setToggleError(
         cause instanceof Error && cause.message
           ? `${cause.message}. Nothing was changed — try again.`
-          : "The holder's state could not be changed. Nothing was changed — try again.",
+          : "The holder's state could not be changed. Nothing was changed — try again."
       );
     } finally {
       setTogglePending(false);
@@ -174,16 +158,14 @@ function HolderBench() {
         </div>
 
         <div className="bench__section bench__form">
-          <label className={`field${amendError ? " field--error" : ""}`}>
+          <label className={`field${amendError ? ' field--error' : ''}`}>
             <span className="label">Holder name</span>
             <input
               required
               autoFocus
               aria-invalid={amendError ? true : undefined}
               value={amend.name}
-              onChange={(event) =>
-                setAmend({ ...amend, name: event.target.value })
-              }
+              onChange={(event) => setAmend({ ...amend, name: event.target.value })}
             />
           </label>
 
@@ -191,9 +173,7 @@ function HolderBench() {
             <span className="label">Role</span>
             <select
               value={amend.role}
-              onChange={(event) =>
-                setAmend({ ...amend, role: event.target.value as Role })
-              }
+              onChange={(event) => setAmend({ ...amend, role: event.target.value as Role })}
             >
               {ROLES.map((value) => (
                 <option key={value} value={value}>
@@ -205,21 +185,20 @@ function HolderBench() {
 
           {amend.role !== identity.role && (
             <p className="amend__consequence">
-              Every credential this holder owns changes from{" "}
-              <span className="role">{identity.role}</span> to{" "}
-              <span className="role">{amend.role}</span> the moment this is
-              saved.
+              Every credential this holder owns changes from{' '}
+              <span className="role">{identity.role}</span> to{' '}
+              <span className="role">{amend.role}</span> the moment this is saved.
             </p>
           )}
 
           <label className="field">
             <span className="label">Submissions</span>
             <select
-              value={amend.autoApprove ? "auto" : "review"}
+              value={amend.autoApprove ? 'auto' : 'review'}
               onChange={(event) =>
                 setAmend({
                   ...amend,
-                  autoApprove: event.target.value === "auto",
+                  autoApprove: event.target.value === 'auto',
                 })
               }
             >
@@ -231,18 +210,16 @@ function HolderBench() {
           {amend.autoApprove !== identity.auto_approve && (
             <p className="amend__consequence">
               {amend.autoApprove
-                ? "Everything this holder submits or revises will be marked approved without a human reading it. Canonical still requires a person."
-                : "Future submissions from this holder will queue for review again. Sources already approved keep their authority."}
+                ? 'Everything this holder submits or revises will be marked approved without a human reading it. Canonical still requires a person.'
+                : 'Future submissions from this holder will queue for review again. Sources already approved keep their authority.'}
             </p>
           )}
 
           <label className="field">
             <span className="label">Administrator note</span>
             <input
-              value={amend.description ?? ""}
-              onChange={(event) =>
-                setAmend({ ...amend, description: event.target.value || null })
-              }
+              value={amend.description ?? ''}
+              onChange={(event) => setAmend({ ...amend, description: event.target.value || null })}
               placeholder="What this holder is for. Not shown to agents."
             />
           </label>
@@ -255,7 +232,7 @@ function HolderBench() {
 
           <div className="bench__controls">
             <button className="btn btn--primary" disabled={amendPending}>
-              {amendPending ? "Saving…" : "Save changes"}
+              {amendPending ? 'Saving…' : 'Save changes'}
             </button>
             <button
               type="button"
@@ -276,23 +253,18 @@ function HolderBench() {
 
   return (
     <>
-      {issued && (
-        <CredentialTag issued={issued} onDismiss={() => setIssued(undefined)} />
-      )}
+      {issued && <CredentialTag issued={issued} onDismiss={() => setIssued(undefined)} />}
 
       <div className="bench__head">
         <div>
           <span className="label">
-            Holder · {accessionOf(identity.id)} · registered{" "}
-            {stamp(identity.created_at)}
+            Holder · {accessionOf(identity.id)} · registered {stamp(identity.created_at)}
           </span>
           <h2>{identity.name}</h2>
         </div>
         <div className="bench__seal">
           {disabled && (
-            <SealChip state="suspended">
-              Disabled {stamp(identity.disabled_at)}
-            </SealChip>
+            <SealChip state="suspended">Disabled {stamp(identity.disabled_at)}</SealChip>
           )}
           {identity.auto_approve && <SealChip state="signed">Trusted</SealChip>}
           <span className="role">{identity.role}</span>
@@ -318,7 +290,7 @@ function HolderBench() {
               disabled={togglePending}
               onClick={() => void setDisabled(false)}
             >
-              {togglePending ? "Enabling…" : "Enable"}
+              {togglePending ? 'Enabling…' : 'Enable'}
             </button>
           ) : armDisable ? (
             <>
@@ -328,7 +300,7 @@ function HolderBench() {
                 disabled={togglePending}
                 onClick={() => void setDisabled(true)}
               >
-                {togglePending ? "Disabling…" : "Confirm disable"}
+                {togglePending ? 'Disabling…' : 'Confirm disable'}
               </button>
               <button
                 type="button"
@@ -340,11 +312,7 @@ function HolderBench() {
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              className="btn btn--void"
-              onClick={() => setArmDisable(true)}
-            >
+            <button type="button" className="btn btn--void" onClick={() => setArmDisable(true)}>
               Disable
             </button>
           )}
@@ -353,9 +321,9 @@ function HolderBench() {
 
       {armDisable && !disabled && (
         <p className="bench__consequence">
-          Disabling refuses {live} live credential{live === 1 ? "" : "s"} at{" "}
-          <code className="register">/mcp</code> immediately. Nothing is voided,
-          and it can be undone.
+          Disabling refuses {live} live credential{live === 1 ? '' : 's'} at{' '}
+          <code className="register">/mcp</code> immediately. Nothing is voided, and it can be
+          undone.
         </p>
       )}
 
@@ -365,9 +333,7 @@ function HolderBench() {
         </p>
       )}
 
-      {identity.description && (
-        <p className="bench__note prose">{identity.description}</p>
-      )}
+      {identity.description && <p className="bench__note prose">{identity.description}</p>}
 
       <div className="bench__section">
         <div className="bench__section-head">
@@ -375,11 +341,7 @@ function HolderBench() {
             Credentials · {live} live of {identity.keys.length}
           </span>
           {!adding && (
-            <button
-              type="button"
-              className="btn btn--quiet"
-              onClick={() => setAdding(true)}
-            >
+            <button type="button" className="btn btn--quiet" onClick={() => setAdding(true)}>
               Issue credential
             </button>
           )}
@@ -387,7 +349,7 @@ function HolderBench() {
 
         {adding && (
           <form className="bench__inline" onSubmit={addCredential}>
-            <label className={`field${issueError ? " field--error" : ""}`}>
+            <label className={`field${issueError ? ' field--error' : ''}`}>
               <span className="label">Credential label</span>
               <input
                 required
@@ -400,7 +362,7 @@ function HolderBench() {
             </label>
             <div className="bench__controls">
               <button className="btn btn--primary" disabled={issuePending}>
-                {issuePending ? "Issuing…" : "Issue"}
+                {issuePending ? 'Issuing…' : 'Issue'}
               </button>
               <button
                 type="button"
@@ -425,8 +387,8 @@ function HolderBench() {
         {identity.keys.length === 0 ? (
           !adding && (
             <p className="empty">
-              This holder has no credentials. Issue one to let an agent present
-              it at <code className="register">/mcp</code>.
+              This holder has no credentials. Issue one to let an agent present it at{' '}
+              <code className="register">/mcp</code>.
             </p>
           )
         ) : (
@@ -435,14 +397,12 @@ function HolderBench() {
               <div className="stub" key={key.id}>
                 <span className="stub__label">{labelOf(key)}</span>
                 <span className="stub__meta register">
-                  <b>{key.prefix}…</b> · issued {stamp(key.createdAt)} · last
-                  presented {key.lastUsedAt ? stamp(key.lastUsedAt) : "never"}
+                  <b>{key.prefix}…</b> · issued {stamp(key.createdAt)} · last presented{' '}
+                  {key.lastUsedAt ? stamp(key.lastUsedAt) : 'never'}
                 </span>
                 <span className="stub__action">
                   {key.revokedAt ? (
-                    <SealChip state="void">
-                      Void {stamp(key.revokedAt)}
-                    </SealChip>
+                    <SealChip state="void">Void {stamp(key.revokedAt)}</SealChip>
                   ) : arming === key.id ? (
                     <>
                       <button
@@ -451,7 +411,7 @@ function HolderBench() {
                         disabled={voiding === key.id}
                         onClick={() => void void_(key.id)}
                       >
-                        {voiding === key.id ? "Voiding…" : "Confirm void"}
+                        {voiding === key.id ? 'Voiding…' : 'Confirm void'}
                       </button>
                       <button
                         type="button"

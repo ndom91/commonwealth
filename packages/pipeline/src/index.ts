@@ -32,10 +32,10 @@
  * this package** — it resolves the barrel, then fails on `./chunking.js`, which
  * only exists as `.ts`. */
 
-export { chunkMarkdown, type Chunk } from "./chunking.js";
-export { Embeddings, EMBEDDING_DIMENSIONS, type EmbeddingOptions } from "./embeddings.js";
+export { type Chunk, chunkMarkdown } from './chunking.js';
 export {
-  DocumentIngestion,
   type ConvertedDocument,
+  DocumentIngestion,
   type DocumentIngestionOptions,
-} from "./document-ingestion.js";
+} from './document-ingestion.js';
+export { EMBEDDING_DIMENSIONS, type EmbeddingOptions, Embeddings } from './embeddings.js';

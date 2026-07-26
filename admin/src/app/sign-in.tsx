@@ -1,19 +1,19 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
-import { authClient } from "../lib/auth-client.js";
-import { getSession } from "../lib/session.js";
+import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
+import { useState } from 'react';
+import { authClient } from '../lib/auth-client.js';
+import { getSession } from '../lib/session.js';
 
-export const Route = createFileRoute("/sign-in")({
+export const Route = createFileRoute('/sign-in')({
   beforeLoad: async () => {
-    if (await getSession()) throw redirect({ to: "/identities" });
+    if (await getSession()) throw redirect({ to: '/identities' });
   },
   component: SignIn,
 });
 
 function SignIn() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
 
@@ -23,11 +23,14 @@ function SignIn() {
     setError(undefined);
     const result = await authClient.signIn.email({ email, password });
     if (result.error) {
-      setError(result.error.message ?? "Those credentials were not accepted. Check the address and try again.");
+      setError(
+        result.error.message ??
+          'Those credentials were not accepted. Check the address and try again.'
+      );
       setPending(false);
       return;
     }
-    router.navigate({ to: "/identities" });
+    router.navigate({ to: '/identities' });
   }
 
   return (
@@ -39,12 +42,12 @@ function SignIn() {
           <span className="label">Intake</span>
           <h1>Sign in</h1>
           <p className="prose">
-            Issue and void the credentials your agents present, and curate what
-            they are allowed to treat as true.
+            Issue and void the credentials your agents present, and curate what they are allowed to
+            treat as true.
           </p>
         </div>
 
-        <label className={`field${error ? " field--error" : ""}`}>
+        <label className={`field${error ? ' field--error' : ''}`}>
           <span className="label">Email</span>
           <input
             name="email"
@@ -57,7 +60,7 @@ function SignIn() {
           />
         </label>
 
-        <label className={`field${error ? " field--error" : ""}`}>
+        <label className={`field${error ? ' field--error' : ''}`}>
           <span className="label">Password</span>
           <input
             name="password"
@@ -78,7 +81,7 @@ function SignIn() {
 
         <div className="intake__foot">
           <button className="btn btn--primary" disabled={pending}>
-            {pending ? "Checking…" : "Sign in"}
+            {pending ? 'Checking…' : 'Sign in'}
           </button>
           <span className="label">Accounts are issued by an administrator</span>
         </div>

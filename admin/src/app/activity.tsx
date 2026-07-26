@@ -1,20 +1,23 @@
-import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
-import { authClient } from "../lib/auth-client.js";
-import { getSession } from "../lib/session.js";
-import { getNavCounts, listEventTypes, listEvents } from "../lib/knowledge.js";
-import { AppShell, accessionOf, stampAt } from "../components/chrome.js";
-import { readFailure } from "../lib/read-failure.js";
+import { createFileRoute, Link, redirect, useNavigate, useRouter } from '@tanstack/react-router';
+import { AppShell, accessionOf, stampAt } from '../components/chrome.js';
+import { authClient } from '../lib/auth-client.js';
+import { getNavCounts, listEvents, listEventTypes } from '../lib/knowledge.js';
+import { readFailure } from '../lib/read-failure.js';
+import { getSession } from '../lib/session.js';
 
 type ActivityFilters = { type?: string };
 
-export const Route = createFileRoute("/activity")({
+export const Route = createFileRoute('/activity')({
   beforeLoad: async () => {
     const session = await getSession();
-    if (!session) throw redirect({ to: "/sign-in" });
+    if (!session) throw redirect({ to: '/sign-in' });
     return { holder: session.user.name ?? session.user.email ?? undefined };
   },
   validateSearch: (search: Record<string, unknown>): ActivityFilters => ({
-    type: typeof search.type === "string" && /^[a-z_]{1,64}$/.test(search.type) ? search.type : undefined,
+    type:
+      typeof search.type === 'string' && /^[a-z_]{1,64}$/.test(search.type)
+        ? search.type
+        : undefined,
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
@@ -27,7 +30,7 @@ export const Route = createFileRoute("/activity")({
       return { counts, log, types, failure: undefined };
     } catch (cause) {
       const types: Array<{ eventType: string; count: number }> = [];
-      return { counts, log: undefined, types, failure: readFailure(cause, "The log") };
+      return { counts, log: undefined, types, failure: readFailure(cause, 'The log') };
     }
   },
   component: Activity,
@@ -49,53 +52,53 @@ type EventRow = {
    would say. Anything unmapped falls back to the raw type with underscores
    opened out — a new event type shows up legibly without a code change. */
 const PHRASING: Record<string, string> = {
-  source_submitted: "Submitted a source",
-  source_revised: "Revised a source",
-  source_authority_changed: "Changed authority",
-  source_deleted: "Withdrew a source",
-  source_restored: "Restored a source",
-  api_key_created: "Issued a credential",
-  api_key_revoked: "Voided a credential",
-  identity_amended: "Amended a holder",
-  identity_disabled: "Disabled a holder",
-  identity_enabled: "Enabled a holder",
-  search: "Searched",
+  source_submitted: 'Submitted a source',
+  source_revised: 'Revised a source',
+  source_authority_changed: 'Changed authority',
+  source_deleted: 'Withdrew a source',
+  source_restored: 'Restored a source',
+  api_key_created: 'Issued a credential',
+  api_key_revoked: 'Voided a credential',
+  identity_amended: 'Amended a holder',
+  identity_disabled: 'Disabled a holder',
+  identity_enabled: 'Enabled a holder',
+  search: 'Searched',
 };
 
-const phrase = (type: string) => PHRASING[type] ?? type.replace(/_/g, " ");
+const phrase = (type: string) => PHRASING[type] ?? type.replace(/_/g, ' ');
 
 /* The one line of detail worth carrying on a log row. Everything else stays in
    the source bench or the holder bench, which have room for it. */
 function detailOf(event: EventRow): string | null {
   const meta = event.metadata;
-  const text = (key: string) => (typeof meta[key] === "string" ? (meta[key] as string) : null);
+  const text = (key: string) => (typeof meta[key] === 'string' ? (meta[key] as string) : null);
 
-  if (event.event_type === "search") {
-    const query = text("query");
-    const count = typeof meta.resultCount === "number" ? meta.resultCount : null;
+  if (event.event_type === 'search') {
+    const query = text('query');
+    const count = typeof meta.resultCount === 'number' ? meta.resultCount : null;
     if (!query) return null;
-    return count === null ? `“${query}”` : `“${query}” — ${count} result${count === 1 ? "" : "s"}`;
+    return count === null ? `“${query}”` : `“${query}” — ${count} result${count === 1 ? '' : 's'}`;
   }
-  if (event.event_type === "source_authority_changed") {
-    const to = text("authority");
-    const from = text("from");
-    const auto = meta.auto === true ? " (auto)" : "";
+  if (event.event_type === 'source_authority_changed') {
+    const to = text('authority');
+    const from = text('from');
+    const auto = meta.auto === true ? ' (auto)' : '';
     if (!to) return null;
     return from ? `${from} → ${to}${auto}` : `→ ${to}${auto}`;
   }
-  if (event.event_type === "identity_amended" && meta.changed && typeof meta.changed === "object") {
+  if (event.event_type === 'identity_amended' && meta.changed && typeof meta.changed === 'object') {
     const fields = Object.keys(meta.changed as Record<string, unknown>);
-    return fields.length > 0 ? fields.join(", ") : null;
+    return fields.length > 0 ? fields.join(', ') : null;
   }
-  if (event.event_type === "api_key_created" || event.event_type === "api_key_revoked") {
-    return text("label");
+  if (event.event_type === 'api_key_created' || event.event_type === 'api_key_revoked') {
+    return text('label');
   }
   return null;
 }
 
 function Activity() {
   const router = useRouter();
-  const navigate = useNavigate({ from: "/activity" });
+  const navigate = useNavigate({ from: '/activity' });
   const { holder } = Route.useRouteContext();
   const filters = Route.useSearch();
   const { counts, log, types, failure } = Route.useLoaderData();
@@ -111,7 +114,7 @@ function Activity() {
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
-        router.navigate({ to: "/sign-in" });
+        router.navigate({ to: '/sign-in' });
       }}
     >
       <section className="log" aria-label="Activity log">
@@ -119,7 +122,7 @@ function Activity() {
           <label className="filters__field">
             <span className="label">Event</span>
             <select
-              value={filters.type ?? ""}
+              value={filters.type ?? ''}
               onChange={(event) =>
                 void navigate({ search: { type: event.target.value || undefined } })
               }
@@ -142,8 +145,8 @@ function Activity() {
 
         {!failure && events.length === 0 && (
           <p className="empty prose">
-            Nothing recorded yet. Every submission, revision, authority decision
-            and credential change is written here as it happens.
+            Nothing recorded yet. Every submission, revision, authority decision and credential
+            change is written here as it happens.
           </p>
         )}
 
@@ -165,7 +168,11 @@ function Activity() {
                   {event.source_id && (
                     <span className="log__subject">
                       {event.source_title ? (
-                        <Link to="/sources/$sourceId" params={{ sourceId: event.source_id }} search={{}}>
+                        <Link
+                          to="/sources/$sourceId"
+                          params={{ sourceId: event.source_id }}
+                          search={{}}
+                        >
                           {event.source_title}
                         </Link>
                       ) : (
@@ -186,8 +193,7 @@ function Activity() {
 
         {log?.hasMore && (
           <p className="empty">
-            Showing the {events.length} most recent entries. Filter by event to
-            look further back.
+            Showing the {events.length} most recent entries. Filter by event to look further back.
           </p>
         )}
       </section>
