@@ -138,18 +138,42 @@ body {
 }
 
 @supports not (scrollbar-color: auto) {
-  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar {
+  :where(
+      html,
+      .cabinet,
+      .index,
+      .detail,
+      .source-body,
+      .queue,
+      .log
+    )::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
 
-  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar-thumb {
+  :where(
+      html,
+      .cabinet,
+      .index,
+      .detail,
+      .source-body,
+      .queue,
+      .log
+    )::-webkit-scrollbar-thumb {
     border: 2px solid var(--scrollbar-track);
     border-radius: 8px;
     background: var(--scrollbar-thumb);
   }
 
-  :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar-track {
+  :where(
+      html,
+      .cabinet,
+      .index,
+      .detail,
+      .source-body,
+      .queue,
+      .log
+    )::-webkit-scrollbar-track {
     background: var(--scrollbar-track);
   }
 }
@@ -812,7 +836,6 @@ select {
   background: none;
   border-color: var(--rule-strong);
   color: var(--ink-2);
-  cursor: progress;
 }
 
 .btn--quiet {
