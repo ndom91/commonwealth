@@ -117,7 +117,7 @@ export const listSources = createServerFn({ method: "GET" })
       SELECT sources.id, sources.source_type, sources.status, sources.authority,
              sources.created_at, sources.deleted_at, sources.last_verified_at,
              revision.title, revision.revision_number, revision.content_updated_at,
-             COALESCE(author.display_name, 'administrator') AS author,
+             COALESCE(author.display_name, admin_author.email, 'administrator') AS author,
              COALESCE(
                (SELECT json_agg(source_tags.tag ORDER BY source_tags.tag)
                 FROM source_tags WHERE source_tags.source_id = sources.id),
@@ -127,6 +127,7 @@ export const listSources = createServerFn({ method: "GET" })
       FROM sources
       JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
       LEFT JOIN users AS author ON author.id = sources.created_by
+      LEFT JOIN "user" AS admin_author ON admin_author.id = sources.created_by_admin_id
       WHERE (${data.authority}::text IS NULL OR sources.authority = ${data.authority})
         AND (${data.sourceType}::text IS NULL OR sources.source_type = ${data.sourceType})
         AND (${data.status}::text IS NULL OR sources.status = ${data.status})
@@ -153,12 +154,13 @@ export const listReviewQueue = createServerFn({ method: "GET" }).handler(async (
   const rows = await client`
     SELECT sources.id, sources.source_type, sources.authority, sources.created_at,
            sources.last_verified_at, revision.title, revision.revision_number,
-           revision.content_updated_at, COALESCE(author.display_name, 'administrator') AS author,
+           revision.content_updated_at, COALESCE(author.display_name, admin_author.email, 'administrator') AS author,
            sources.authority = 'unverified' AS is_unverified,
            (${IS_STALE}) AS is_stale
     FROM sources
     JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
     LEFT JOIN users AS author ON author.id = sources.created_by
+    LEFT JOIN "user" AS admin_author ON admin_author.id = sources.created_by_admin_id
     WHERE ${NEEDS_REVIEW}
     ORDER BY revision.content_updated_at DESC
     LIMIT 200
@@ -203,7 +205,7 @@ export const getSourceDetail = createServerFn({ method: "GET" })
              sources.current_content_hash,
              revision.title, revision.revision_number, revision.markdown_content,
              revision.content_updated_at, revision.original_filename, revision.mime_type,
-             COALESCE(author.display_name, 'administrator') AS author,
+             COALESCE(author.display_name, admin_author.email, 'administrator') AS author,
              COALESCE(
                (SELECT json_agg(source_tags.tag ORDER BY source_tags.tag)
                 FROM source_tags WHERE source_tags.source_id = sources.id),
@@ -213,6 +215,7 @@ export const getSourceDetail = createServerFn({ method: "GET" })
       FROM sources
       JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
       LEFT JOIN users AS author ON author.id = sources.created_by
+      LEFT JOIN "user" AS admin_author ON admin_author.id = sources.created_by_admin_id
       WHERE sources.id = ${data.sourceId}
     `;
     if (!source) throw new Error("That source no longer exists");
@@ -229,10 +232,11 @@ export const getSourceRevisions = createServerFn({ method: "GET" })
              source_revisions.created_at, source_revisions.title,
              length(source_revisions.markdown_content) AS content_length,
              source_revisions.id = sources.current_revision_id AS is_current,
-             COALESCE(author.display_name, 'administrator') AS author
+             COALESCE(author.display_name, admin_author.email, 'administrator') AS author
       FROM source_revisions
       JOIN sources ON sources.id = source_revisions.source_id
       LEFT JOIN users AS author ON author.id = source_revisions.created_by
+      LEFT JOIN "user" AS admin_author ON admin_author.id = source_revisions.created_by_admin_id
       WHERE source_revisions.source_id = ${data.sourceId}
       ORDER BY source_revisions.revision_number DESC
     `;
@@ -464,13 +468,14 @@ export const searchSources = createServerFn({ method: "GET" })
       WITH terms AS (SELECT websearch_to_tsquery('english', ${data.query}) AS value)
       SELECT sources.id, sources.authority, sources.source_type, sources.status,
              sources.last_verified_at, revision.title, revision.revision_number,
-             revision.content_updated_at, COALESCE(author.display_name, 'administrator') AS author,
+             revision.content_updated_at, COALESCE(author.display_name, admin_author.email, 'administrator') AS author,
              (${IS_STALE}) AS is_stale,
              body.excerpt,
              strpos(lower(revision.title), lower(${data.query})) > 0 AS title_match
       FROM sources
       JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
       LEFT JOIN users AS author ON author.id = sources.created_by
+      LEFT JOIN "user" AS admin_author ON admin_author.id = sources.created_by_admin_id
       CROSS JOIN terms
       LEFT JOIN LATERAL (
         SELECT max(ts_rank_cd(chunks.search_vector, terms.value)) AS rank,
