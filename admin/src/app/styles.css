@@ -796,6 +796,52 @@ select {
   white-space: nowrap;
 }
 
+/* Hidden exactly as `.sr-only` until it takes focus, then a real piece of tag
+   stock at the top-left. It cannot simply *be* `.sr-only`: a skip link that
+   stays invisible while focused helps nobody sighted navigating by keyboard.
+ *
+ * Clipped rather than pushed off-screen with a negative offset — `.custody` is
+ * not a positioned ancestor, so an offset element would anchor to the viewport
+ * and could add a horizontal scrollbar below the 861px breakpoint, where the
+ * page is no longer `overflow: hidden`. */
+.skip {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip:focus {
+  top: var(--s-snug);
+  left: var(--s-snug);
+  z-index: 10;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 9px 12px;
+  overflow: visible;
+  clip-path: none;
+  background: var(--tag);
+  border-radius: 2px;
+  color: var(--tag-ink);
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+/* The landmark is a focus target, never a focus ring — the skip link's arrival
+   is already announced by the region itself. */
+.main:focus-visible {
+  outline: none;
+}
+
 .notice {
   display: flex;
   gap: var(--s-tight);

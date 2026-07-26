@@ -100,6 +100,13 @@ export function AppShell({
 }) {
   return (
     <div className="custody">
+      {/* The cabinet puts its plate and four drawer links ahead of the page's
+          own content, on every route. Without this a keyboard user re-traverses
+          the whole rail after each navigation. */}
+      <a className="skip" href="#main">
+        Skip to content
+      </a>
+
       <aside className="cabinet">
         <Link to="/dashboard" className="cabinet__plate">
           <span>Team knowledge base</span>
@@ -157,7 +164,11 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="main">
+      {/* A real landmark, not a styled div: every page behind auth had none, so
+          screen-reader users had no main region to jump to. `tabIndex={-1}`
+          makes the skip link move focus here rather than only scrolling — the
+          difference between the link working and appearing to work. */}
+      <main className="main" id="main" tabIndex={-1}>
         <header className="masthead">
           <div>
             {accession && <span className="label">{accession}</span>}
@@ -166,7 +177,7 @@ export function AppShell({
           {actions && <div className="masthead__actions">{actions}</div>}
         </header>
         {children}
-      </div>
+      </main>
     </div>
   );
 }

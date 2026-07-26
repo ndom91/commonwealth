@@ -473,12 +473,21 @@ The cabinet rail is a drawer index. Groups carry tracked labels; items are
 ground plus a 1px left hairline in tag stock and an ink-weight bump. Sections
 that do not exist yet render as genuinely `disabled` buttons with an uppercase
 `PENDING` register mark and a visually hidden explanation — honest about what
-is built rather than linking to nothing.
+is built rather than linking to nothing. **No section is dormant today**; every
+drawer routes somewhere, so that branch is currently unexercised and kept only
+as the pattern for the next unbuilt section.
 
 The rail is the only place a register's size is stated. A register never
 repeats its own count in a head above itself: the number is already in the rail
 a few inches to the left, and a head carrying nothing but a number it duplicates
 is a row of chrome between the reader and the rows.
+
+The rail precedes page content in the DOM on every route, so a **skip link** is
+the first focusable element: hidden by the same clip as `.sr-only` until it
+takes focus, then tag stock at the top-left. It targets the page's `<main>`,
+which carries `tabindex="-1"` so following the link moves focus rather than
+only scrolling. A skip link that scrolls without moving focus looks correct and
+does nothing.
 
 ### Credential Tag (signature component)
 The one-time key reveal. A manila plate carrying the full secret in register

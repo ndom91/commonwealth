@@ -121,6 +121,14 @@ function Sources() {
   const holders = submitters as Array<{ id: string; name: string; count: number }>;
   const hasMore = register?.hasMore ?? false;
   const searching = Boolean(filters.q);
+  /* An empty register means two different things, and saying the wrong one
+     misleads. With a filter or a query applied, sources are being excluded.
+     With neither, none has ever been submitted — a first-run state, which on a
+     self-hosted instance is what a new team sees before any agent has written
+     anything. */
+  const narrowed = Boolean(
+    filters.authority || filters.type || filters.status || filters.submitter,
+  );
 
   const setFilter = (key: keyof SourceFilters, value: string) =>
     void navigate({ search: (previous: SourceFilters) => ({ ...previous, [key]: value || undefined }) });
@@ -238,11 +246,17 @@ function Sources() {
                   No title or source body matches. Try fewer words, or clear the
                   search to browse the register.
                 </>
+              ) : narrowed ? (
+                <>
+                  No sources match these filters. Widen one, or set them all
+                  back to All to browse the whole register.
+                </>
               ) : (
                 <>
-                  No sources match. Agents submit knowledge over MCP with{" "}
+                  The register is empty. Agents write to it over MCP with{" "}
                   <code className="register">submit_note</code> and{" "}
-                  <code className="register">submit_document</code>.
+                  <code className="register">submit_document</code>; anything
+                  they submit appears here for review.
                 </>
               )}
             </p>
