@@ -270,7 +270,7 @@ function Sources() {
                   params={{ sourceId: source.id }}
                   search={filters}
                   className="entry"
-                  activeProps={{ "aria-current": "true" }}
+                  activeProps={{ "aria-current": "page" }}
                 >
                   <span className="entry__name">{source.title}</span>
                   <span className="entry__accession">

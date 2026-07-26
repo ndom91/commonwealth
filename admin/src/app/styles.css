@@ -584,7 +584,7 @@ select {
   background: var(--slate-raised);
 }
 
-.entry[aria-current="true"] {
+.entry[aria-current="page"] {
   background: var(--slate-bench);
 }
 
@@ -605,7 +605,7 @@ select {
   font-variant-numeric: tabular-nums;
 }
 
-.entry[aria-current="true"] .entry__accession {
+.entry[aria-current="page"] .entry__accession {
   color: var(--mark);
 }
 

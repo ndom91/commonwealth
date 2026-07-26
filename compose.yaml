@@ -3,7 +3,7 @@ services:
     build: .
     environment:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
-      OLLAMA_URL: ${OLLAMA_URL}
+      OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       PORT: 3000
       MAX_REQUEST_BYTES: ${MAX_REQUEST_BYTES:-15000000}
@@ -30,7 +30,7 @@ services:
       # Editing a source rewrites its chunks, so the admin now embeds too. It
       # must resolve to the same Ollama and the same model as `app`: chunks from
       # two models in one index do not error, they quietly stop matching.
-      OLLAMA_URL: ${OLLAMA_URL}
+      OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       PORT: 3001
     depends_on:
@@ -90,6 +90,12 @@ services:
       retries: 24
     volumes:
       - ollama_data:/root/.ollama
+    # Published on loopback so `pnpm dev` on the host can embed. Without this the
+    # admin dev server can only reach Ollama by the compose hostname, which does
+    # not resolve outside the network — so revising a source failed with a bare
+    # "failed to fetch" and nothing to point at.
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
 
   ollama-init:
     image: ollama/ollama:latest

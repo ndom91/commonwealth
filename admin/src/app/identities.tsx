@@ -137,7 +137,7 @@ function IdentitiesLayout() {
                     to="/identities/$identityId"
                     params={{ identityId: identity.id }}
                     className={`entry${identity.disabled_at ? " entry--disabled" : ""}`}
-                    activeProps={{ "aria-current": "true" }}
+                    activeProps={{ "aria-current": "page" }}
                     onClick={() => setIssuing(false)}
                   >
                     <span className="entry__name">{identity.name}</span>
