@@ -10,3 +10,4 @@ admin/.output/
 admin/.tanstack/
 .impeccable/
 playground/
+.DS_Store
