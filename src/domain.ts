@@ -1,5 +1,5 @@
 export type Role = "reader" | "writer" | "reviewer" | "admin";
-export type Actor = { id: string; workspaceId: string; name: string; role: Role };
+export type Actor = { id: string; workspaceId: string; name: string; role: Role; autoApprove: boolean };
 export type Authority = "canonical" | "approved" | "unverified";
 export type SourceType = "note" | "upload";
 

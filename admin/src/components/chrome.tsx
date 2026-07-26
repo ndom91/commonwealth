@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 
 /* Application chrome for the Custody Bench. Every workbench screen mounts
@@ -52,22 +52,24 @@ function DrawerMark({ mark }: { mark: Mark }) {
 type Drawer = { mark: Mark; label: string; to?: string; count?: number };
 type DrawerGroup = { label: string; items: Drawer[] };
 
+export type NavCounts = { identities: number; sources: number; review: number };
+
 /* Sections the MCP server already supports but the browser cannot reach yet
    render dormant and marked PENDING. Linking them to routes that do not exist
    would be a claim the product cannot honour. */
-function drawerGroups(identityCount: number): DrawerGroup[] {
+function drawerGroups(counts: NavCounts | undefined): DrawerGroup[] {
   return [
     {
       label: "Knowledge",
       items: [
-        { mark: "sources", label: "Sources" },
-        { mark: "review", label: "Review queue" },
+        { mark: "sources", label: "Sources", to: "/sources", count: counts?.sources },
+        { mark: "review", label: "Review queue", to: "/review", count: counts?.review },
       ],
     },
     {
       label: "Access",
       items: [
-        { mark: "identities", label: "Identities", to: "/dashboard", count: identityCount },
+        { mark: "identities", label: "Identities", to: "/dashboard", count: counts?.identities },
       ],
     },
     { label: "Custody", items: [{ mark: "activity", label: "Activity" }] },
@@ -79,7 +81,7 @@ export function AppShell({
   accession,
   actions,
   holder,
-  identityCount,
+  counts,
   onSignOut,
   children,
 }: {
@@ -87,7 +89,11 @@ export function AppShell({
   accession?: string;
   actions?: ReactNode;
   holder?: string;
-  identityCount: number;
+  /* Supplied by each route's loader rather than fetched here, so that
+     `router.invalidate()` after a mutation moves the rail as well as the pane
+     that caused it. A component-local fetch could not be reached from the
+     bench that changes a source's authority. */
+  counts: NavCounts | undefined;
   onSignOut: () => void;
   children: ReactNode;
 }) {
@@ -100,7 +106,7 @@ export function AppShell({
         </Link>
 
         <nav className="drawers" aria-label="Sections">
-          {drawerGroups(identityCount).map((group) => (
+          {drawerGroups(counts).map((group) => (
             <div className="drawer-group" key={group.label}>
               <span className="label">{group.label}</span>
               {group.items.map((item) =>
@@ -172,6 +178,15 @@ export type SealState = "unsealed" | "signed" | "sealed" | "suspended" | "void";
 
 export function SealChip({ state, children }: { state: SealState; children: ReactNode }) {
   return <span className={`chip chip--${state}`}>{children}</span>;
+}
+
+/* Source authority maps onto the seal vocabulary with no new states: an
+   unverified source is unsealed, an approved one is signed, a canonical one is
+   sealed. */
+export function authoritySeal(authority: string): SealState {
+  if (authority === "canonical") return "sealed";
+  if (authority === "approved") return "signed";
+  return "unsealed";
 }
 
 /* Records dates are rendered from the ISO string in UTC so the server and the

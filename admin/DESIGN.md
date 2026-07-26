@@ -217,6 +217,13 @@ requires a new custody concept, not a new state.
 tracked `{colors.ink-secondary}` label and never as a chip, so all four stay
 distinguishable and `admin` never spends oxide.
 
+**The Untrusted-Body Rule.** Source content is submitted by agents and this
+surface can revoke credentials. Bodies render as preformatted text on a
+recessed ground, never parsed to HTML — Markdown structure stays visible as
+literal `#` and backticks. The block carries a caption saying so, because a
+reader who does not know it is unrendered will read the syntax as a mistake.
+Rendering it later needs a sanitiser and a deliberate decision, not a default.
+
 ## Typography
 
 **UI Font:** system stack (`ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto`)
@@ -318,11 +325,43 @@ tag stock.
 ### Chips (seal states)
 Seal state escalates by material commitment, not by hue:
 - **Unsealed** (`UNVERIFIED`): dashed hairline, meta ink, no fill.
-- **Signed** (`APPROVED`): solid hairline, primary ink, no fill.
+- **Signed** (`APPROVED`, `TRUSTED`, `CURRENT`): solid hairline, primary ink,
+  no fill.
 - **Sealed** (`CANONICAL`): oxide fill with tag-stock text.
-- **Suspended** (`DISABLED`): oxide outline, no fill, no strike — withdrawn
-  from service but intact. It is the one seal state that can be reversed.
+- **Suspended** (`DISABLED`, `STALE`): oxide outline, no fill, no strike —
+  withdrawn from service but intact. It is the one seal state that can be
+  reversed.
 - **Void** (`WITHDRAWN` / `REVOKED`): oxide mark, struck through.
+
+A source's authority maps onto these with no new states: `unverified →
+unsealed`, `approved → signed`, `canonical → sealed`. Withdrawn and stale
+override the authority chip in list views, because a reader scanning the
+register needs the reason a row cannot be trusted before its rank.
+
+### Tags
+Source tags are the smallest register object: uppercase register type on
+`{colors.slate-raised}` inside a hairline box, in a wrapping row under the
+bench head. They are labels an agent applied, not states the product assigns,
+so they take no seal material — no oxide, no tag stock.
+
+### Filter bar
+Three underline selects in a row above the register, each with its tracked
+label. Filters live in the URL, not component state: a filtered register is a
+thing people send each other, and the review queue hands off into it. The bar
+sits inside the index pane below its head, separated by a hairline, so it
+reads as a property of the register rather than of the page.
+
+### Source body
+The recessed content block: `{colors.slate-ground}` inside a hairline box,
+register type, `pre-wrap`. See the Untrusted-Body Rule — this block is never
+rendered HTML, and its caption says so in plain words.
+
+### Review queue
+Two named groups, not one list: **Never verified** and **Changed since
+verification**. Each carries a count in its head and one sentence of
+consequence saying what the group means for agents right now. The groups are
+separate because they are different failures — nobody has looked, versus
+somebody looked and then the text moved underneath them.
 
 ### Containers
 There are no cards. Regions are declared by a ground shift plus a hairline

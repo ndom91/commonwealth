@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import postgres, { type Sql, type TransactionSql } from "postgres";
+import postgres, { type JSONValue, type Sql, type TransactionSql } from "postgres";
 import { requirePermission } from "./access-service.js";
 import { chunkMarkdown } from "./chunking.js";
 import type { Config } from "./config.js";
@@ -90,7 +90,16 @@ export class KnowledgeRepository {
       if (source.source_type === "upload") {
         throw new DomainError("Uploaded sources require binary replacement; Markdown revisions are not supported yet");
       }
-      if (source.authority !== "unverified" && actor.role !== "reviewer" && actor.role !== "admin") {
+      /* A trusted holder is exempt from the reviewer gate, otherwise trusting a
+         writer would promote its first submission to approved and then lock
+         that same agent out of revising it. The writer `created_by` check above
+         still applies, so a trusted writer may only revise its own work. */
+      if (
+        source.authority !== "unverified" &&
+        !actor.autoApprove &&
+        actor.role !== "reviewer" &&
+        actor.role !== "admin"
+      ) {
         throw new DomainError("Reviewer access is required to revise approved or canonical sources");
       }
 
@@ -107,16 +116,31 @@ export class KnowledgeRepository {
 
       const nextRevisionNumber = currentRevision.revision_number + 1;
       const revisionId = await this.insertRevision(transaction, source.id, randomUUID(), nextRevisionNumber, source.current_revision_id, actor, revision);
+      /* A trusted holder vouches for what they write, but trust only ever raises
+         standing: an already approved or canonical source keeps its authority and
+         merely has its verification moved forward. */
+      const promoted = actor.autoApprove && source.authority === "unverified";
       await transaction`
-        UPDATE sources SET current_revision_id = ${revisionId}, current_content_hash = ${revision.contentHash}
+        UPDATE sources SET current_revision_id = ${revisionId}, current_content_hash = ${revision.contentHash},
+          authority = ${promoted ? "approved" : source.authority},
+          last_verified_at = CASE WHEN ${actor.autoApprove}::boolean THEN now() ELSE last_verified_at END
         WHERE id = ${source.id}
       `;
       if (input.tags !== undefined) await this.replaceTags(transaction, source.id, input.tags);
       await transaction`
         INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
         VALUES (${actor.workspaceId}, ${actor.id}, 'source_revised', ${source.id},
-          ${JSON.stringify({ previousRevisionId: source.current_revision_id, revisionId, revisionNumber: nextRevisionNumber })}::jsonb)
+          ${transaction.json({ previousRevisionId: source.current_revision_id, revisionId, revisionNumber: nextRevisionNumber })})
       `;
+      /* Only an actual transition is an authority change. Refreshing
+         last_verified_at on a source that was already vouched for is not one. */
+      if (promoted) {
+        await transaction`
+          INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
+          VALUES (${actor.workspaceId}, ${actor.id}, 'source_authority_changed', ${source.id},
+            ${transaction.json({ authority: "approved", auto: true })})
+        `;
+      }
       return { id: source.id, revisionNumber: nextRevisionNumber, chunkCount: revision.chunks.length };
     });
   }
@@ -227,7 +251,7 @@ export class KnowledgeRepository {
       if (updated.length === 0) throw new Error("Source not found");
       await transaction`
         INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
-        VALUES (${actor.workspaceId}, ${actor.id}, 'source_authority_changed', ${sourceId}, ${JSON.stringify({ authority })}::jsonb)
+        VALUES (${actor.workspaceId}, ${actor.id}, 'source_authority_changed', ${sourceId}, ${transaction.json({ authority })})
       `;
     });
   }
@@ -258,12 +282,14 @@ export class KnowledgeRepository {
       mimeType: input.mimeType,
       storagePath: input.storagePath,
     });
+    const authority: Authority = actor.autoApprove ? "approved" : "unverified";
     return this.sql.begin(async (transaction) => {
       const sourceId = randomUUID();
       const revisionId = randomUUID();
       const [source] = await transaction<{ id: string }[]>`
-        INSERT INTO sources (id, workspace_id, source_type, authority, current_revision_id, current_content_hash, created_by)
-        VALUES (${sourceId}, ${actor.workspaceId}, ${input.sourceType}, 'unverified', ${revisionId}, ${revision.contentHash}, ${actor.id})
+        INSERT INTO sources (id, workspace_id, source_type, authority, current_revision_id, current_content_hash, created_by, last_verified_at)
+        VALUES (${sourceId}, ${actor.workspaceId}, ${input.sourceType}, ${authority}, ${revisionId}, ${revision.contentHash}, ${actor.id},
+                CASE WHEN ${actor.autoApprove}::boolean THEN now() END)
         RETURNING id
       `;
       if (!source) throw new Error("Unable to create source");
@@ -272,8 +298,15 @@ export class KnowledgeRepository {
       await transaction`
         INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
         VALUES (${actor.workspaceId}, ${actor.id}, 'source_submitted', ${source.id},
-          ${JSON.stringify({ sourceType: input.sourceType, authority: 'unverified', revisionId })}::jsonb)
+          ${transaction.json({ sourceType: input.sourceType, authority, revisionId })})
       `;
+      if (actor.autoApprove) {
+        await transaction`
+          INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
+          VALUES (${actor.workspaceId}, ${actor.id}, 'source_authority_changed', ${source.id},
+            ${transaction.json({ authority: "approved", auto: true })})
+        `;
+      }
       return { id: source.id, revisionNumber: 1, chunkCount: revision.chunks.length };
     });
   }
@@ -320,10 +353,15 @@ export class KnowledgeRepository {
     }
   }
 
-  private async event(actor: Actor, eventType: string, sourceId: string | null, metadata: Record<string, unknown>): Promise<void> {
+  /* Metadata goes through `sql.json` rather than `${JSON.stringify(x)}::jsonb`.
+     On a bare postgres.js client the latter encodes twice and stores a jsonb
+     *string* instead of an object, which reads back as unusable. The admin app
+     must use the opposite form because Drizzle replaces the serializer on the
+     client it wraps; see admin/src/lib/db.ts. */
+  private async event(actor: Actor, eventType: string, sourceId: string | null, metadata: JSONValue): Promise<void> {
     await this.sql`
       INSERT INTO events (workspace_id, actor_id, event_type, source_id, metadata)
-      VALUES (${actor.workspaceId}, ${actor.id}, ${eventType}, ${sourceId}, ${JSON.stringify(metadata)}::jsonb)
+      VALUES (${actor.workspaceId}, ${actor.id}, ${eventType}, ${sourceId}, ${this.sql.json(metadata)})
     `;
   }
 }

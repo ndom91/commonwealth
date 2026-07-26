@@ -9,7 +9,9 @@ import {
   setIdentityDisabled,
   updateIdentity,
 } from "../lib/management.js";
+import { getNavCounts } from "../lib/knowledge.js";
 import { getSession } from "../lib/session.js";
+import { readFailure } from "../lib/read-failure.js";
 import { AppShell, SealChip, accessionOf, stamp, stampAt } from "../components/chrome.js";
 
 export const Route = createFileRoute("/dashboard")({
@@ -18,6 +20,9 @@ export const Route = createFileRoute("/dashboard")({
     if (!session) throw redirect({ to: "/sign-in" });
     return { holder: session.user.email ?? session.user.name ?? undefined };
   },
+  /* Counts are decorative and degrade to a dash; the register below reports a
+     read failure in full, and two alarms for one fault would be noise. */
+  loader: async () => ({ counts: await getNavCounts().catch(() => undefined) }),
   component: Dashboard,
 });
 
@@ -45,6 +50,9 @@ type Identity = {
   /* Set while the holder is suspended. AccessService refuses every credential
      they own for as long as it is non-null. */
   disabled_at: string | null;
+  /* When true this holder's submissions and revisions arrive approved instead
+     of queuing for review. */
+  auto_approve: boolean;
   keys: Credential[];
 };
 
@@ -76,6 +84,7 @@ function custodyLine(identity: Identity) {
 function Dashboard() {
   const router = useRouter();
   const { holder } = Route.useRouteContext();
+  const { counts } = Route.useLoaderData();
 
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [status, setStatus] = useState<Status>({ state: "loading" });
@@ -89,23 +98,22 @@ function Dashboard() {
   const [keyLabel, setKeyLabel] = useState("");
   const [pending, setPending] = useState(false);
 
-  const reload = async () => {
+  /* `rail` is false on first load only: the route loader has just supplied the
+     counts, so invalidating would fetch them a second time. Every mutation
+     path leaves it true, because creating or disabling a holder moves the
+     rail's Identities count as well as this register. */
+  const reload = async (rail = true) => {
     try {
       setIdentities((await listIdentities()) as unknown as Identity[]);
       setStatus({ state: "ready" });
+      if (rail) void router.invalidate();
     } catch (cause) {
-      const raw = cause instanceof Error ? cause.message : "";
-      setStatus({
-        state: "error",
-        message: /forbidden/i.test(raw)
-          ? "This account does not have administrator access on this instance. Ask an administrator to grant it, then reload."
-          : "The register could not be read. Check that the admin service can reach the database, then retry.",
-      });
+      setStatus({ state: "error", message: readFailure(cause, "The register") });
     }
   };
 
   useEffect(() => {
-    void reload();
+    void reload(false);
   }, []);
 
   const selected = useMemo(
@@ -141,7 +149,7 @@ function Dashboard() {
       title="Identities"
       accession="Access register"
       holder={holder}
-      identityCount={identities.length}
+      counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: "/sign-in" });
@@ -224,6 +232,8 @@ function Dashboard() {
                     <span className="entry__role">
                       {identity.disabled_at ? (
                         <SealChip state="suspended">Disabled</SealChip>
+                      ) : identity.auto_approve ? (
+                        <SealChip state="signed">{identity.role} · trusted</SealChip>
                       ) : (
                         <span className="role">{identity.role}</span>
                       )}
@@ -426,7 +436,7 @@ function IssueForm({
   );
 }
 
-type Amendment = { name: string; role: Role; description: string | null };
+type Amendment = { name: string; role: Role; description: string | null; autoApprove: boolean };
 
 function Holder({
   identity,
@@ -576,6 +586,27 @@ function Holder({
           )}
 
           <label className="field">
+            <span className="label">Submissions</span>
+            <select
+              value={amend.autoApprove ? "auto" : "review"}
+              onChange={(event) =>
+                setAmend({ ...amend, autoApprove: event.target.value === "auto" })
+              }
+            >
+              <option value="review">Held for review</option>
+              <option value="auto">Approved automatically</option>
+            </select>
+          </label>
+
+          {amend.autoApprove !== identity.auto_approve && (
+            <p className="amend__consequence">
+              {amend.autoApprove
+                ? "Everything this holder submits or revises will be marked approved without a human reading it. Canonical still requires a person."
+                : "Future submissions from this holder will queue for review again. Sources already approved keep their authority."}
+            </p>
+          )}
+
+          <label className="field">
             <span className="label">Administrator note</span>
             <input
               value={amend.description ?? ""}
@@ -626,6 +657,7 @@ function Holder({
           {disabled && (
             <SealChip state="suspended">Disabled {stamp(identity.disabled_at)}</SealChip>
           )}
+          {identity.auto_approve && <SealChip state="signed">Trusted</SealChip>}
           <span className="role">{identity.role}</span>
           <button
             type="button"
@@ -635,6 +667,7 @@ function Holder({
                 name: identity.name,
                 role: identity.role,
                 description: identity.description,
+                autoApprove: identity.auto_approve,
               })
             }
           >

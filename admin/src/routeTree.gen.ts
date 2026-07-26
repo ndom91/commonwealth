@@ -11,7 +11,11 @@
 import { Route as rootRouteImport } from './app/__root'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as DashboardRouteImport } from './app/dashboard'
+import { Route as ReviewRouteImport } from './app/review'
 import { Route as SignInRouteImport } from './app/sign-in'
+import { Route as SourcesRouteImport } from './app/sources'
+import { Route as SourcesIndexRouteImport } from './app/sources/index'
+import { Route as SourcesSourceIdRouteImport } from './app/sources/$sourceId'
 import { Route as ApiAuthSplatRouteImport } from './app/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -24,10 +28,30 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReviewRoute = ReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SourcesRoute = SourcesRouteImport.update({
+  id: '/sources',
+  path: '/sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SourcesIndexRoute = SourcesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SourcesRoute,
+} as any)
+const SourcesSourceIdRoute = SourcesSourceIdRouteImport.update({
+  id: '/$sourceId',
+  path: '/$sourceId',
+  getParentRoute: () => SourcesRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -38,34 +62,71 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/review': typeof ReviewRoute
   '/sign-in': typeof SignInRoute
+  '/sources': typeof SourcesRouteWithChildren
+  '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/sources/': typeof SourcesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/review': typeof ReviewRoute
   '/sign-in': typeof SignInRoute
+  '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/sources': typeof SourcesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/review': typeof ReviewRoute
   '/sign-in': typeof SignInRoute
+  '/sources': typeof SourcesRouteWithChildren
+  '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/sources/': typeof SourcesIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/sign-in' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/review'
+    | '/sign-in'
+    | '/sources'
+    | '/sources/$sourceId'
+    | '/sources/'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/sign-in' | '/api/auth/$'
-  id: '__root__' | '/' | '/dashboard' | '/sign-in' | '/api/auth/$'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/review'
+    | '/sign-in'
+    | '/sources/$sourceId'
+    | '/sources'
+    | '/api/auth/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/review'
+    | '/sign-in'
+    | '/sources'
+    | '/sources/$sourceId'
+    | '/sources/'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
+  ReviewRoute: typeof ReviewRoute
   SignInRoute: typeof SignInRoute
+  SourcesRoute: typeof SourcesRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -85,12 +146,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/review': {
+      id: '/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sign-in': {
       id: '/sign-in'
       path: '/sign-in'
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/sources': {
+      id: '/sources'
+      path: '/sources'
+      fullPath: '/sources'
+      preLoaderRoute: typeof SourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sources/': {
+      id: '/sources/'
+      path: '/'
+      fullPath: '/sources/'
+      preLoaderRoute: typeof SourcesIndexRouteImport
+      parentRoute: typeof SourcesRoute
+    }
+    '/sources/$sourceId': {
+      id: '/sources/$sourceId'
+      path: '/$sourceId'
+      fullPath: '/sources/$sourceId'
+      preLoaderRoute: typeof SourcesSourceIdRouteImport
+      parentRoute: typeof SourcesRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -102,10 +191,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface SourcesRouteChildren {
+  SourcesSourceIdRoute: typeof SourcesSourceIdRoute
+  SourcesIndexRoute: typeof SourcesIndexRoute
+}
+
+const SourcesRouteChildren: SourcesRouteChildren = {
+  SourcesSourceIdRoute: SourcesSourceIdRoute,
+  SourcesIndexRoute: SourcesIndexRoute,
+}
+
+const SourcesRouteWithChildren =
+  SourcesRoute._addFileChildren(SourcesRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
+  ReviewRoute: ReviewRoute,
   SignInRoute: SignInRoute,
+  SourcesRoute: SourcesRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

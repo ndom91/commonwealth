@@ -6,7 +6,7 @@ import { auth } from "./auth.js";
 
 type Role = "reader" | "writer" | "reviewer" | "admin";
 type IdentityInput = { name: string; role: Role; keyLabel: string };
-type IdentityAmendment = { name: string; role: Role; description: string | null };
+type IdentityAmendment = { name: string; role: Role; description: string | null; autoApprove: boolean };
 
 async function adminId(): Promise<string> {
   const session = await auth.api.getSession({ headers: getRequest().headers });
@@ -20,7 +20,7 @@ export const listIdentities = createServerFn({ method: "GET" }).handler(async ()
   await adminId();
   return client`
     SELECT users.id, users.display_name AS name, users.role, users.created_at, users.description,
-      users.disabled_at,
+      users.disabled_at, users.auto_approve,
       COALESCE(json_agg(json_build_object('id', api_keys.id, 'prefix', api_keys.key_prefix, 'label', managed_api_key.label, 'createdAt', api_keys.created_at, 'lastUsedAt', api_keys.last_used_at, 'revokedAt', api_keys.revoked_at)
         ORDER BY api_keys.created_at DESC) FILTER (WHERE api_keys.id IS NOT NULL), '[]') AS keys
     FROM users
@@ -75,36 +75,59 @@ export const createIdentity = createServerFn({ method: "POST" })
    alongside the values it replaced. */
 export const updateIdentity = createServerFn({ method: "POST" })
   .validator((value: unknown): { identityId: string } & IdentityAmendment => {
-    const input = value as Partial<{ identityId: string; name: string; role: string; description: string }>;
+    const input = value as Partial<{
+      identityId: string;
+      name: string;
+      role: string;
+      description: string;
+      autoApprove: boolean;
+    }>;
     if (!input.identityId?.trim()) throw new Error("Invalid identity");
     if (!input.name?.trim()) throw new Error("A holder name is required");
     if (!["reader", "writer", "reviewer", "admin"].includes(input.role ?? "")) throw new Error("Invalid role");
+    if (typeof input.autoApprove !== "boolean") throw new Error("Invalid trusted-holder setting");
     return {
       identityId: input.identityId.trim(),
       name: input.name.trim(),
       role: input.role as IdentityAmendment["role"],
       description: input.description?.trim() || null,
+      autoApprove: input.autoApprove,
     };
   })
   .handler(async ({ data }) => {
     await adminId();
     await client.begin(async (transaction) => {
       const [before] = await transaction<
-        { workspace_id: string; display_name: string; role: string; description: string | null }[]
+        {
+          workspace_id: string;
+          display_name: string;
+          role: string;
+          description: string | null;
+          auto_approve: boolean;
+        }[]
       >`
-        SELECT workspace_id, display_name, role, description FROM users WHERE id = ${data.identityId}
+        SELECT workspace_id, display_name, role, description, auto_approve
+        FROM users WHERE id = ${data.identityId}
       `;
       if (!before) throw new Error("That identity no longer exists");
       await transaction`
         UPDATE users
-        SET display_name = ${data.name}, role = ${data.role}, description = ${data.description}
+        SET display_name = ${data.name}, role = ${data.role}, description = ${data.description},
+            auto_approve = ${data.autoApprove}
         WHERE id = ${data.identityId}
       `;
-      const changed: Record<string, { from: unknown; to: unknown }> = {};
+      /* Values are narrowed to what jsonb can carry rather than `unknown`, so
+         the compiler — not a runtime surprise — catches a field that cannot be
+         written to the event log. */
+      const changed: Record<string, { from: string | boolean | null; to: string | boolean | null }> = {};
       if (before.display_name !== data.name) changed.name = { from: before.display_name, to: data.name };
       if (before.role !== data.role) changed.role = { from: before.role, to: data.role };
       if ((before.description ?? null) !== data.description)
         changed.description = { from: before.description, to: data.description };
+      /* Trusting a holder delegates review authority to an agent, so the change
+         is recorded as deliberately as a role change. */
+      if (before.auto_approve !== data.autoApprove)
+        changed.autoApprove = { from: before.auto_approve, to: data.autoApprove };
       if (Object.keys(changed).length > 0) {
         await transaction`
           INSERT INTO events (workspace_id, event_type, metadata)
