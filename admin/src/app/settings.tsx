@@ -296,11 +296,6 @@ function Administrators({
           ))}
         </div>
       )}
-
-      <p className="line__caption">
-        Everyone who can sign in to this surface. Sign-up stays closed — administrators are only
-        created here. Removing one is not yet possible from the browser.
-      </p>
     </div>
   );
 }
