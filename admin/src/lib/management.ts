@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { client } from "./db.js";
 import { auth } from "./auth.js";
+import { PAGE_SIZE } from "./knowledge.js";
 
 type Role = "reader" | "writer" | "reviewer" | "admin";
 type IdentityInput = { name: string; role: Role; keyLabel: string };
@@ -16,20 +17,47 @@ async function adminId(): Promise<string> {
   return role.user_id;
 }
 
-export const listIdentities = createServerFn({ method: "GET" }).handler(async () => {
-  await adminId();
-  return client`
-    SELECT users.id, users.display_name AS name, users.role, users.created_at, users.description,
-      users.disabled_at, users.auto_approve,
-      COALESCE(json_agg(json_build_object('id', api_keys.id, 'prefix', api_keys.key_prefix, 'label', managed_api_key.label, 'createdAt', api_keys.created_at, 'lastUsedAt', api_keys.last_used_at, 'revokedAt', api_keys.revoked_at)
-        ORDER BY api_keys.created_at DESC) FILTER (WHERE api_keys.id IS NOT NULL), '[]') AS keys
-    FROM users
-    LEFT JOIN api_keys ON api_keys.user_id = users.id
-    LEFT JOIN managed_api_key ON managed_api_key.id = api_keys.id
-    GROUP BY users.id
-    ORDER BY users.created_at DESC
-  `;
-});
+/* Keyset paginated on (created_at DESC, id DESC), the same ordering the source
+   register and the event log use.
+ *
+ * Unlike those two, this one cannot simply cap and tell you to narrow with a
+ * filter: there are no filters here, and an unreachable holder is a credential
+ * you cannot revoke. So the page is bounded and a cursor walks the rest.
+ *
+ * Bounding matters more than the row count suggests — each row carries a
+ * json_agg of every credential that holder has ever owned, so the payload grows
+ * with key churn, not just with headcount. */
+export const listIdentities = createServerFn({ method: "GET" })
+  .validator((value: unknown): { cursor: { createdAt: string; id: string } | null } => {
+    const input = (value ?? {}) as { cursor?: { createdAt?: string; id?: string } };
+    if (!input.cursor) return { cursor: null };
+    if (!input.cursor.createdAt || !input.cursor.id) throw new Error("Invalid cursor");
+    return { cursor: { createdAt: input.cursor.createdAt, id: input.cursor.id } };
+  })
+  .handler(async ({ data }) => {
+    await adminId();
+    const rows = await client`
+      SELECT users.id, users.display_name AS name, users.role, users.created_at, users.description,
+        users.disabled_at, users.auto_approve,
+        COALESCE(json_agg(json_build_object('id', api_keys.id, 'prefix', api_keys.key_prefix, 'label', managed_api_key.label, 'createdAt', api_keys.created_at, 'lastUsedAt', api_keys.last_used_at, 'revokedAt', api_keys.revoked_at)
+          ORDER BY api_keys.created_at DESC) FILTER (WHERE api_keys.id IS NOT NULL), '[]') AS keys
+      FROM users
+      LEFT JOIN api_keys ON api_keys.user_id = users.id
+      LEFT JOIN managed_api_key ON managed_api_key.id = api_keys.id
+      WHERE (
+        ${data.cursor?.createdAt ?? null}::timestamptz IS NULL
+        OR (users.created_at, users.id)
+           < (${data.cursor?.createdAt ?? null}::timestamptz, ${data.cursor?.id ?? null}::uuid)
+      )
+      GROUP BY users.id
+      ORDER BY users.created_at DESC, users.id DESC
+      LIMIT ${PAGE_SIZE + 1}
+    `;
+    /* One row past the page proves another page exists without counting the
+       whole table. */
+    const hasMore = rows.length > PAGE_SIZE;
+    return { identities: rows.slice(0, PAGE_SIZE), hasMore };
+  });
 
 export const createIdentity = createServerFn({ method: "POST" })
   .validator((value: unknown): IdentityInput => {

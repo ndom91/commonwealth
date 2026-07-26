@@ -8,6 +8,20 @@ import { readFailure } from "../lib/read-failure.js";
 import { AppShell, SealChip, accessionOf } from "../components/chrome.js";
 import { CredentialTag, ROLES, type Identity, type Issued, type Role } from "../components/identity.js";
 
+export type IdentitySearch = { after?: string };
+
+/* The cursor is one search param rather than two, so a link carries a single
+   opaque token instead of exposing a timestamp and a uuid the reader is
+   invited to hand-edit. Malformed values resolve to null and simply return the
+   first page — a bad cursor should show the register, not an error. */
+function parseCursor(after: string | undefined) {
+  if (!after) return null;
+  const separator = after.indexOf("|");
+  const createdAt = after.slice(0, separator);
+  const id = after.slice(separator + 1);
+  return createdAt && id ? { createdAt, id } : null;
+}
+
 /* The access register, formerly /dashboard.
  *
  * Selection lives in the URL rather than in component state, which is what the
@@ -21,14 +35,23 @@ export const Route = createFileRoute("/identities")({
     if (!session) throw redirect({ to: "/sign-in" });
     return { holder: session.user.email ?? session.user.name ?? undefined };
   },
-  loader: async () => {
+  /* The cursor lives in the URL like every other register state, so a page of
+     the register is linkable and a reload does not silently jump back to the
+     newest holders. */
+  validateSearch: (search: Record<string, unknown>): IdentitySearch => ({
+    after: typeof search.after === "string" && search.after.includes("|") ? search.after : undefined,
+  }),
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps }) => {
     /* Counts are decorative and degrade to a dash; the register reports a read
        failure in full, and two alarms for one fault would be noise. */
     const counts = await getNavCounts().catch(() => undefined);
+    const cursor = parseCursor(deps.after);
     try {
-      return { counts, identities: (await listIdentities()) as unknown as Identity[], failure: undefined };
+      const page = await listIdentities({ data: { cursor } });
+      return { counts, page, failure: undefined };
     } catch (cause) {
-      return { counts, identities: undefined, failure: readFailure(cause, "The register") };
+      return { counts, page: undefined, failure: readFailure(cause, "The register") };
     }
   },
   component: IdentitiesLayout,
@@ -38,11 +61,14 @@ function IdentitiesLayout() {
   const router = useRouter();
   const navigate = useNavigate();
   const { holder } = Route.useRouteContext();
-  const { counts, identities: loaded, failure } = Route.useLoaderData();
+  const { counts, page, failure } = Route.useLoaderData();
+  const { after } = Route.useSearch();
 
   /* Loader data crosses a serialisation boundary, so the router hands it back
      widened. Re-stated here rather than at every use site. */
-  const identities: Identity[] = (loaded ?? []) as Identity[];
+  const identities: Identity[] = (page?.identities ?? []) as Identity[];
+  const hasMore = page?.hasMore ?? false;
+  const last = identities[identities.length - 1];
 
   /* The reveal is layout state, not bench state: creating a holder navigates to
      that holder, and the secret has to survive the navigation. It is shown once
@@ -158,6 +184,28 @@ function IdentitiesLayout() {
               );
             })}
           </ul>
+
+          {/* A register of credentials has no filters to narrow by, so a holder
+              you cannot page to is a key you cannot revoke. Both directions are
+              offered rather than only "more". */}
+          {(hasMore || after) && (
+            <div className="index__note index__page">
+              {after && (
+                <Link to="/identities" search={{}} className="btn btn--quiet">
+                  Newest
+                </Link>
+              )}
+              {hasMore && last && (
+                <Link
+                  to="/identities"
+                  search={{ after: `${last.created_at}|${last.id}` }}
+                  className="btn btn--quiet"
+                >
+                  Earlier holders
+                </Link>
+              )}
+            </div>
+          )}
         </section>
 
         {/* The detail pane belongs to the layout rather than to each child, so

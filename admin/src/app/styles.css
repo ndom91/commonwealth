@@ -636,6 +636,14 @@ select {
 /* Only for a note that stacks separate blocks — a failure message above a
    Retry control. A note that is itself a paragraph must stay in normal inline
    flow, or every inline `<code>` in the sentence becomes its own grid row. */
+/* Page controls close the register rather than floating in it, so the rule
+   above them reads as the end of the rows. */
+.index__page {
+  display: flex;
+  gap: var(--s-tight);
+  border-top: 1px solid var(--rule-hair);
+}
+
 .index__note--stack {
   display: grid;
   justify-items: start;

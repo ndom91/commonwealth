@@ -31,10 +31,10 @@ function HolderBench() {
      already holds every holder, and one `router.invalidate()` after a mutation
      refreshes the register, this bench and the rail count from a single
      round trip. */
-  const { identities } = useLoaderData({ from: "/identities" }) as {
-    identities: Identity[] | undefined;
+  const { page } = useLoaderData({ from: "/identities" }) as {
+    page: { identities: Identity[] } | undefined;
   };
-  const identity = (identities ?? []).find((entry) => entry.id === identityId);
+  const identity = (page?.identities ?? []).find((entry) => entry.id === identityId);
 
   const [arming, setArming] = useState<string>();
   const [adding, setAdding] = useState(false);
@@ -52,10 +52,14 @@ function HolderBench() {
   const [failed, setFailed] = useState<{ id: string; message: string }>();
 
   if (!identity) {
+    /* The register is paginated, so a holder can be real but simply not on the
+       page in view — a deep link to an older holder lands here. Say both
+       possibilities rather than declaring the link dead. */
     return (
       <p className="empty prose">
-        That holder is not in the register. It may have been removed, or the
-        link may be stale.
+        That holder is not on this page of the register. Page back through
+        earlier holders to reach them, or check the link — they may have been
+        removed.
       </p>
     );
   }
