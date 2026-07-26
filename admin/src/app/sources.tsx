@@ -153,13 +153,7 @@ function Sources() {
             )}
           </form>
 
-          {searching ? (
-            <p className="line__caption seek__note">
-              Matches titles containing this text, and bodies containing these
-              words. Agents retrieve by meaning as well, so this can miss what{" "}
-              <code className="register">search_knowledge</code> would return.
-            </p>
-          ) : (
+          {!searching && (
           <div className="filters">
             <label className="filters__field">
               <span className="label">Authority</span>

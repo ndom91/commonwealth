@@ -575,14 +575,20 @@ select {
   color: var(--ink-2);
 }
 
+/* Notes inside the register pane carry its gutter; the pane itself is flush so
+   that entry rows can rule edge to edge. Block padding keeps a note from
+   reading as part of the ruled control directly above it. */
 .index__note {
+  padding: var(--s-base) var(--s-loose);
+}
+
+/* Only for a note that stacks separate blocks — a failure message above a
+   Retry control. A note that is itself a paragraph must stay in normal inline
+   flow, or every inline `<code>` in the sentence becomes its own grid row. */
+.index__note--stack {
   display: grid;
   justify-items: start;
   gap: var(--s-snug);
-  /* Block padding as well as inline: the note sits directly under a ruled
-     filter or search bar, and without it the sentence reads as part of the
-     control rather than as the register's answer. */
-  padding: var(--s-base) var(--s-loose);
 }
 
 /* ── Seal chips ──────────────────────────────────────────────────────────── */
@@ -1027,8 +1033,12 @@ select {
   color: var(--ink-3);
 }
 
+/* Vertical rhythm only. The gutter belongs to whatever contains it: standalone
+   uses sit inside an already-padded pane, and register notes add their own
+   inline padding via `.index__note`. Setting it here would clobber theirs,
+   since this rule is the later of the two. */
 .empty {
-  padding: var(--s-snug) 0 var(--s-section);
+  padding-block: var(--s-snug) var(--s-section);
   color: var(--ink-3);
 }
 
@@ -1230,12 +1240,6 @@ select {
   outline: none;
   border-bottom: 2px solid var(--ink);
   padding-bottom: 4px;
-}
-
-/* The honesty note: admin search is lexical, agent retrieval is not. */
-.seek__note {
-  padding: var(--s-snug) var(--s-loose);
-  border-bottom: 1px solid var(--rule-hair);
 }
 
 /* ts_headline delimits matched terms with « ». Left as text rather than

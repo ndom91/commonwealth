@@ -187,7 +187,7 @@ function Dashboard() {
           {status.state === "loading" && <p className="empty index__note">Reading register…</p>}
 
           {status.state === "error" && (
-            <div className="index__note">
+            <div className="index__note index__note--stack">
               <p className="notice" role="alert">
                 {status.message}
               </p>
