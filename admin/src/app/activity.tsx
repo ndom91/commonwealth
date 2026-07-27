@@ -1,5 +1,6 @@
 import { createFileRoute, Link, redirect, useNavigate, useRouter } from '@tanstack/react-router';
-import { AppShell, accessionOf, stampAt } from '../components/chrome.js';
+import { AppShell, accessionOf } from '../components/chrome.js';
+import { Stamp } from '../components/stamp.js';
 import { authClient } from '../lib/auth-client.js';
 import { getNavCounts, listEvents, listEventTypes } from '../lib/knowledge.js';
 import { readFailure } from '../lib/read-failure.js';
@@ -165,9 +166,7 @@ function Activity() {
               const detail = detailOf(event);
               return (
                 <li className="log__row" key={event.id}>
-                  <time className="log__at register" dateTime={event.created_at}>
-                    {stampAt(event.created_at)}
-                  </time>
+                  <Stamp at={event.created_at} withTime className="log__at register" />
                   <span className="log__what">
                     {phrase(event.event_type)}
                     {detail && <span className="log__detail"> {detail}</span>}

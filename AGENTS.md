@@ -76,8 +76,31 @@ wrong on the admin side in two separate ways. Each package keeps its own SQL.
 ## Two Postgres clients that behave differently
 
 Both packages use postgres.js against the same database, but the admin hands
-its client to Drizzle, and **`drizzle()` mutates the client it is given** — it
-replaces the jsonb serializer with a pass-through so it can supply its own
+its client to Drizzle, and **`drizzle()` mutates the client it is given**. It
+does this to two things, and both fail quietly rather than loudly.
+
+### Dates come back as strings, and not ISO ones
+
+| Client | Same `timestamptz` column |
+|---|---|
+| bare postgres.js | `Date` → serializes `2026-07-24T16:30:00.313Z` |
+| after `drizzle(client)` | string `2026-07-24 16:30:00.313448+00` |
+
+Two consequences. `.toISOString()` on one of these throws, because it is not a
+`Date`. And the string is **not ISO 8601** — space instead of `T`, two-digit
+offset — so `Date.parse` on it is implementation-defined per ECMA-262. Today's
+engines read it as UTC; one that read it as local time would shift every
+timestamp in the product by the reader's own offset without erroring.
+
+So **every timestamp reaching the UI goes through `isoUtc`** in
+`admin/src/components/stamp.tsx`, which normalises `Date`, the Postgres form and
+plain ISO to one `Z`-suffixed string, and returns `null` rather than
+`Invalid Date` for anything else. Render it with `<Stamp>`; there is no other
+date helper.
+
+### jsonb is written differently on each side
+
+It replaces the jsonb serializer with a pass-through so it can supply its own
 encoded JSON. That inverts how raw tagged templates must write jsonb:
 
 | Package | Client | Correct form |

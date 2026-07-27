@@ -1,6 +1,7 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
-import { AppShell, stampAt } from '../components/chrome.js';
+import { AppShell } from '../components/chrome.js';
+import { Stamp } from '../components/stamp.js';
 import { authClient } from '../lib/auth-client.js';
 import { getNavCounts } from '../lib/knowledge.js';
 import { type Administrator, createAdministrator, listAdministrators } from '../lib/management.js';
@@ -290,7 +291,7 @@ function Administrators({
                 {administrator.isYou && ' — you'}
               </span>
               <span className="stub__meta register">
-                {administrator.email} · since {stampAt(administrator.createdAt)}
+                {administrator.email} · since <Stamp at={administrator.createdAt} withTime />
               </span>
             </div>
           ))}

@@ -13,8 +13,8 @@ import {
   authoritySeal,
   IconButton,
   SealChip,
-  stamp,
 } from '../components/chrome.js';
+import { Stamp } from '../components/stamp.js';
 import { authClient } from '../lib/auth-client.js';
 import { getNavCounts, listSources, listSubmitters, searchSources } from '../lib/knowledge.js';
 import { readFailure } from '../lib/read-failure.js';
@@ -307,7 +307,7 @@ function Sources() {
                   <span className="entry__name">{source.title}</span>
                   <span className="entry__accession">
                     {accessionOf(source.id)} · r{source.revision_number} ·{' '}
-                    {stamp(source.content_updated_at)}
+                    <Stamp at={source.content_updated_at} />
                     {source.author ? ` · ${source.author}` : ''}
                   </span>
                   {source.excerpt && (

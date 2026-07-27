@@ -1,3 +1,4 @@
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 import appCss from './styles.css?url';
 
@@ -17,7 +18,13 @@ export const Route = createRootRoute({
         <HeadContent />
       </head>
       <body>
-        <Outlet />
+        {/* One provider for the whole app so the open delay is shared: moving
+            along a register of timestamps should not re-serve the delay on
+            every row. `skipDelayDuration` keeps that grace period short, since
+            these tooltips are read by scanning rather than by settling. */}
+        <Tooltip.Provider delayDuration={250} skipDelayDuration={400}>
+          <Outlet />
+        </Tooltip.Provider>
         <Scripts />
       </body>
     </html>

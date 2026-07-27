@@ -326,8 +326,8 @@ export const listAdministrators = createServerFn({ method: 'GET' }).handler(
     /* `created_at` comes back as a string, not a Date. `drizzle()` mutates the
      client it is handed (see `db.ts`) and that extends to its date parsers, so
      this client hands back raw Postgres timestamps while a bare postgres.js
-     client would give you a Date. Pass it through untouched and let `stampAt`
-     format it, which is what every other register here already does. */
+     client would give you a Date. Pass it through untouched: `<Stamp>` takes
+     either shape and normalises it, which is what every register here does. */
     const rows = await client<{ id: string; name: string; email: string; created_at: string }[]>`
     SELECT "user".id, "user".name, "user".email, admin_role.created_at
     FROM admin_role

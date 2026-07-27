@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
-import { accessionOf, authoritySeal, SealChip, stamp, stampAt } from '../../components/chrome.js';
+import { accessionOf, authoritySeal, SealChip } from '../../components/chrome.js';
+import { Stamp } from '../../components/stamp.js';
 import {
   getIndexingProgress,
   getSourceDetail,
@@ -195,7 +196,7 @@ function SourceBench() {
         <div>
           <span className="label">
             {detail.source_type} · {accessionOf(detail.id)} · revision {detail.revision_number} ·
-            updated {stamp(detail.content_updated_at)}
+            updated <Stamp at={detail.content_updated_at} />
             {detail.author ? ` · ${detail.author}` : ''}
           </span>
           <h2>{detail.title}</h2>
@@ -206,7 +207,9 @@ function SourceBench() {
               sealed, voided or suspended; it is simply not finished. */}
           {indexing && <span className="label">Indexing</span>}
           {withdrawn ? (
-            <SealChip state="void">Withdrawn {stamp(detail.deleted_at)}</SealChip>
+            <SealChip state="void">
+              Withdrawn <Stamp at={detail.deleted_at} />
+            </SealChip>
           ) : indexFailed ? (
             <SealChip state="suspended">Index failed</SealChip>
           ) : detail.is_stale ? (
@@ -255,9 +258,9 @@ function SourceBench() {
 
       {detail.is_stale && !withdrawn && (
         <p className="bench__consequence">
-          Revised {stamp(detail.content_updated_at)}, after it was last verified on{' '}
-          {stamp(detail.last_verified_at)}. Agents are being served content no human has vouched
-          for.
+          Revised <Stamp at={detail.content_updated_at} />, after it was last verified on{' '}
+          <Stamp at={detail.last_verified_at} />. Agents are being served content no human has
+          vouched for.
         </p>
       )}
 
@@ -275,9 +278,14 @@ function SourceBench() {
         <div className="bench__section-head">
           <span className="label">
             Authority
-            {detail.last_verified_at
-              ? ` · last verified ${stamp(detail.last_verified_at)}`
-              : ' · never verified by a human'}
+            {detail.last_verified_at ? (
+              <>
+                {' · last verified '}
+                <Stamp at={detail.last_verified_at} />
+              </>
+            ) : (
+              ' · never verified by a human'
+            )}
           </span>
           <div className="authority-current">
             <span className="label">Current authority</span>
@@ -492,7 +500,8 @@ function SourceBench() {
               </span>
               <span className="stub__meta register">
                 <b>{revision.content_hash.slice(0, 12)}…</b> ·{' '}
-                {stampAt(revision.content_updated_at)} · {revision.content_length} chars
+                <Stamp at={revision.content_updated_at} withTime /> · {revision.content_length}{' '}
+                chars
                 {revision.author ? ` · ${revision.author}` : ''}
               </span>
               <span className="stub__action">
@@ -511,7 +520,7 @@ function SourceBench() {
           <ul className="line register">
             {events.map((event) => (
               <li key={event.id}>
-                <time dateTime={event.created_at}>{stampAt(event.created_at)}</time>
+                <Stamp at={event.created_at} withTime />
                 <span>
                   {event.event_type}
                   {event.actor ? ` — ${event.actor}` : ''}

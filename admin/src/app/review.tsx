@@ -1,5 +1,6 @@
 import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router';
-import { AppShell, accessionOf, SealChip, stamp } from '../components/chrome.js';
+import { AppShell, accessionOf, SealChip } from '../components/chrome.js';
+import { Stamp } from '../components/stamp.js';
 import { authClient } from '../lib/auth-client.js';
 import { getNavCounts, listReviewQueue } from '../lib/knowledge.js';
 import { readFailure } from '../lib/read-failure.js';
@@ -110,9 +111,15 @@ function QueueGroup({ label, note, rows }: { label: string; note: string; rows: 
             >
               <span className="entry__name">{row.title}</span>
               <span className="entry__accession">
-                {accessionOf(row.id)} · r{row.revision_number} · {stamp(row.content_updated_at)}
+                {accessionOf(row.id)} · r{row.revision_number} ·{' '}
+                <Stamp at={row.content_updated_at} />
                 {row.author ? ` · ${row.author}` : ''}
-                {row.last_verified_at ? ` · verified ${stamp(row.last_verified_at)}` : ''}
+                {row.last_verified_at ? (
+                  <>
+                    {' · verified '}
+                    <Stamp at={row.last_verified_at} />
+                  </>
+                ) : null}
               </span>
               <span className="entry__role">
                 <SealChip state={row.is_unverified ? 'unsealed' : 'suspended'}>

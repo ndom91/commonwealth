@@ -1,6 +1,6 @@
 import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
-import { accessionOf, SealChip, stamp, stampAt } from '../../components/chrome.js';
+import { accessionOf, SealChip } from '../../components/chrome.js';
 import {
   CredentialTag,
   custodyLine,
@@ -10,6 +10,7 @@ import {
   ROLES,
   type Role,
 } from '../../components/identity.js';
+import { Stamp } from '../../components/stamp.js';
 import {
   issueCredential,
   revokeKey,
@@ -258,13 +259,15 @@ function HolderBench() {
       <div className="bench__head">
         <div>
           <span className="label">
-            Holder · {accessionOf(identity.id)} · registered {stamp(identity.created_at)}
+            Holder · {accessionOf(identity.id)} · registered <Stamp at={identity.created_at} />
           </span>
           <h2>{identity.name}</h2>
         </div>
         <div className="bench__seal">
           {disabled && (
-            <SealChip state="suspended">Disabled {stamp(identity.disabled_at)}</SealChip>
+            <SealChip state="suspended">
+              Disabled <Stamp at={identity.disabled_at} />
+            </SealChip>
           )}
           {identity.auto_approve && <SealChip state="signed">Trusted</SealChip>}
           <span className="role">{identity.role}</span>
@@ -397,12 +400,14 @@ function HolderBench() {
               <div className="stub" key={key.id}>
                 <span className="stub__label">{labelOf(key)}</span>
                 <span className="stub__meta register">
-                  <b>{key.prefix}…</b> · issued {stamp(key.createdAt)} · last presented{' '}
-                  {key.lastUsedAt ? stamp(key.lastUsedAt) : 'never'}
+                  <b>{key.prefix}…</b> · issued <Stamp at={key.createdAt} /> · last presented{' '}
+                  {key.lastUsedAt ? <Stamp at={key.lastUsedAt} /> : 'never'}
                 </span>
                 <span className="stub__action">
                   {key.revokedAt ? (
-                    <SealChip state="void">Void {stamp(key.revokedAt)}</SealChip>
+                    <SealChip state="void">
+                      Void <Stamp at={key.revokedAt} />
+                    </SealChip>
                   ) : arming === key.id ? (
                     <>
                       <button
@@ -448,7 +453,7 @@ function HolderBench() {
         <ul className="line register">
           {line.map((entry, index) => (
             <li key={`${entry.at}-${index}`}>
-              <time dateTime={entry.at}>{stampAt(entry.at)}</time>
+              <Stamp at={entry.at} withTime />
               <span>{entry.what}</span>
             </li>
           ))}

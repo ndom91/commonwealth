@@ -1179,6 +1179,50 @@ select {
   border-left-color: var(--rule-strong);
 }
 
+/* ── Timestamps ─────────────────────────────────────────────────────────────
+   The page shows an instant in the reader's own timezone; the tooltip shows the
+   same instant as ISO 8601 UTC, which is what the database holds.
+
+   `cursor: help` is the whole affordance. No underline, no dotted rule: these
+   sit inside dense register lines, several to a row, and marking each one would
+   turn a scannable line into a field of decorations. The app already uses
+   semantic cursors this way — the key prefix carries `cursor: copy`. */
+/* No `cursor: help`. The question mark is louder than the thing it advertises —
+   a supplementary reading of a value already on screen — and it appeared on
+   every date in a register several rows deep. The tooltip is a reward for
+   hovering, not a control anyone needs to be sent looking for. */
+.stamp {
+  /* A timestamp is one value and never breaks across lines. Left to wrap, an
+     en-US `07/27/2026, 01:34 AM` splits at the comma or before the meridiem and
+     reads as two separate facts. The columns below are sized to hold it. */
+  white-space: nowrap;
+}
+
+/* Raised out of the bench rather than inverted against it. A tooltip is a note
+   laid on top of the record, not a different kind of surface — so it takes the
+   same slate, hairline and register face as everything else, and zero radius
+   per the rule that only applied chips and tags are rounded.
+
+   No oxide. An instant is neither sealed nor voided. */
+.tip {
+  padding: 5px var(--s-snug);
+  max-width: 40ch;
+  background: var(--slate-raised);
+  border: 1px solid var(--rule-strong);
+  color: var(--ink);
+  font-family: var(--font-register);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  box-shadow: var(--issued-lift);
+  user-select: text;
+  z-index: 40;
+}
+
+.tip__arrow {
+  fill: var(--rule-strong);
+}
+
 /* A suspended holder still has to be readable in the register; it is dimmed
    to secondary ink rather than hidden or struck. */
 .entry--disabled .entry__name {
@@ -1282,7 +1326,10 @@ select {
 
 .line li {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
+  /* 168px, not 150px: a local date-and-time in a 12-hour locale sets to 151px
+     (`07/27/2026, 01:34 AM`), which the old column missed by a single pixel and
+     wrapped every row. The headroom covers locales that run slightly wider. */
+  grid-template-columns: 168px minmax(0, 1fr);
   gap: var(--s-base);
   padding-block: var(--s-hair);
   position: relative;
@@ -1550,7 +1597,10 @@ select {
 
 .log__row {
   display: grid;
-  grid-template-columns: 132px minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.5fr);
+  /* First column widened with the switch to local time — see `.line li`. This
+     face is 12px rather than 12.5px, so it needs 145px; 160px leaves the same
+     margin for wider locales. */
+  grid-template-columns: 160px minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.5fr);
   gap: var(--s-snug);
   align-items: baseline;
   padding: var(--s-snug) 0;

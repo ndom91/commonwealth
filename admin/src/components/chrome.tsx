@@ -254,23 +254,15 @@ export function authoritySeal(authority: string): SealState {
   return 'unsealed';
 }
 
-/* Records dates are rendered from the ISO string in UTC so the server and the
-   client always agree, and so the column stays sortable by eye. */
-export function stamp(value: string | null | undefined): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toISOString().slice(0, 10);
-}
+/* Timestamps live in `components/stamp.tsx`. They used to be two functions
+   here returning UTC strings, which kept the server and client in agreement but
+   meant nobody could read the time in their own timezone. `<Stamp>` shows local
+   time and puts the UTC instant in a tooltip; it is a component rather than a
+   function because the tooltip needs an element to hang on.
 
-/* Same-day custody entries are common, so the line needs the clock as well as
-   the date or its ordering cannot be checked by eye. */
-export function stampAt(value: string | null | undefined): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? '—'
-    : `${date.toISOString().slice(0, 10)} ${date.toISOString().slice(11, 16)}`;
-}
+   Nothing should render a date without it — a bare `toISOString().slice()`
+   anywhere in a route is a timestamp that silently reads UTC to a reader who is
+   not in it. */
 
 /* An accession is a short, stable handle derived from the record's own id;
    nothing is invented. */
