@@ -104,8 +104,11 @@ export type NavCounts = {
  * drawer is the honest version: the section is not theirs to open.
  *
  * This is presentation, not protection. Every server function behind these
- * links calls `requireMember(permission)` — see `lib/session.ts` — and refuses
- * regardless of what the rail happens to be showing.
+ * links calls `requireMember(permission, slug)` — see `lib/authorize.ts` — and
+ * refuses regardless of what the rail happens to be showing.
+ *
+ * The role is the caller's role *in this workspace*. Someone may be an admin in
+ * one and a reader in another, and the rail changes when they switch.
  *
  * Sections the MCP server already supports but the browser cannot reach yet
  * render dormant and marked PENDING. Linking them to routes that do not exist
@@ -115,13 +118,13 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
     {
       label: 'Knowledge',
       items: [
-        { mark: 'sources', label: 'Sources', to: '/sources', count: counts?.sources },
+        { mark: 'sources', label: 'Sources', to: '/w/$slug/sources', count: counts?.sources },
         ...(can(role, 'review')
           ? [
               {
                 mark: 'review' as const,
                 label: 'Review queue',
-                to: '/review',
+                to: '/w/$slug/review',
                 count: counts?.review,
               },
             ]
@@ -136,16 +139,94 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
     groups.push({
       label: 'Access',
       items: [
-        { mark: 'identities', label: 'Identities', to: '/identities', count: counts?.identities },
-        { mark: 'people', label: 'People', to: '/people', count: counts?.people },
+        {
+          mark: 'identities',
+          label: 'Identities',
+          to: '/w/$slug/identities',
+          count: counts?.identities,
+        },
+        { mark: 'people', label: 'People', to: '/w/$slug/people', count: counts?.people },
       ],
     });
   }
   groups.push({
     label: 'Custody',
-    items: [{ mark: 'activity', label: 'Activity', to: '/activity' }],
+    items: [{ mark: 'activity', label: 'Activity', to: '/w/$slug/activity' }],
   });
   return groups;
+}
+
+export type WorkspaceRef = { id: string; name: string; slug: string; role: Role };
+
+/* The plate names the corpus you are in, and is how you leave it.
+ *
+ * It used to read "Team knowledge base / Custody bench" on every screen, which
+ * was true and told you nothing. With more than one workspace the single most
+ * important fact on the page is *which* one you are looking at — every count,
+ * every register and every search below is scoped to it — so the plate says so
+ * and the product name steps down to the sub-line.
+ *
+ * A `<details>` rather than a menu primitive: Radix's dropdown is not yet a
+ * dependency and this is one list of links. `<details>` is keyboard-operable,
+ * announces its own expanded state, and closes on Escape without any of that
+ * being written here. A control this small should not add a dependency.
+ *
+ * With one workspace and no right to create another there is nothing to choose,
+ * so it renders as a plain plate — no disclosure arrow promising a menu that
+ * would open onto a list of one. */
+function WorkspacePlate({
+  slug,
+  name,
+  workspaces,
+  canCreate,
+}: {
+  slug: string;
+  name: string;
+  workspaces: WorkspaceRef[];
+  canCreate: boolean;
+}) {
+  const others = workspaces.filter((entry) => entry.slug !== slug);
+  if (others.length === 0 && !canCreate) {
+    return (
+      <div className="cabinet__plate">
+        <span>{name}</span>
+        <small>Team knowledge base</small>
+      </div>
+    );
+  }
+  return (
+    <details className="cabinet__switch">
+      <summary className="cabinet__plate">
+        <span>{name}</span>
+        <small>Team knowledge base</small>
+      </summary>
+      <div className="cabinet__workspaces">
+        {others.length > 0 && <span className="label">Switch to</span>}
+        {others.map((entry) => (
+          <Link
+            key={entry.slug}
+            to="/w/$slug/sources"
+            params={{ slug: entry.slug }}
+            search={{}}
+            className="cabinet__workspace"
+          >
+            {entry.name}
+            <span className="cabinet__workspace-role register">{entry.role}</span>
+          </Link>
+        ))}
+        {canCreate && (
+          <Link
+            to="/w/$slug/people"
+            params={{ slug }}
+            hash="new-workspace"
+            className="cabinet__workspace cabinet__workspace--new"
+          >
+            New workspace
+          </Link>
+        )}
+      </div>
+    </details>
+  );
 }
 
 export function AppShell({
@@ -154,6 +235,9 @@ export function AppShell({
   actions,
   holder,
   role,
+  slug,
+  workspaceName,
+  workspaces,
   counts,
   onSignOut,
   children,
@@ -162,9 +246,15 @@ export function AppShell({
   accession?: string;
   actions?: ReactNode;
   holder?: string;
-  /* Shapes the rail. Supplied by every route's `beforeLoad` through
-     `getViewer()`, alongside the holder name, so one round trip covers both. */
+  /* Shapes the rail, and is the caller's role *in this workspace*. Supplied by
+     the `/w/$slug` layout's `beforeLoad` alongside the holder name and the
+     workspace list, so one round trip covers the whole shell. */
   role: Role;
+  /* The workspace this page is showing. Every drawer link carries it, so
+     switching section never silently changes corpus. */
+  slug: string;
+  workspaceName: string;
+  workspaces: WorkspaceRef[];
   /* Supplied by each route's loader rather than fetched here, so that
      `router.invalidate()` after a mutation moves the rail as well as the pane
      that caused it. A component-local fetch could not be reached from the
@@ -183,12 +273,12 @@ export function AppShell({
       </a>
 
       <aside className="cabinet">
-        {/* Sources, not Identities: the plate is the way home, and home has to
-            be somewhere every role can stand. */}
-        <Link to="/sources" search={{}} className="cabinet__plate">
-          <span>Team knowledge base</span>
-          <small>Custody bench</small>
-        </Link>
+        <WorkspacePlate
+          slug={slug}
+          name={workspaceName}
+          workspaces={workspaces}
+          canCreate={can(role, 'admin')}
+        />
 
         <nav className="drawers" aria-label="Sections">
           {drawerGroups(role, counts).map((group) => (
@@ -199,6 +289,8 @@ export function AppShell({
                   <Link
                     key={item.label}
                     to={item.to}
+                    params={{ slug }}
+                    search={{}}
                     className="drawer"
                     activeProps={{ 'aria-current': 'page' }}
                   >
@@ -248,7 +340,8 @@ export function AppShell({
                   the Icon Button rule. */}
               <Hint label="Settings">
                 <Link
-                  to="/settings"
+                  to="/w/$slug/settings"
+                  params={{ slug }}
                   className="icon-btn"
                   aria-label="Settings"
                   activeProps={{ 'aria-current': 'page' }}

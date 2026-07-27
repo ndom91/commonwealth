@@ -84,7 +84,7 @@ function AcceptInvite() {
         router.navigate({ to: '/sign-in' });
         return;
       }
-      router.navigate({ to: '/sources', search: {} });
+      router.navigate({ to: '/' });
     } catch (cause) {
       setError(
         cause instanceof Error && cause.message

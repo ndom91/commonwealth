@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
-import { accessionOf, authoritySeal, SealChip } from '../../components/chrome.js';
-import { Stamp } from '../../components/stamp.js';
+import { accessionOf, authoritySeal, SealChip } from '../../../../components/chrome.js';
+import { Stamp } from '../../../../components/stamp.js';
 import {
   getIndexingProgress,
   getSourceDetail,
@@ -12,9 +12,9 @@ import {
   reviseSource,
   setSourceAuthority,
   withdrawSource,
-} from '../../lib/knowledge.js';
+} from '../../../../lib/knowledge.js';
 
-export const Route = createFileRoute('/sources/$sourceId')({
+export const Route = createFileRoute('/w/$slug/sources/$sourceId')({
   component: SourceBench,
 });
 
@@ -65,6 +65,7 @@ type Progress = { status: string; done: number; total: number; message: string |
 const AUTHORITIES: Authority[] = ['unverified', 'approved', 'canonical'];
 
 function SourceBench() {
+  const { slug } = Route.useParams();
   const { sourceId } = Route.useParams();
   const router = useRouter();
 
@@ -83,12 +84,12 @@ function SourceBench() {
     setError(undefined);
     try {
       const [nextDetail, nextRevisions, nextEvents, nextProgress] = await Promise.all([
-        getSourceDetail({ data: { sourceId } }),
-        getSourceRevisions({ data: { sourceId } }),
-        getSourceEvents({ data: { sourceId } }),
+        getSourceDetail({ data: { workspace: slug, sourceId } }),
+        getSourceRevisions({ data: { workspace: slug, sourceId } }),
+        getSourceEvents({ data: { workspace: slug, sourceId } }),
         /* Fetched on every load, not only while polling: landing directly on a
            source whose indexing failed must show why it failed. */
-        getIndexingProgress({ data: { sourceId } }),
+        getIndexingProgress({ data: { workspace: slug, sourceId } }),
       ]);
       setDetail(nextDetail as unknown as Detail);
       setRevisions(nextRevisions as unknown as Revision[]);
@@ -120,7 +121,7 @@ function SourceBench() {
     const tick = async () => {
       let next: Progress;
       try {
-        next = await getIndexingProgress({ data: { sourceId } });
+        next = await getIndexingProgress({ data: { workspace: slug, sourceId } });
       } catch {
         /* A transient read failure should not tear down a job that is still
            running server-side. The next tick tries again. */
@@ -310,7 +311,10 @@ function SourceBench() {
                     disabled={pending || withdrawn || current || unindexed}
                     onClick={() =>
                       void act(
-                        () => setSourceAuthority({ data: { sourceId, authority: value } }),
+                        () =>
+                          setSourceAuthority({
+                            data: { workspace: slug, sourceId, authority: value },
+                          }),
                         'The authority could not be changed.'
                       )
                     }
@@ -329,7 +333,7 @@ function SourceBench() {
               disabled={pending}
               onClick={() =>
                 void act(
-                  () => retryIndexing({ data: { sourceId } }),
+                  () => retryIndexing({ data: { workspace: slug, sourceId } }),
                   'Indexing could not be restarted.'
                 )
               }
@@ -344,7 +348,7 @@ function SourceBench() {
               disabled={pending}
               onClick={() =>
                 void act(
-                  () => restoreSource({ data: { sourceId } }),
+                  () => restoreSource({ data: { workspace: slug, sourceId } }),
                   'The source could not be restored.'
                 )
               }
@@ -359,7 +363,7 @@ function SourceBench() {
                 disabled={pending}
                 onClick={() =>
                   void act(
-                    () => withdrawSource({ data: { sourceId } }),
+                    () => withdrawSource({ data: { workspace: slug, sourceId } }),
                     'The source could not be withdrawn.'
                   )
                 }
@@ -428,7 +432,10 @@ function SourceBench() {
             onSubmit={(event) => {
               event.preventDefault();
               void act(
-                () => reviseSource({ data: { sourceId, title: draftTitle, markdown: draftBody } }),
+                () =>
+                  reviseSource({
+                    data: { workspace: slug, sourceId, title: draftTitle, markdown: draftBody },
+                  }),
                 'The revision could not be saved.'
               );
             }}

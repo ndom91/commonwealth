@@ -233,6 +233,86 @@ select {
   border-right: 1px solid var(--rule-hair);
 }
 
+/* The plate is a disclosure when there is more than one corpus to choose from,
+   and a plain plate when there is not. `<details>`/`<summary>` rather than a
+   menu primitive: keyboard operation, expanded state and Escape-to-close all
+   come for free, and a rail control this small should not add a dependency.
+
+   The marker is removed and replaced by nothing at all — the plate is already
+   the only tag-stock object in the rail, and a disclosure triangle on manila
+   reads as a form widget stuck to a label. */
+.cabinet__switch {
+  position: relative;
+}
+
+.cabinet__switch summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.cabinet__switch summary::-webkit-details-marker {
+  display: none;
+}
+
+.cabinet__switch summary:focus-visible {
+  outline: 2px solid var(--mark);
+  outline-offset: 2px;
+}
+
+/* Sits under the plate rather than over the rail: the rail is narrow, and a
+   floating panel would either clip against it or cover the drawers the reader
+   is about to compare against. */
+.cabinet__workspaces {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Pulled up under the plate: the plate's own bottom margin opens the gap
+     before the first drawer group, which is too much space when a panel is
+     hanging off it. No rule between the two — tag stock against slate is
+     already the strongest edge in the rail, and a hairline on top of a
+     material change reads as indecision. */
+  margin: calc(var(--s-section) * -1 + var(--s-snug)) var(--s-base) var(--s-loose);
+}
+
+.cabinet__workspaces .label {
+  padding: var(--s-hair) 2px;
+  color: var(--ink-3);
+}
+
+/* Inset to 2px so the names start on the same vertical as SWITCH TO above and
+   the drawer icons below, rather than in a third column of their own. */
+.cabinet__workspace {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-tight);
+  padding: 6px 2px;
+  border-radius: 2px;
+  color: var(--ink-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.cabinet__workspace:hover {
+  box-shadow: inset 0 0 0 100px var(--slate-raised);
+  color: var(--ink);
+}
+
+.cabinet__workspace-role {
+  color: var(--ink-dormant);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+/* Separated by a rule because it is a different kind of act: the entries above
+   move you, this one makes something. */
+.cabinet__workspace--new {
+  margin-top: var(--s-hair);
+  border-top: 1px solid var(--rule-hair);
+  padding-top: var(--s-snug);
+  color: var(--ink-3);
+}
+
 .cabinet__plate {
   display: block;
   margin: var(--s-loose) var(--s-base) var(--s-section);
@@ -1515,6 +1595,16 @@ select {
     margin: var(--s-base);
   }
 
+  /* The rail is a band here and the plate no longer has a 32px skirt to hang
+     the panel under, so the negative pull that closes that gap on the wide
+     layout would drag the switcher up over the plate. Sit it below instead,
+     and let it take the plate's own measure rather than the rail's. */
+  .cabinet__workspaces {
+    width: fit-content;
+    min-width: 200px;
+    margin: calc(var(--s-base) * -1 + var(--s-hair)) var(--s-base) var(--s-base);
+  }
+
   .cabinet__foot {
     display: flex;
     flex-wrap: wrap;
@@ -1620,7 +1710,7 @@ select {
   font-family: var(--font-register);
   font-size: 12px;
   line-height: 1.55;
-  color: var(--ink-secondary);
+  color: var(--ink-2);
 }
 
 /* ── Activity log ───────────────────────────────────────────────────────────
@@ -1662,7 +1752,7 @@ select {
 
 .log__at {
   font-size: 12px;
-  color: var(--ink-meta);
+  color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1672,7 +1762,7 @@ select {
 }
 
 .log__detail {
-  color: var(--ink-secondary);
+  color: var(--ink-2);
 }
 
 .log__subject,
@@ -1682,7 +1772,7 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
-  color: var(--ink-secondary);
+  color: var(--ink-2);
 }
 
 .log__actor {

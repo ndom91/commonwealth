@@ -64,6 +64,13 @@
       "when": 1784914839310,
       "tag": "0008_membership",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784914839311,
+      "tag": "0009_invitation_per_workspace",
+      "breakpoints": true
     }
   ]
 }

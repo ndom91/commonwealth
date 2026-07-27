@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 import { getRequest } from '@tanstack/react-start/server';
 import { auth } from './auth.js';
-import { readMembership } from './authorize.js';
+import { readMembership, readWorkspaces, validateWorkspace } from './authorize.js';
 
 /* Server functions only. Routes import from here, so every export has to be
    something TanStack's split can strip from the client bundle — see the note in
@@ -11,23 +11,36 @@ export const getSession = createServerFn({ method: 'GET' }).handler(async () => 
   return auth.api.getSession({ headers: getRequest().headers });
 });
 
-/* What a route needs before it renders: who is signed in, and what they may do.
- *
- * One round trip carries both the display name and the role so the shell can be
- * shaped without a second.
- *
- * `null` means "send them to sign-in" — either there is no session, or there is
- * one with no membership behind it. The second is rare but real: an account
- * whose membership was removed while they were signed in. Treating it as signed
- * out is the honest answer, since there is nothing they can reach. */
-export const getViewer = createServerFn({ method: 'GET' }).handler(async () => {
-  const session = await auth.api.getSession({ headers: getRequest().headers });
-  if (!session) return null;
-  const membership = await readMembership();
-  if (!membership) return null;
-  return {
-    holder: session.user.name || session.user.email || undefined,
-    role: membership.role,
-    workspaceId: membership.workspaceId,
-  };
+/* Where an unscoped route sends you: the workspaces you belong to, oldest
+   first. `/` redirects to the first; the switcher lists them all.
+
+   Empty means "sign in" — either there is no session, or there is one with no
+   membership behind it. The second is rare but real: an account whose last
+   membership was removed while it was signed in. Treating it as signed out is
+   the honest answer, since there is nothing it can reach. */
+export const getWorkspaces = createServerFn({ method: 'GET' }).handler(async () => {
+  return readWorkspaces();
 });
+
+/* Everything the shell needs for one workspace, in one round trip: who is
+   signed in, what they may do *here*, and the other workspaces the switcher
+   offers. `null` when the slug is unknown or they are not a member — the
+   layout route turns that into a refusal. */
+export const getWorkspaceViewer = createServerFn({ method: 'GET' })
+  .validator((value: unknown) => ({ workspace: validateWorkspace(value) }))
+  .handler(async ({ data }) => {
+    const session = await auth.api.getSession({ headers: getRequest().headers });
+    if (!session) return null;
+    const membership = await readMembership(data.workspace);
+    if (!membership) return null;
+    const workspaces = await readWorkspaces();
+    const current = workspaces.find((entry) => entry.slug === membership.slug);
+    return {
+      holder: session.user.name || session.user.email || undefined,
+      role: membership.role,
+      workspaceId: membership.workspaceId,
+      slug: membership.slug,
+      workspaceName: current?.name ?? membership.slug,
+      workspaces,
+    };
+  });

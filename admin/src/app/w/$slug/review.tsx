@@ -1,25 +1,29 @@
 import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router';
-import { AppShell, accessionOf, SealChip } from '../components/chrome.js';
-import { Stamp } from '../components/stamp.js';
-import { authClient } from '../lib/auth-client.js';
-import { getNavCounts, listReviewQueue } from '../lib/knowledge.js';
-import { readFailure } from '../lib/read-failure.js';
-import { can } from '../lib/roles.js';
-import { getViewer } from '../lib/session.js';
+import { AppShell, accessionOf, SealChip } from '../../../components/chrome.js';
+import { Stamp } from '../../../components/stamp.js';
+import { authClient } from '../../../lib/auth-client.js';
+import { getNavCounts, listReviewQueue } from '../../../lib/knowledge.js';
+import { readFailure } from '../../../lib/read-failure.js';
+import { can } from '../../../lib/roles.js';
 
-export const Route = createFileRoute('/review')({
-  beforeLoad: async () => {
-    const viewer = await getViewer();
-    if (!viewer) throw redirect({ to: '/sign-in' });
-    /* Approving what the corpus vouches for is a reviewer's job. A writer who
-       lands here would see a queue of buttons that all refuse. */
-    if (!can(viewer.role, 'review')) throw redirect({ to: '/sources', search: {} });
-    return viewer;
+export const Route = createFileRoute('/w/$slug/review')({
+  /* The `/w/$slug` layout has already resolved the workspace and confirmed
+     membership; this only narrows by role. Approving what the corpus vouches for is
+     a reviewer's job; a writer landing here would see a queue of buttons that
+     all refuse.
+     Enforced again in every server function this page calls. */
+  beforeLoad: ({ context }) => {
+    if (!can(context.role, 'review'))
+      throw redirect({ to: '/w/$slug/sources', params: { slug: context.slug }, search: {} });
   },
-  loader: async () => {
-    const counts = await getNavCounts().catch(() => undefined);
+  loader: async ({ params }) => {
+    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     try {
-      return { counts, rows: await listReviewQueue(), failure: undefined };
+      return {
+        counts,
+        rows: await listReviewQueue({ data: { workspace: params.slug } }),
+        failure: undefined,
+      };
     } catch (cause) {
       return { counts, rows: undefined, failure: readFailure(cause, 'The queue') };
     }
@@ -43,7 +47,7 @@ type QueueRow = {
 
 function Review() {
   const router = useRouter();
-  const { holder, role } = Route.useRouteContext();
+  const viewer = Route.useRouteContext();
   const { counts, rows: loaded, failure } = Route.useLoaderData();
 
   const rows = (loaded ?? []) as unknown as QueueRow[];
@@ -54,8 +58,7 @@ function Review() {
     <AppShell
       title="Review queue"
       accession="Awaiting a human"
-      holder={holder}
-      role={role}
+      {...viewer}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
@@ -97,6 +100,7 @@ function Review() {
 }
 
 function QueueGroup({ label, note, rows }: { label: string; note: string; rows: QueueRow[] }) {
+  const { slug } = Route.useParams();
   return (
     <div className="queue__group">
       <div className="bench__section-head">
@@ -109,8 +113,8 @@ function QueueGroup({ label, note, rows }: { label: string; note: string; rows: 
         {rows.map((row) => (
           <li key={row.id}>
             <Link
-              to="/sources/$sourceId"
-              params={{ sourceId: row.id }}
+              to="/w/$slug/sources/$sourceId"
+              params={{ slug, sourceId: row.id }}
               search={{}}
               className="entry"
             >

@@ -1,10 +1,11 @@
-import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
+import { createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
-import { AppShell } from '../components/chrome.js';
-import { Stamp } from '../components/stamp.js';
-import { authClient } from '../lib/auth-client.js';
-import { getNavCounts } from '../lib/knowledge.js';
+import { AppShell } from '../../../components/chrome.js';
+import { Stamp } from '../../../components/stamp.js';
+import { authClient } from '../../../lib/auth-client.js';
+import { getNavCounts } from '../../../lib/knowledge.js';
 import {
+  createWorkspace,
   type Invitation,
   invitePerson,
   listInvitations,
@@ -13,10 +14,9 @@ import {
   removePerson,
   revokeInvitation,
   updatePersonRole,
-} from '../lib/management.js';
-import { readFailure } from '../lib/read-failure.js';
-import { can, ROLE_SUMMARY, ROLES, type Role } from '../lib/roles.js';
-import { getViewer } from '../lib/session.js';
+} from '../../../lib/management.js';
+import { readFailure } from '../../../lib/read-failure.js';
+import { can, ROLE_SUMMARY, ROLES, type Role } from '../../../lib/roles.js';
 
 /* Who can open the cabinet, and how far.
  *
@@ -29,19 +29,22 @@ import { getViewer } from '../lib/session.js';
  * There is nothing here to browse — a team is a handful of people, listed in
  * full, and a pending invitation is a live credential that has to be visible
  * next to them. */
-export const Route = createFileRoute('/people')({
-  beforeLoad: async () => {
-    const viewer = await getViewer();
-    if (!viewer) throw redirect({ to: '/sign-in' });
-    /* Enforced server-side too, in `requireMember('admin')`. This only spares a
-       non-admin the sight of a page that would answer with a refusal. */
-    if (!can(viewer.role, 'admin')) throw redirect({ to: '/sources', search: {} });
-    return viewer;
+export const Route = createFileRoute('/w/$slug/people')({
+  /* The `/w/$slug` layout has already resolved the workspace and confirmed
+     membership; this only narrows by role. Membership and invitations are credentials
+     to this workspace, so they are an administrator's business.
+     Enforced again in every server function this page calls. */
+  beforeLoad: ({ context }) => {
+    if (!can(context.role, 'admin'))
+      throw redirect({ to: '/w/$slug/sources', params: { slug: context.slug }, search: {} });
   },
-  loader: async () => {
-    const counts = await getNavCounts().catch(() => undefined);
+  loader: async ({ params }) => {
+    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     try {
-      const [people, invitations] = await Promise.all([listPeople(), listInvitations()]);
+      const [people, invitations] = await Promise.all([
+        listPeople({ data: { workspace: params.slug } }),
+        listInvitations({ data: { workspace: params.slug } }),
+      ]);
       return { counts, people, invitations, failure: undefined };
     } catch (cause) {
       return {
@@ -57,7 +60,7 @@ export const Route = createFileRoute('/people')({
 
 function People() {
   const router = useRouter();
-  const { holder, role } = Route.useRouteContext();
+  const viewer = Route.useRouteContext();
   const {
     counts,
     people: loadedPeople,
@@ -75,8 +78,7 @@ function People() {
     <AppShell
       title="People"
       accession="Access · people"
-      holder={holder}
-      role={role}
+      {...viewer}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
@@ -134,6 +136,8 @@ function People() {
           Sign-up is closed on this instance and stays that way — the public endpoint refuses
           everyone, so an invitation is the only way in.
         </p>
+
+        <NewWorkspace />
       </section>
     </AppShell>
   );
@@ -147,6 +151,7 @@ function People() {
  * confirmation, because it is the one action here that cannot be undone from
  * this page. */
 function PersonRow({ person }: { person: Person }) {
+  const { slug } = Route.useParams();
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -184,7 +189,7 @@ function PersonRow({ person }: { person: Person }) {
               act(
                 () =>
                   updatePersonRole({
-                    data: { userId: person.id, role: event.target.value as Role },
+                    data: { workspace: slug, userId: person.id, role: event.target.value as Role },
                   }),
                 'That role could not be changed.'
               )
@@ -212,7 +217,7 @@ function PersonRow({ person }: { person: Person }) {
                   disabled={pending}
                   onClick={() =>
                     act(
-                      () => removePerson({ data: { userId: person.id } }),
+                      () => removePerson({ data: { workspace: slug, userId: person.id } }),
                       'That person could not be removed.'
                     )
                   }
@@ -252,6 +257,7 @@ function PersonRow({ person }: { person: Person }) {
    now" answerable; an expired one stays visible because knowing a link went
    unused is the difference between chasing someone and reissuing. */
 function Invitations({ invitations }: { invitations: Invitation[] }) {
+  const { slug } = Route.useParams();
   const router = useRouter();
   const [revoking, setRevoking] = useState<string>();
   const [error, setError] = useState<string>();
@@ -282,7 +288,9 @@ function Invitations({ invitations }: { invitations: Invitation[] }) {
                   setRevoking(invitation.id);
                   setError(undefined);
                   try {
-                    await revokeInvitation({ data: { invitationId: invitation.id } });
+                    await revokeInvitation({
+                      data: { workspace: slug, invitationId: invitation.id },
+                    });
                     await router.invalidate();
                   } catch (cause) {
                     setError(
@@ -310,6 +318,103 @@ function Invitations({ invitations }: { invitations: Invitation[] }) {
   );
 }
 
+/* A second corpus on the same instance — the AI team's notes kept apart from
+ * the core team's, one deployment.
+ *
+ * It lives at the foot of the people register rather than in Settings because
+ * it is the same subject: who may reach which cabinet. Settings is your own
+ * account. The rail's workspace plate links straight here by hash, so the form
+ * is open on arrival — a disclosure that arrived closed would be a dead end.
+ *
+ * The slug follows the name until the moment you touch it, then it is yours.
+ * Deriving it silently forever would mean renaming a workspace could not fix a
+ * typo in its URL; making you type it twice for the ordinary case is worse. */
+function NewWorkspace() {
+  const { slug } = Route.useParams();
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [wanted, setWanted] = useState('');
+  const [edited, setEdited] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+
+  const derived = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const value = edited ? wanted : derived;
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setPending(true);
+    setError(undefined);
+    try {
+      const created = await createWorkspace({ data: { workspace: slug, name, slug: value } });
+      /* Straight into it. Creating a workspace and then staying in the old one
+         would leave you to find the switcher to see what you just made. */
+      await navigate({ to: '/w/$slug/sources', params: { slug: created.slug }, search: {} });
+    } catch (cause) {
+      setError(
+        cause instanceof Error && cause.message
+          ? `${cause.message} Nothing was created.`
+          : 'That workspace could not be created. Nothing was created.'
+      );
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="bench__section" id="new-workspace">
+      <span className="label">Start another workspace</span>
+      <form className="bench__inline" onSubmit={submit}>
+        <label className={`field${error ? ' field--error' : ''}`}>
+          <span className="label">Name</span>
+          <input
+            required
+            value={name}
+            disabled={pending}
+            placeholder="AI team"
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span className="label">Slug</span>
+          <input
+            required
+            className="register"
+            value={value}
+            disabled={pending}
+            /* Mirrors the name placeholder so the pair shows the derivation
+               before anyone has typed anything. */
+            placeholder="ai-team"
+            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+            onChange={(event) => {
+              setEdited(true);
+              setWanted(event.target.value);
+            }}
+          />
+        </label>
+        <p className="line__caption">
+          Its own sources, its own agent identities, its own activity log — nothing crosses between
+          workspaces, and the slug is what everyone will see in the URL. You become its first
+          administrator; it starts with the same embedding model as this one, which is the only
+          model this instance runs.
+        </p>
+        {error && (
+          <p className="notice" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="bench__controls">
+          <button className="btn btn--primary" disabled={pending || !value}>
+            {pending ? 'Creating…' : 'Create workspace'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /* No password field, deliberately. The old form took one, showed it to the
  * issuer, and told the recipient to replace it — which is an admission that the
  * issuer should never have had it. The link authorises creating exactly one
@@ -324,6 +429,7 @@ function Invitations({ invitations }: { invitations: Invitation[] }) {
  * makes every new teammate wait on a second admin action, writer hands out the
  * corpus by omission. */
 function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () => void }) {
+  const { slug } = Route.useParams();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role | ''>('');
@@ -338,7 +444,9 @@ function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () 
     setPending(true);
     setError(undefined);
     try {
-      const result = await invitePerson({ data: { name, email, role: role as Role } });
+      const result = await invitePerson({
+        data: { workspace: slug, name, email, role: role as Role },
+      });
       if (result.added) {
         setAdded(result.email);
         onClose();

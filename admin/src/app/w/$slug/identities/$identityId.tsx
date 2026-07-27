@@ -1,6 +1,6 @@
 import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
-import { accessionOf, SealChip } from '../../components/chrome.js';
+import { accessionOf, SealChip } from '../../../../components/chrome.js';
 import {
   CredentialTag,
   custodyLine,
@@ -9,16 +9,16 @@ import {
   labelOf,
   ROLES,
   type Role,
-} from '../../components/identity.js';
-import { Stamp } from '../../components/stamp.js';
+} from '../../../../components/identity.js';
+import { Stamp } from '../../../../components/stamp.js';
 import {
   issueCredential,
   revokeKey,
   setIdentityDisabled,
   updateIdentity,
-} from '../../lib/management.js';
+} from '../../../../lib/management.js';
 
-export const Route = createFileRoute('/identities/$identityId')({
+export const Route = createFileRoute('/w/$slug/identities/$identityId')({
   component: HolderBench,
 });
 
@@ -30,6 +30,7 @@ type Amendment = {
 };
 
 function HolderBench() {
+  const { slug } = Route.useParams();
   const { identityId } = Route.useParams();
   const router = useRouter();
 
@@ -77,7 +78,7 @@ function HolderBench() {
     setVoiding(keyId);
     setFailed(undefined);
     try {
-      await revokeKey({ data: { keyId } });
+      await revokeKey({ data: { workspace: slug, keyId } });
       setArming(undefined);
       await router.invalidate();
     } catch {
@@ -95,7 +96,9 @@ function HolderBench() {
     setIssuePending(true);
     setIssueError(undefined);
     try {
-      setIssued(await issueCredential({ data: { identityId, keyLabel: newLabel } }));
+      setIssued(
+        await issueCredential({ data: { workspace: slug, identityId, keyLabel: newLabel } })
+      );
       setNewLabel('');
       setAdding(false);
       await router.invalidate();
@@ -116,7 +119,7 @@ function HolderBench() {
     setAmendPending(true);
     setAmendError(undefined);
     try {
-      await updateIdentity({ data: { identityId, ...amend } });
+      await updateIdentity({ data: { workspace: slug, identityId, ...amend } });
       setAmend(undefined);
       await router.invalidate();
     } catch (cause) {
@@ -134,7 +137,7 @@ function HolderBench() {
     setTogglePending(true);
     setToggleError(undefined);
     try {
-      await setIdentityDisabled({ data: { identityId, disabled: next } });
+      await setIdentityDisabled({ data: { workspace: slug, identityId, disabled: next } });
       setArmDisable(false);
       await router.invalidate();
     } catch (cause) {

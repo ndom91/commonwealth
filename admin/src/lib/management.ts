@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
 import { provisioning } from './auth.js';
-import { requireMember } from './authorize.js';
+import { requireMember, SLUG, validateWorkspace } from './authorize.js';
 import { client } from './db.js';
 import { PAGE_SIZE } from './knowledge.js';
 import { isRole, type Role } from './roles.js';
@@ -19,12 +19,17 @@ type IdentityAmendment = {
 };
 
 /* Everything in this module manages who may act — agent credentials and the
-   people who hold accounts — so it is uniformly behind `admin`. The one
-   exception is redeeming an invitation, where the token is the authorisation
-   and there is no session yet. */
-async function adminId(): Promise<string> {
-  const { userId } = await requireMember('admin');
-  return userId;
+ * people who hold accounts — so it is uniformly behind `admin` *in the
+ * workspace named by the caller*. The one exception is redeeming an invitation,
+ * where the token is the authorisation and there is no session yet.
+ *
+ * Both halves are per-workspace. Agent identities carry `users.workspace_id`
+ * and members carry `member.workspace_id`, so an administrator of one workspace
+ * can neither see nor void the credentials of another. */
+type Scoped<T> = T & { workspace: string };
+
+function validateScope(value: unknown): { workspace: string } {
+  return { workspace: validateWorkspace(value) };
 }
 
 /* Keyset paginated on (created_at DESC, id DESC), the same ordering the source
@@ -38,14 +43,15 @@ async function adminId(): Promise<string> {
  * json_agg of every credential that holder has ever owned, so the payload grows
  * with key churn, not just with headcount. */
 export const listIdentities = createServerFn({ method: 'GET' })
-  .validator((value: unknown): { cursor: { createdAt: string; id: string } | null } => {
+  .validator((value: unknown): Scoped<{ cursor: { createdAt: string; id: string } | null }> => {
     const input = (value ?? {}) as { cursor?: { createdAt?: string; id?: string } };
-    if (!input.cursor) return { cursor: null };
+    const workspace = validateWorkspace(value);
+    if (!input.cursor) return { workspace, cursor: null };
     if (!input.cursor.createdAt || !input.cursor.id) throw new Error('Invalid cursor');
-    return { cursor: { createdAt: input.cursor.createdAt, id: input.cursor.id } };
+    return { workspace, cursor: { createdAt: input.cursor.createdAt, id: input.cursor.id } };
   })
   .handler(async ({ data }) => {
-    await adminId();
+    const { workspaceId } = await requireMember('admin', data.workspace);
     const rows = await client`
       SELECT users.id, users.display_name AS name, users.role, users.created_at, users.description,
         users.disabled_at, users.auto_approve,
@@ -54,11 +60,12 @@ export const listIdentities = createServerFn({ method: 'GET' })
       FROM users
       LEFT JOIN api_keys ON api_keys.user_id = users.id
       LEFT JOIN managed_api_key ON managed_api_key.id = api_keys.id
-      WHERE (
-        ${data.cursor?.createdAt ?? null}::timestamptz IS NULL
-        OR (users.created_at, users.id)
-           < (${data.cursor?.createdAt ?? null}::timestamptz, ${data.cursor?.id ?? null}::uuid)
-      )
+      WHERE users.workspace_id = ${workspaceId}
+        AND (
+          ${data.cursor?.createdAt ?? null}::timestamptz IS NULL
+          OR (users.created_at, users.id)
+             < (${data.cursor?.createdAt ?? null}::timestamptz, ${data.cursor?.id ?? null}::uuid)
+        )
       GROUP BY users.id
       ORDER BY users.created_at DESC, users.id DESC
       LIMIT ${PAGE_SIZE + 1}
@@ -70,7 +77,7 @@ export const listIdentities = createServerFn({ method: 'GET' })
   });
 
 export const createIdentity = createServerFn({ method: 'POST' })
-  .validator((value: unknown): IdentityInput => {
+  .validator((value: unknown): Scoped<IdentityInput> => {
     const input = value as Partial<IdentityInput>;
     if (
       !input.name?.trim() ||
@@ -79,25 +86,30 @@ export const createIdentity = createServerFn({ method: 'POST' })
     )
       throw new Error('Invalid identity details');
     return {
+      workspace: validateWorkspace(value),
       name: input.name.trim(),
       keyLabel: input.keyLabel.trim(),
       role: input.role as IdentityInput['role'],
     };
   })
   .handler(async ({ data }) => {
-    const createdByAdminId = await adminId();
+    const { userId: createdByAdminId, workspaceId } = await requireMember('admin', data.workspace);
     const secret = `tkb_${randomBytes(32).toString('base64url')}`;
     const salt = randomBytes(16).toString('hex');
     const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
     const keyId = randomUUID();
     let identityId: string | undefined;
     await client.begin(async (transaction) => {
+      /* Filed under the workspace the administrator is looking at. An agent
+         belongs to exactly one workspace — `src/access-service.ts` reads
+         `users.workspace_id` off the key and scopes everything to it — so this
+         is also the decision about which corpus the credential can reach. */
       const [identity] = await transaction<{ id: string }[]>`
         INSERT INTO users (workspace_id, display_name, role)
-        SELECT id, ${data.name}, ${data.role} FROM workspaces WHERE name = 'default'
+        VALUES (${workspaceId}, ${data.name}, ${data.role})
         RETURNING id
       `;
-      if (!identity) throw new Error('Default workspace is unavailable');
+      if (!identity) throw new Error('Unable to create identity');
       identityId = identity.id;
       await transaction`
         INSERT INTO api_keys (id, user_id, key_prefix, secret_hash)
@@ -109,9 +121,8 @@ export const createIdentity = createServerFn({ method: 'POST' })
       `;
       await transaction`
         INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        SELECT id, ${createdByAdminId}, 'api_key_created',
-          ${JSON.stringify({ identityId: identity.id, keyId, label: data.keyLabel })}::jsonb
-        FROM workspaces WHERE name = 'default'
+        VALUES (${workspaceId}, ${createdByAdminId}, 'api_key_created',
+          ${JSON.stringify({ identityId: identity.id, keyId, label: data.keyLabel })}::jsonb)
       `;
     });
     if (!identityId) throw new Error('Unable to create identity');
@@ -122,7 +133,7 @@ export const createIdentity = createServerFn({ method: 'POST' })
    holder owns is permitted to do, so the change is written to the event log
    alongside the values it replaced. */
 export const updateIdentity = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { identityId: string } & IdentityAmendment => {
+  .validator((value: unknown): Scoped<{ identityId: string } & IdentityAmendment> => {
     const input = value as Partial<{
       identityId: string;
       name: string;
@@ -136,6 +147,7 @@ export const updateIdentity = createServerFn({ method: 'POST' })
       throw new Error('Invalid role');
     if (typeof input.autoApprove !== 'boolean') throw new Error('Invalid trusted-holder setting');
     return {
+      workspace: validateWorkspace(value),
       identityId: input.identityId.trim(),
       name: input.name.trim(),
       role: input.role as IdentityAmendment['role'],
@@ -144,7 +156,7 @@ export const updateIdentity = createServerFn({ method: 'POST' })
     };
   })
   .handler(async ({ data }) => {
-    const administrator = await adminId();
+    const { userId: administrator, workspaceId } = await requireMember('admin', data.workspace);
     await client.begin(async (transaction) => {
       const [before] = await transaction<
         {
@@ -156,14 +168,14 @@ export const updateIdentity = createServerFn({ method: 'POST' })
         }[]
       >`
         SELECT workspace_id, display_name, role, description, auto_approve
-        FROM users WHERE id = ${data.identityId}
+        FROM users WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
       `;
       if (!before) throw new Error('That identity no longer exists');
       await transaction`
         UPDATE users
         SET display_name = ${data.name}, role = ${data.role}, description = ${data.description},
             auto_approve = ${data.autoApprove}
-        WHERE id = ${data.identityId}
+        WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
       `;
       /* Values are narrowed to what jsonb can carry rather than `unknown`, so
          the compiler — not a runtime surprise — catches a field that cannot be
@@ -197,17 +209,22 @@ export const updateIdentity = createServerFn({ method: 'POST' })
    credential this holder owns at the MCP boundary immediately — and, unlike
    revoking, it is reversible and destroys nothing. */
 export const setIdentityDisabled = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { identityId: string; disabled: boolean } => {
+  .validator((value: unknown): Scoped<{ identityId: string; disabled: boolean }> => {
     const input = value as Partial<{ identityId: string; disabled: boolean }>;
     if (!input.identityId?.trim()) throw new Error('Invalid identity');
     if (typeof input.disabled !== 'boolean') throw new Error('Invalid state');
-    return { identityId: input.identityId.trim(), disabled: input.disabled };
+    return {
+      workspace: validateWorkspace(value),
+      identityId: input.identityId.trim(),
+      disabled: input.disabled,
+    };
   })
   .handler(async ({ data }) => {
-    const administrator = await adminId();
+    const { userId: administrator, workspaceId } = await requireMember('admin', data.workspace);
     await client.begin(async (transaction) => {
       const [identity] = await transaction<{ workspace_id: string; disabled_at: string | null }[]>`
-        SELECT workspace_id, disabled_at FROM users WHERE id = ${data.identityId}
+        SELECT workspace_id, disabled_at FROM users
+        WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
       `;
       if (!identity) throw new Error('That identity no longer exists');
       if (data.disabled === Boolean(identity.disabled_at)) return;
@@ -215,9 +232,15 @@ export const setIdentityDisabled = createServerFn({ method: 'POST' })
          from the pooled client is not the transaction's handle, and the write
          silently produced no timestamp. */
       if (data.disabled) {
-        await transaction`UPDATE users SET disabled_at = now() WHERE id = ${data.identityId}`;
+        await transaction`
+          UPDATE users SET disabled_at = now()
+          WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
+        `;
       } else {
-        await transaction`UPDATE users SET disabled_at = NULL WHERE id = ${data.identityId}`;
+        await transaction`
+          UPDATE users SET disabled_at = NULL
+          WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
+        `;
       }
       await transaction`
         INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
@@ -233,21 +256,26 @@ export const setIdentityDisabled = createServerFn({ method: 'POST' })
    custody operation: a holder outlives any one credential, so voiding a key
    must never strand the identity that held it. */
 export const issueCredential = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { identityId: string; keyLabel: string } => {
+  .validator((value: unknown): Scoped<{ identityId: string; keyLabel: string }> => {
     const input = value as Partial<{ identityId: string; keyLabel: string }>;
     if (!input.identityId?.trim() || !input.keyLabel?.trim())
       throw new Error('Invalid credential details');
-    return { identityId: input.identityId.trim(), keyLabel: input.keyLabel.trim() };
+    return {
+      workspace: validateWorkspace(value),
+      identityId: input.identityId.trim(),
+      keyLabel: input.keyLabel.trim(),
+    };
   })
   .handler(async ({ data }) => {
-    const createdByAdminId = await adminId();
+    const { userId: createdByAdminId, workspaceId } = await requireMember('admin', data.workspace);
     const secret = `tkb_${randomBytes(32).toString('base64url')}`;
     const salt = randomBytes(16).toString('hex');
     const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
     const keyId = randomUUID();
     await client.begin(async (transaction) => {
       const [identity] = await transaction<{ id: string; workspace_id: string }[]>`
-        SELECT id, workspace_id FROM users WHERE id = ${data.identityId}
+        SELECT id, workspace_id FROM users
+        WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
       `;
       if (!identity) throw new Error('That identity no longer exists');
       await transaction`
@@ -268,20 +296,24 @@ export const issueCredential = createServerFn({ method: 'POST' })
   });
 
 export const revokeKey = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { keyId: string } => {
+  .validator((value: unknown): Scoped<{ keyId: string }> => {
     const keyId = (value as { keyId?: string }).keyId;
     if (!keyId) throw new Error('Invalid key');
-    return { keyId };
+    return { workspace: validateWorkspace(value), keyId };
   })
   .handler(async ({ data }) => {
-    const administrator = await adminId();
+    const { userId: administrator, workspaceId } = await requireMember('admin', data.workspace);
     await client.begin(async (transaction) => {
       /* Only the first revoke is an event. Voiding an already-void key is a
          no-op, and RETURNING lets the write itself decide that rather than a
          separate read that could race another administrator. */
+      /* `api_keys` has no workspace of its own, so the scope rides in through
+         its holder — in the same statement, so a key belonging to another
+         workspace is never voided and then discovered to be foreign. */
       const [revoked] = await transaction<{ user_id: string; key_prefix: string }[]>`
         UPDATE api_keys SET revoked_at = now()
         WHERE id = ${data.keyId} AND revoked_at IS NULL
+          AND user_id IN (SELECT id FROM users WHERE workspace_id = ${workspaceId})
         RETURNING user_id, key_prefix
       `;
       if (!revoked) return;
@@ -327,31 +359,33 @@ export type Person = {
 /* Unpaginated on purpose, unlike `listIdentities`. These are people with a
    password to this instance; if that list ever needs a cursor, something has
    gone wrong that pagination would only hide. */
-export const listPeople = createServerFn({ method: 'GET' }).handler(async (): Promise<Person[]> => {
-  const { userId: you, workspaceId } = await requireMember('admin');
-  /* `created_at` comes back as a string, not a Date. `drizzle()` mutates the
+export const listPeople = createServerFn({ method: 'GET' })
+  .validator(validateScope)
+  .handler(async ({ data }): Promise<Person[]> => {
+    const { userId: you, workspaceId } = await requireMember('admin', data.workspace);
+    /* `created_at` comes back as a string, not a Date. `drizzle()` mutates the
      client it is handed (see `db.ts`) and that extends to its date parsers, so
      this client hands back raw Postgres timestamps while a bare postgres.js
      client would give you a Date. Pass it through untouched: `<Stamp>` takes
      either shape and normalises it, which is what every register here does. */
-  const rows = await client<
-    { id: string; name: string; email: string; role: string; created_at: string }[]
-  >`
+    const rows = await client<
+      { id: string; name: string; email: string; role: string; created_at: string }[]
+    >`
     SELECT "user".id, "user".name, "user".email, member.role, member.created_at
     FROM member
     JOIN "user" ON "user".id = member.user_id
     WHERE member.workspace_id = ${workspaceId}
     ORDER BY member.created_at ASC, "user".email ASC
   `;
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    role: isRole(row.role) ? row.role : 'reader',
-    createdAt: row.created_at,
-    isYou: row.id === you,
-  }));
-});
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: isRole(row.role) ? row.role : 'reader',
+      createdAt: row.created_at,
+      isYou: row.id === you,
+    }));
+  });
 
 /* Raising or lowering what someone may do.
  *
@@ -362,15 +396,15 @@ export const listPeople = createServerFn({ method: 'GET' }).handler(async (): Pr
  * simultaneous demotions cannot both see a second admin that is about to
  * disappear. */
 export const updatePersonRole = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { userId: string; role: Role } => {
+  .validator((value: unknown): Scoped<{ userId: string; role: Role }> => {
     const input = (value ?? {}) as Partial<{ userId: string; role: string }>;
     const userId = input.userId?.trim();
     if (!userId) throw new Error('Invalid person');
     if (!isRole(input.role)) throw new Error('Invalid role');
-    return { userId, role: input.role };
+    return { workspace: validateWorkspace(value), userId, role: input.role };
   })
   .handler(async ({ data }) => {
-    const { userId: actor, workspaceId } = await requireMember('admin');
+    const { userId: actor, workspaceId } = await requireMember('admin', data.workspace);
     await client.begin(async (transaction) => {
       const [before] = await transaction<{ role: string }[]>`
         SELECT role FROM member
@@ -408,13 +442,13 @@ export const updatePersonRole = createServerFn({ method: 'POST' })
  * account would quietly unattribute their submissions — which is the opposite
  * of what a provenance product should do when someone leaves. */
 export const removePerson = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { userId: string } => {
+  .validator((value: unknown): Scoped<{ userId: string }> => {
     const userId = (value as { userId?: string })?.userId?.trim();
     if (!userId) throw new Error('Invalid person');
-    return { userId };
+    return { workspace: validateWorkspace(value), userId };
   })
   .handler(async ({ data }) => {
-    const { userId: actor, workspaceId } = await requireMember('admin');
+    const { userId: actor, workspaceId } = await requireMember('admin', data.workspace);
     if (data.userId === actor) throw new Error('You cannot remove your own access.');
     await client.begin(async (transaction) => {
       const [removed] = await transaction<{ role: string }[]>`
@@ -470,7 +504,7 @@ const tokenDigest = (token: string) => createHash('sha256').update(token).digest
  * thing that creates accounts, and the public `POST /api/auth/sign-up/email`
  * route keeps refusing. */
 export const invitePerson = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { name: string; email: string; role: Role } => {
+  .validator((value: unknown): Scoped<{ name: string; email: string; role: Role }> => {
     const input = (value ?? {}) as Partial<{ name: string; email: string; role: string }>;
     const email = input.email?.trim().toLowerCase();
     const name = input.name?.trim();
@@ -480,10 +514,10 @@ export const invitePerson = createServerFn({ method: 'POST' })
     /* No default. The inviter decides what this person may do, every time —
        a role that arrives by omission is one nobody chose. */
     if (!isRole(input.role)) throw new Error('Choose a role for this person.');
-    return { name, email, role: input.role };
+    return { workspace: validateWorkspace(value), name, email, role: input.role };
   })
   .handler(async ({ data }) => {
-    const { userId: invitedBy, workspaceId } = await requireMember('admin');
+    const { userId: invitedBy, workspaceId } = await requireMember('admin', data.workspace);
 
     const [existing] = await client<
       { id: string }[]
@@ -511,12 +545,18 @@ export const invitePerson = createServerFn({ method: 'POST' })
 
     const token = `inv_${randomBytes(32).toString('base64url')}`;
     await client.begin(async (transaction) => {
-      /* Supersede any outstanding link for this address rather than collide
-         with the partial unique index. Re-inviting should mean "here is a fresh
-         link", not an error about one they never used. */
+      /* Supersede this workspace's outstanding link for the address rather
+         than collide with the partial unique index. Re-inviting should mean
+         "here is a fresh link", not an error about one they never used.
+
+         Scoped, and the index is scoped with it (0009): superseding every live
+         invitation for the address would let one workspace cancel another's,
+         which is the same person's invitation to a corpus this admin cannot
+         even see. */
       await transaction`
         UPDATE member_invitation SET revoked_at = now()
-        WHERE lower(email) = ${data.email} AND accepted_at IS NULL AND revoked_at IS NULL
+        WHERE workspace_id = ${workspaceId} AND lower(email) = ${data.email}
+          AND accepted_at IS NULL AND revoked_at IS NULL
       `;
       await transaction`
         INSERT INTO member_invitation (email, name, token_hash, workspace_id, role, invited_by, expires_at)
@@ -536,9 +576,10 @@ export const invitePerson = createServerFn({ method: 'POST' })
 /* A pending invitation is a live credential to this surface, so it has to be
    visible and cancellable. Expired ones stay listed: knowing a link went unused
    is the difference between chasing someone and reissuing. */
-export const listInvitations = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<Invitation[]> => {
-    const { workspaceId } = await requireMember('admin');
+export const listInvitations = createServerFn({ method: 'GET' })
+  .validator(validateScope)
+  .handler(async ({ data }): Promise<Invitation[]> => {
+    const { workspaceId } = await requireMember('admin', data.workspace);
     const rows = await client<
       {
         id: string;
@@ -571,17 +612,16 @@ export const listInvitations = createServerFn({ method: 'GET' }).handler(
       expiresAt: row.expires_at,
       expired: row.expired,
     }));
-  }
-);
+  });
 
 export const revokeInvitation = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { invitationId: string } => {
+  .validator((value: unknown): Scoped<{ invitationId: string }> => {
     const id = (value as { invitationId?: string })?.invitationId?.trim();
     if (!id || !UUID.test(id)) throw new Error('Invalid invitation');
-    return { invitationId: id };
+    return { workspace: validateWorkspace(value), invitationId: id };
   })
   .handler(async ({ data }) => {
-    const { userId: revokedBy, workspaceId } = await requireMember('admin');
+    const { userId: revokedBy, workspaceId } = await requireMember('admin', data.workspace);
     await client.begin(async (transaction) => {
       const [revoked] = await transaction<{ email: string }[]>`
         UPDATE member_invitation SET revoked_at = now()
@@ -707,6 +747,9 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
     const role = isRole(invitation.role) ? invitation.role : ('reader' as Role);
 
     await client.begin(async (transaction) => {
+      /* The one write in `admin/src/lib` with no workspace predicate, and the
+         only one that should not have: the row was found by token digest, so
+         its workspace came from the invitation rather than from a caller. */
       const [claimed] = await transaction<{ id: string }[]>`
         UPDATE member_invitation SET accepted_at = now()
         WHERE id = ${invitation.id} AND accepted_at IS NULL AND revoked_at IS NULL
@@ -734,6 +777,73 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
     });
 
     return { email: invitation.email, role };
+  });
+
+/* A second corpus on one instance.
+ *
+ * Four things have to happen together, which is why this is a transaction and
+ * why `allowUserToCreateOrganization` stays `false` on the plugin: its own
+ * `organization/create` endpoint would do the first and leave the rest, giving
+ * you a workspace with no members and no index configuration — reachable by
+ * nobody and unable to accept a source.
+ *
+ * The index configuration is copied from the workspace you are standing in
+ * rather than read from the environment. `chunks.embedding` is `vector(1024)`
+ * for the whole table and `EMBEDDING_MODEL` is one process-wide variable, so
+ * every workspace on an instance necessarily shares a model; copying makes that
+ * explicit and keeps `index_configuration`'s existing job — refusing a silent
+ * model change — working per workspace.
+ *
+ * Gated on `admin` in the *current* workspace. There is no instance-level role,
+ * so administering one corpus is what earns the right to start another. */
+export const createWorkspace = createServerFn({ method: 'POST' })
+  .validator((value: unknown): Scoped<{ name: string; slug: string }> => {
+    const input = (value ?? {}) as Partial<{ name: string; slug: string }>;
+    const name = input.name?.trim();
+    if (!name) throw new Error('A workspace needs a name.');
+    if (name.length > 120) throw new Error('That name is too long.');
+    const slug = input.slug?.trim().toLowerCase();
+    if (!slug || !SLUG.test(slug)) {
+      throw new Error('A slug may hold lowercase letters, numbers and single hyphens.');
+    }
+    if (slug.length > 60) throw new Error('That slug is too long.');
+    return { workspace: validateWorkspace(value), name, slug };
+  })
+  .handler(async ({ data }) => {
+    const { userId: creator, workspaceId: from } = await requireMember('admin', data.workspace);
+
+    const [taken] = await client<
+      { id: string }[]
+    >`SELECT id FROM workspaces WHERE slug = ${data.slug}`;
+    if (taken) throw new Error(`The slug “${data.slug}” is already in use.`);
+
+    let created: string | undefined;
+    await client.begin(async (transaction) => {
+      const [workspace] = await transaction<{ id: string }[]>`
+        INSERT INTO workspaces (name, slug) VALUES (${data.name}, ${data.slug})
+        RETURNING id
+      `;
+      if (!workspace) throw new Error('That workspace could not be created.');
+      created = workspace.id;
+      await transaction`
+        INSERT INTO member (workspace_id, user_id, role)
+        VALUES (${workspace.id}, ${creator}, 'admin')
+      `;
+      await transaction`
+        INSERT INTO index_configuration (workspace_id, embedding_model, embedding_dimensions)
+        SELECT ${workspace.id}, embedding_model, embedding_dimensions
+        FROM index_configuration WHERE workspace_id = ${from}
+      `;
+      /* Filed in the new workspace's own log, not the one it was created from.
+         The custody line of a corpus should start with its creation. */
+      await transaction`
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${workspace.id}, ${creator}, 'workspace_created',
+          ${JSON.stringify({ name: data.name, slug: data.slug })}::jsonb)
+      `;
+    });
+    if (!created) throw new Error('That workspace could not be created.');
+    return { id: created, name: data.name, slug: data.slug };
   });
 
 /* Changing your own name and password goes through `authClient.updateUser` and

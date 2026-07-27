@@ -1,11 +1,4 @@
-import {
-  createFileRoute,
-  Link,
-  Outlet,
-  redirect,
-  useNavigate,
-  useRouter,
-} from '@tanstack/react-router';
+import { createFileRoute, Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router';
 import { Search, X } from 'lucide-react';
 import {
   AppShell,
@@ -13,12 +6,16 @@ import {
   authoritySeal,
   IconButton,
   SealChip,
-} from '../components/chrome.js';
-import { Stamp } from '../components/stamp.js';
-import { authClient } from '../lib/auth-client.js';
-import { getNavCounts, listSources, listSubmitters, searchSources } from '../lib/knowledge.js';
-import { readFailure } from '../lib/read-failure.js';
-import { getViewer } from '../lib/session.js';
+} from '../../../components/chrome.js';
+import { Stamp } from '../../../components/stamp.js';
+import { authClient } from '../../../lib/auth-client.js';
+import {
+  getNavCounts,
+  listSources,
+  listSubmitters,
+  searchSources,
+} from '../../../lib/knowledge.js';
+import { readFailure } from '../../../lib/read-failure.js';
 
 /* Filters live in the URL rather than component state: a filtered register is
    a thing people send each other, and the review queue hands off into it. */
@@ -53,12 +50,7 @@ function highlight(excerpt: string) {
   });
 }
 
-export const Route = createFileRoute('/sources')({
-  beforeLoad: async () => {
-    const viewer = await getViewer();
-    if (!viewer) throw redirect({ to: '/sign-in' });
-    return viewer;
-  },
+export const Route = createFileRoute('/w/$slug/sources')({
   validateSearch: (search: Record<string, unknown>): SourceFilters => ({
     authority: oneOf(search.authority, ['unverified', 'approved', 'canonical'] as const),
     type: oneOf(search.type, ['note', 'upload'] as const),
@@ -73,11 +65,11 @@ export const Route = createFileRoute('/sources')({
   /* The register and the rail load here rather than in the component so that
      the bench — a child route — can move both by calling `router.invalidate()`
      after it changes a source's authority or withdraws it. */
-  loader: async ({ deps }) => {
+  loader: async ({ deps, params }) => {
     /* Counts are decorative and degrade to a dash. A failure here means the
        database is unreachable, which the register's own message explains in
        full; two alarms for one fault would be noise. */
-    const counts = await getNavCounts().catch(() => undefined);
+    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     const filters = {
       authority: deps.authority,
       sourceType: deps.type,
@@ -89,12 +81,14 @@ export const Route = createFileRoute('/sources')({
          identities that have actually submitted something. */
       const [register, submitters] = await Promise.all([
         deps.q
-          ? searchSources({ data: { ...filters, query: deps.q } }).then((sources) => ({
-              sources,
-              hasMore: false,
-            }))
-          : listSources({ data: filters }),
-        listSubmitters(),
+          ? searchSources({ data: { workspace: params.slug, ...filters, query: deps.q } }).then(
+              (sources) => ({
+                sources,
+                hasMore: false,
+              })
+            )
+          : listSources({ data: { workspace: params.slug, ...filters } }),
+        listSubmitters({ data: { workspace: params.slug } }),
       ]);
       return { counts, register, submitters, failure: undefined };
     } catch (cause) {
@@ -130,9 +124,10 @@ export type SourceRow = {
 };
 
 function Sources() {
+  const { slug } = Route.useParams();
   const router = useRouter();
   const navigate = useNavigate({ from: '/sources' });
-  const { holder, role } = Route.useRouteContext();
+  const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
   const { counts, register, submitters, failure } = Route.useLoaderData();
 
@@ -158,15 +153,14 @@ function Sources() {
     <AppShell
       title="Sources"
       accession="Knowledge register"
-      holder={holder}
-      role={role}
+      {...viewer}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: '/sign-in' });
       }}
       actions={
-        <Link to="/sources/new" search={{}} className="btn btn--primary">
+        <Link to="/w/$slug/sources/new" search={{}} className="btn btn--primary">
           New source
         </Link>
       }
@@ -299,8 +293,8 @@ function Sources() {
             {sources.map((source) => (
               <li key={source.id}>
                 <Link
-                  to="/sources/$sourceId"
-                  params={{ sourceId: source.id }}
+                  to="/w/$slug/sources/$sourceId"
+                  params={{ slug, sourceId: source.id }}
                   search={filters}
                   className="entry"
                   activeProps={{ 'aria-current': 'page' }}

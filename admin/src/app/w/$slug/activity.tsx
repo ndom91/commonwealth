@@ -1,19 +1,13 @@
-import { createFileRoute, Link, redirect, useNavigate, useRouter } from '@tanstack/react-router';
-import { AppShell, accessionOf } from '../components/chrome.js';
-import { Stamp } from '../components/stamp.js';
-import { authClient } from '../lib/auth-client.js';
-import { getNavCounts, listEvents, listEventTypes } from '../lib/knowledge.js';
-import { readFailure } from '../lib/read-failure.js';
-import { getViewer } from '../lib/session.js';
+import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router';
+import { AppShell, accessionOf } from '../../../components/chrome.js';
+import { Stamp } from '../../../components/stamp.js';
+import { authClient } from '../../../lib/auth-client.js';
+import { getNavCounts, listEvents, listEventTypes } from '../../../lib/knowledge.js';
+import { readFailure } from '../../../lib/read-failure.js';
 
 type ActivityFilters = { type?: string };
 
-export const Route = createFileRoute('/activity')({
-  beforeLoad: async () => {
-    const viewer = await getViewer();
-    if (!viewer) throw redirect({ to: '/sign-in' });
-    return viewer;
-  },
+export const Route = createFileRoute('/w/$slug/activity')({
   validateSearch: (search: Record<string, unknown>): ActivityFilters => ({
     type:
       typeof search.type === 'string' && /^[a-z_]{1,64}$/.test(search.type)
@@ -21,12 +15,12 @@ export const Route = createFileRoute('/activity')({
         : undefined,
   }),
   loaderDeps: ({ search }) => search,
-  loader: async ({ deps }) => {
-    const counts = await getNavCounts().catch(() => undefined);
+  loader: async ({ deps, params }) => {
+    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     try {
       const [log, types] = await Promise.all([
-        listEvents({ data: { eventType: deps.type } }),
-        listEventTypes(),
+        listEvents({ data: { workspace: params.slug, eventType: deps.type } }),
+        listEventTypes({ data: { workspace: params.slug } }),
       ]);
       return { counts, log, types, failure: undefined };
     } catch (cause) {
@@ -135,9 +129,10 @@ function detailOf(event: EventRow): string | null {
 }
 
 function Activity() {
+  const { slug } = Route.useParams();
   const router = useRouter();
   const navigate = useNavigate({ from: '/activity' });
-  const { holder, role } = Route.useRouteContext();
+  const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
   const { counts, log, types, failure } = Route.useLoaderData();
 
@@ -148,8 +143,7 @@ function Activity() {
     <AppShell
       title="Activity"
       accession="Custody line"
-      holder={holder}
-      role={role}
+      {...viewer}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
@@ -206,8 +200,8 @@ function Activity() {
                     <span className="log__subject">
                       {event.source_title ? (
                         <Link
-                          to="/sources/$sourceId"
-                          params={{ sourceId: event.source_id }}
+                          to="/w/$slug/sources/$sourceId"
+                          params={{ slug, sourceId: event.source_id }}
                           search={{}}
                         >
                           {event.source_title}

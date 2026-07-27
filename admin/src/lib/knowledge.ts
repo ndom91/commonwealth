@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { type Chunk, chunkMarkdown } from '@llm-team-kb/pipeline';
 import { createServerFn } from '@tanstack/react-start';
-import { requireMember } from './authorize.js';
+import { requireMember, validateWorkspace } from './authorize.js';
 import { client } from './db.js';
 import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from './pipeline.js';
 
@@ -47,11 +47,18 @@ const NEEDS_REVIEW = client`
     AND (sources.authority = 'unverified' OR (${IS_STALE}))
 `;
 
-/* Authorship, once the caller has been allowed through. `requireMember` is the
-   gate; this is the id to write into `created_by_member_id` and the event log. */
-async function actingMember(permission: Parameters<typeof requireMember>[0]): Promise<string> {
-  const { userId } = await requireMember(permission);
-  return userId;
+/* Every server function here names the workspace it acts in, taken from the
+ * URL by the caller and re-checked by `requireMember`. Nothing infers it.
+ *
+ * That is what keeps a source id from one workspace out of a query authorised
+ * against another: the id and the permission come from the same lookup. It also
+ * means the workspace predicate belongs in the *same* `WHERE` as the id, never
+ * as a check on the row after it has been fetched — a foreign id must read as
+ * "not found", not as "found, then refused". */
+type Scoped<T> = T & { workspace: string };
+
+function validateScope(value: unknown): { workspace: string } {
+  return { workspace: validateWorkspace(value) };
 }
 
 function optionalOneOf<T extends string>(
@@ -101,7 +108,7 @@ type ListInput = SourceFilters & {
   cursor: { createdAt: string; id: string } | null;
 };
 
-function validateList(value: unknown): ListInput {
+function validateList(value: unknown): Scoped<ListInput> {
   const input = (value ?? {}) as Record<string, unknown>;
   const cursorInput = input.cursor as { createdAt?: string; id?: string } | undefined;
   let cursor: ListInput['cursor'] = null;
@@ -109,13 +116,13 @@ function validateList(value: unknown): ListInput {
     if (!cursorInput.createdAt || !cursorInput.id) throw new Error('Invalid cursor');
     cursor = { createdAt: cursorInput.createdAt, id: cursorInput.id };
   }
-  return { ...validateFilters(input), cursor };
+  return { workspace: validateWorkspace(value), ...validateFilters(input), cursor };
 }
 
 export const listSources = createServerFn({ method: 'GET' })
   .validator(validateList)
   .handler(async ({ data }) => {
-    await requireMember('read');
+    const { workspaceId } = await requireMember('read', data.workspace);
     const rows = await client`
       SELECT sources.id, sources.source_type, sources.status, sources.authority,
              sources.created_at, sources.deleted_at, sources.last_verified_at,
@@ -131,7 +138,8 @@ export const listSources = createServerFn({ method: 'GET' })
       JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
       LEFT JOIN users AS author ON author.id = sources.created_by
       LEFT JOIN "user" AS admin_author ON admin_author.id = sources.created_by_admin_id
-      WHERE (${data.authority}::text IS NULL OR sources.authority = ${data.authority})
+      WHERE sources.workspace_id = ${workspaceId}
+        AND (${data.authority}::text IS NULL OR sources.authority = ${data.authority})
         AND (${data.sourceType}::text IS NULL OR sources.source_type = ${data.sourceType})
         AND (${data.status}::text IS NULL OR sources.status = ${data.status})
         AND (${data.submitter}::uuid IS NULL OR sources.created_by = ${data.submitter})
@@ -152,9 +160,11 @@ export const listSources = createServerFn({ method: 'GET' })
 /* The review queue is two populations, not one: sources nobody has vouched for,
    and sources that changed after someone did. The second is the one a
    provenance product must not let slip. */
-export const listReviewQueue = createServerFn({ method: 'GET' }).handler(async () => {
-  await requireMember('read');
-  const rows = await client`
+export const listReviewQueue = createServerFn({ method: 'GET' })
+  .validator(validateScope)
+  .handler(async ({ data }) => {
+    const { workspaceId } = await requireMember('read', data.workspace);
+    const rows = await client`
     SELECT sources.id, sources.source_type, sources.authority, sources.created_at,
            sources.last_verified_at, revision.title, revision.revision_number,
            revision.content_updated_at, COALESCE(author.display_name, NULLIF(admin_author.name, ''), admin_author.email, 'administrator') AS author,
@@ -164,48 +174,51 @@ export const listReviewQueue = createServerFn({ method: 'GET' }).handler(async (
     JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
     LEFT JOIN users AS author ON author.id = sources.created_by
     LEFT JOIN "user" AS admin_author ON admin_author.id = sources.created_by_admin_id
-    WHERE ${NEEDS_REVIEW}
+    WHERE sources.workspace_id = ${workspaceId} AND ${NEEDS_REVIEW}
     ORDER BY revision.content_updated_at DESC
     LIMIT 200
   `;
-  return rows;
-});
+    return rows;
+  });
 
 /* The rail shows a live count against each section. One round trip keeps the
    chrome consistent across routes instead of each page counting what it
    happens to have already fetched. */
-export const getNavCounts = createServerFn({ method: 'GET' }).handler(async () => {
-  const { workspaceId } = await requireMember('read');
-  const [row] = await client<
-    { identities: string; people: string; sources: string; review: string }[]
-  >`
+export const getNavCounts = createServerFn({ method: 'GET' })
+  .validator(validateScope)
+  .handler(async ({ data }) => {
+    const { workspaceId } = await requireMember('read', data.workspace);
+    const [row] = await client<
+      { identities: string; people: string; sources: string; review: string }[]
+    >`
     SELECT
-      (SELECT count(*) FROM users) AS identities,
+      (SELECT count(*) FROM users WHERE workspace_id = ${workspaceId}) AS identities,
       (SELECT count(*) FROM member WHERE workspace_id = ${workspaceId}) AS people,
-      (SELECT count(*) FROM sources WHERE status = 'active') AS sources,
+      (SELECT count(*) FROM sources
+        WHERE workspace_id = ${workspaceId} AND status = 'active') AS sources,
       (SELECT count(*)
        FROM sources
        JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
-       WHERE ${NEEDS_REVIEW}) AS review
+       WHERE sources.workspace_id = ${workspaceId} AND ${NEEDS_REVIEW}) AS review
   `;
-  return {
-    identities: Number(row?.identities ?? 0),
-    people: Number(row?.people ?? 0),
-    sources: Number(row?.sources ?? 0),
-    review: Number(row?.review ?? 0),
-  };
-});
+    return {
+      identities: Number(row?.identities ?? 0),
+      people: Number(row?.people ?? 0),
+      sources: Number(row?.sources ?? 0),
+      review: Number(row?.review ?? 0),
+    };
+  });
 
-function validateSourceId(value: unknown): { sourceId: string } {
+function validateSourceId(value: unknown): Scoped<{ sourceId: string }> {
   const sourceId = (value as { sourceId?: string })?.sourceId?.trim();
   if (!sourceId) throw new Error('Invalid source');
-  return { sourceId };
+  return { workspace: validateWorkspace(value), sourceId };
 }
 
 export const getSourceDetail = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await requireMember('read');
+    const { workspaceId } = await requireMember('read', data.workspace);
     const [source] = await client`
       SELECT sources.id, sources.source_type, sources.status, sources.authority,
              sources.created_at, sources.deleted_at, sources.last_verified_at,
@@ -223,7 +236,7 @@ export const getSourceDetail = createServerFn({ method: 'GET' })
       JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
       LEFT JOIN users AS author ON author.id = sources.created_by
       LEFT JOIN "user" AS admin_author ON admin_author.id = sources.created_by_admin_id
-      WHERE sources.id = ${data.sourceId}
+      WHERE sources.id = ${data.sourceId} AND sources.workspace_id = ${workspaceId}
     `;
     if (!source) throw new Error('That source no longer exists');
     return source;
@@ -232,7 +245,7 @@ export const getSourceDetail = createServerFn({ method: 'GET' })
 export const getSourceRevisions = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await requireMember('read');
+    const { workspaceId } = await requireMember('read', data.workspace);
     return client`
       SELECT source_revisions.id, source_revisions.revision_number,
              source_revisions.content_hash, source_revisions.content_updated_at,
@@ -245,6 +258,7 @@ export const getSourceRevisions = createServerFn({ method: 'GET' })
       LEFT JOIN users AS author ON author.id = source_revisions.created_by
       LEFT JOIN "user" AS admin_author ON admin_author.id = source_revisions.created_by_admin_id
       WHERE source_revisions.source_id = ${data.sourceId}
+        AND sources.workspace_id = ${workspaceId}
       ORDER BY source_revisions.revision_number DESC
     `;
   });
@@ -271,13 +285,13 @@ function eventMetadata(raw: unknown): Record<string, JsonValue> {
 export const getSourceEvents = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await requireMember('read');
+    const { workspaceId } = await requireMember('read', data.workspace);
     const rows = await client`
       SELECT events.id, events.event_type, events.metadata, events.created_at,
              actor.display_name AS actor
       FROM events
       LEFT JOIN users AS actor ON actor.id = events.actor_id
-      WHERE events.source_id = ${data.sourceId}
+      WHERE events.source_id = ${data.sourceId} AND events.workspace_id = ${workspaceId}
       ORDER BY events.created_at DESC
       LIMIT 100
     `;
@@ -288,23 +302,28 @@ export const getSourceEvents = createServerFn({ method: 'GET' })
    review queue measures staleness against, so a decision that did not record
    when it was made would leave the source permanently in the queue. */
 export const setSourceAuthority = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { sourceId: string; authority: Authority } => {
+  .validator((value: unknown): Scoped<{ sourceId: string; authority: Authority }> => {
     const input = value as Partial<{ sourceId: string; authority: string }>;
     if (!input.sourceId?.trim()) throw new Error('Invalid source');
     if (!AUTHORITIES.includes(input.authority as Authority)) throw new Error('Invalid authority');
-    return { sourceId: input.sourceId.trim(), authority: input.authority as Authority };
+    return {
+      workspace: validateWorkspace(value),
+      sourceId: input.sourceId.trim(),
+      authority: input.authority as Authority,
+    };
   })
   .handler(async ({ data }) => {
-    const administrator = await actingMember('review');
+    const { userId: administrator, workspaceId } = await requireMember('review', data.workspace);
     await client.begin(async (transaction) => {
       const [source] = await transaction<{ workspace_id: string; authority: string }[]>`
-        SELECT workspace_id, authority FROM sources WHERE id = ${data.sourceId}
+        SELECT workspace_id, authority FROM sources
+        WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
       `;
       if (!source) throw new Error('That source no longer exists');
       await transaction`
         UPDATE sources
         SET authority = ${data.authority}, last_verified_at = now()
-        WHERE id = ${data.sourceId}
+        WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
       `;
       if (source.authority !== data.authority) {
         await transaction`
@@ -320,15 +339,17 @@ export const setSourceAuthority = createServerFn({ method: 'POST' })
 export const withdrawSource = createServerFn({ method: 'POST' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    const administrator = await actingMember('review');
+    const { userId: administrator, workspaceId } = await requireMember('review', data.workspace);
     await client.begin(async (transaction) => {
       const [source] = await transaction<{ workspace_id: string; status: string }[]>`
-        SELECT workspace_id, status FROM sources WHERE id = ${data.sourceId}
+        SELECT workspace_id, status FROM sources
+        WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
       `;
       if (!source) throw new Error('That source no longer exists');
       if (source.status === 'deleted') return;
       await transaction`
-        UPDATE sources SET status = 'deleted', deleted_at = now() WHERE id = ${data.sourceId}
+        UPDATE sources SET status = 'deleted', deleted_at = now()
+        WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
       `;
       await transaction`
         INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
@@ -352,7 +373,7 @@ export const withdrawSource = createServerFn({ method: 'POST' })
 export const restoreSource = createServerFn({ method: 'POST' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    const administrator = await actingMember('review');
+    const { userId: administrator, workspaceId } = await requireMember('review', data.workspace);
     let restored: 'active' | 'failed' = 'active';
     try {
       await client.begin(async (transaction) => {
@@ -364,7 +385,7 @@ export const restoreSource = createServerFn({ method: 'POST' })
                   WHERE chunks.source_revision_id = sources.current_revision_id) AS chunks
           FROM sources
           JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
-          WHERE sources.id = ${data.sourceId}
+          WHERE sources.id = ${data.sourceId} AND sources.workspace_id = ${workspaceId}
         `;
         if (!source) throw new Error('That source no longer exists');
         if (source.status === 'active') return;
@@ -376,7 +397,8 @@ export const restoreSource = createServerFn({ method: 'POST' })
             ? 'active'
             : 'failed';
         await transaction`
-          UPDATE sources SET status = ${restored}, deleted_at = NULL WHERE id = ${data.sourceId}
+          UPDATE sources SET status = ${restored}, deleted_at = NULL
+          WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
         `;
         await transaction`
           INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
@@ -406,7 +428,7 @@ export const listEvents = createServerFn({ method: 'GET' })
   .validator(
     (
       value: unknown
-    ): { eventType: string | null; cursor: { createdAt: string; id: string } | null } => {
+    ): Scoped<{ eventType: string | null; cursor: { createdAt: string; id: string } | null }> => {
       const input = (value ?? {}) as Partial<{
         eventType: string;
         cursor: { createdAt?: string; id?: string };
@@ -421,11 +443,11 @@ export const listEvents = createServerFn({ method: 'GET' })
        the shape is constrained instead: the filter is matched exactly against
        a column, and anything that is not a bare event-type token is refused. */
       if (eventType && !/^[a-z_]{1,64}$/.test(eventType)) throw new Error('Invalid event type');
-      return { eventType, cursor };
+      return { workspace: validateWorkspace(value), eventType, cursor };
     }
   )
   .handler(async ({ data }) => {
-    await requireMember('read');
+    const { workspaceId } = await requireMember('read', data.workspace);
     const rows = await client`
       SELECT events.id, events.event_type, events.metadata, events.created_at,
              events.source_id, revision.title AS source_title,
@@ -436,7 +458,8 @@ export const listEvents = createServerFn({ method: 'GET' })
       LEFT JOIN "user" AS administrator ON administrator.id = events.actor_admin_id
       LEFT JOIN sources ON sources.id = events.source_id
       LEFT JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
-      WHERE (${data.eventType}::text IS NULL OR events.event_type = ${data.eventType})
+      WHERE events.workspace_id = ${workspaceId}
+        AND (${data.eventType}::text IS NULL OR events.event_type = ${data.eventType})
         AND (
           ${data.cursor?.createdAt ?? null}::timestamptz IS NULL
           OR (events.created_at, events.id)
@@ -455,13 +478,17 @@ export const listEvents = createServerFn({ method: 'GET' })
 
 /* The distinct event types actually present, so the filter offers what this
    workspace has rather than a hardcoded list that drifts from the writers. */
-export const listEventTypes = createServerFn({ method: 'GET' }).handler(async () => {
-  await requireMember('read');
-  const rows = await client<{ event_type: string; count: string }[]>`
-    SELECT event_type, count(*) AS count FROM events GROUP BY event_type ORDER BY event_type
+export const listEventTypes = createServerFn({ method: 'GET' })
+  .validator(validateScope)
+  .handler(async ({ data }) => {
+    const { workspaceId } = await requireMember('read', data.workspace);
+    const rows = await client<{ event_type: string; count: string }[]>`
+    SELECT event_type, count(*) AS count FROM events
+    WHERE workspace_id = ${workspaceId}
+    GROUP BY event_type ORDER BY event_type
   `;
-  return rows.map((row) => ({ eventType: row.event_type, count: Number(row.count) }));
-});
+    return rows.map((row) => ({ eventType: row.event_type, count: Number(row.count) }));
+  });
 
 /* Keyword search over the corpus.
  *
@@ -493,15 +520,15 @@ export const listEventTypes = createServerFn({ method: 'GET' }).handler(async ()
  * question people actually have, and answering only half of it would send them
  * to scroll a ranked list by eye. */
 export const searchSources = createServerFn({ method: 'GET' })
-  .validator((value: unknown): SourceFilters & { query: string } => {
+  .validator((value: unknown): Scoped<SourceFilters & { query: string }> => {
     const input = (value ?? {}) as Record<string, unknown>;
     const query = typeof input.query === 'string' ? input.query.trim() : '';
     if (!query) throw new Error('Enter something to search for');
     if (query.length > 200) throw new Error('That search is too long');
-    return { ...validateFilters(input), query };
+    return { workspace: validateWorkspace(value), ...validateFilters(input), query };
   })
   .handler(async ({ data }) => {
-    await requireMember('read');
+    const { workspaceId } = await requireMember('read', data.workspace);
     return client`
       WITH terms AS (SELECT websearch_to_tsquery('english', ${data.query}) AS value)
       SELECT sources.id, sources.authority, sources.source_type, sources.status,
@@ -528,7 +555,8 @@ export const searchSources = createServerFn({ method: 'GET' })
           AND chunks.search_vector @@ terms.value
         GROUP BY terms.value
       ) AS body ON true
-      WHERE (${data.status}::text IS NULL OR sources.status = ${data.status})
+      WHERE sources.workspace_id = ${workspaceId}
+        AND (${data.status}::text IS NULL OR sources.status = ${data.status})
         AND (${data.authority}::text IS NULL OR sources.authority = ${data.authority})
         AND (${data.sourceType}::text IS NULL OR sources.source_type = ${data.sourceType})
         AND (${data.submitter}::uuid IS NULL OR sources.created_by = ${data.submitter})
@@ -544,17 +572,20 @@ export const searchSources = createServerFn({ method: 'GET' })
    submitter filter. Counts every status, not just active: a submitter whose
    only sources were withdrawn must stay selectable, or the Withdrawn status
    filter has nobody to combine with. */
-export const listSubmitters = createServerFn({ method: 'GET' }).handler(async () => {
-  await requireMember('read');
-  const rows = await client<{ id: string; name: string; count: string }[]>`
+export const listSubmitters = createServerFn({ method: 'GET' })
+  .validator(validateScope)
+  .handler(async ({ data }) => {
+    const { workspaceId } = await requireMember('read', data.workspace);
+    const rows = await client<{ id: string; name: string; count: string }[]>`
     SELECT users.id, users.display_name AS name, count(*) AS count
     FROM sources
     JOIN users ON users.id = sources.created_by
+    WHERE sources.workspace_id = ${workspaceId}
     GROUP BY users.id, users.display_name
     ORDER BY users.display_name
   `;
-  return rows.map((row) => ({ id: row.id, name: row.name, count: Number(row.count) }));
-});
+    return rows.map((row) => ({ id: row.id, name: row.name, count: Number(row.count) }));
+  });
 
 /* Authoring — the one thing the review queue could not do.
  *
@@ -574,7 +605,7 @@ export const listSubmitters = createServerFn({ method: 'GET' }).handler(async ()
  * construction while the old revision stays readable — principle 2, nothing in
  * the product may make history unrecoverable. */
 export const reviseSource = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { sourceId: string; title: string; markdown: string } => {
+  .validator((value: unknown): Scoped<{ sourceId: string; title: string; markdown: string }> => {
     const input = (value ?? {}) as Partial<{ sourceId: string; title: string; markdown: string }>;
     const sourceId = input.sourceId?.trim();
     if (!sourceId || !UUID.test(sourceId)) throw new Error('Invalid source');
@@ -582,10 +613,14 @@ export const reviseSource = createServerFn({ method: 'POST' })
     if (!title) throw new Error('A revision needs a title.');
     const markdown = input.markdown?.trim();
     if (!markdown) throw new Error('A revision cannot be empty.');
-    return { sourceId, title, markdown };
+    return { workspace: validateWorkspace(value), sourceId, title, markdown };
   })
   .handler(async ({ data }) => {
-    const { userId: administrator, role } = await requireMember('write');
+    const {
+      userId: administrator,
+      role,
+      workspaceId,
+    } = await requireMember('write', data.workspace);
 
     const chunks = chunkMarkdown(data.markdown);
     if (chunks.length === 0) throw new Error('That text contains nothing indexable.');
@@ -609,7 +644,9 @@ export const reviseSource = createServerFn({ method: 'POST' })
         >`
           SELECT workspace_id, current_revision_id, source_type, status, authority,
                  created_by_admin_id
-          FROM sources WHERE id = ${data.sourceId} FOR UPDATE
+          FROM sources
+          WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
+          FOR UPDATE
         `;
         if (!source) throw new Error('That source no longer exists');
         if (source.status !== 'active') {
@@ -675,7 +712,7 @@ export const reviseSource = createServerFn({ method: 'POST' })
           UPDATE sources
           SET current_revision_id = ${revision.id}, current_content_hash = ${contentHash},
               last_verified_at = now()
-          WHERE id = ${data.sourceId}
+          WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
         `;
 
         await transaction`
@@ -713,7 +750,7 @@ export const reviseSource = createServerFn({ method: 'POST' })
  * `source_revisions.source_id` point at each other. Migration 0004 defers that
  * constraint precisely so the pair can be written in one transaction. */
 export const createSource = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { title: string; markdown: string; tags: string[] } => {
+  .validator((value: unknown): Scoped<{ title: string; markdown: string; tags: string[] }> => {
     const input = (value ?? {}) as Partial<{ title: string; markdown: string; tags: unknown }>;
     const title = input.title?.trim();
     if (!title) throw new Error('A source needs a title.');
@@ -722,11 +759,12 @@ export const createSource = createServerFn({ method: 'POST' })
     const tags = Array.isArray(input.tags)
       ? [...new Set(input.tags.map((tag) => String(tag).trim()).filter(Boolean))]
       : [];
-    return { title, markdown, tags };
+    return { workspace: validateWorkspace(value), title, markdown, tags };
   })
-  .handler(async ({ data }) =>
-    writeNewSource(await actingMember('write'), { ...data, sourceType: 'note' })
-  );
+  .handler(async ({ data }) => {
+    const { userId, workspaceId } = await requireMember('write', data.workspace);
+    return writeNewSource(userId, workspaceId, { ...data, sourceType: 'note' });
+  });
 
 /* The single writer for a source an administrator creates, whether they typed
    the Markdown or uploaded a document that MarkItDown converted. The two paths
@@ -751,6 +789,7 @@ export const createSource = createServerFn({ method: 'POST' })
  * the intended behaviour. */
 async function writeNewSource(
   administrator: string,
+  workspaceId: string,
   input: {
     title: string;
     markdown: string;
@@ -770,20 +809,19 @@ async function writeNewSource(
   const sourceId = randomUUID();
   const revisionId = randomUUID();
 
-  const workspaceId = await (async () => {
+  /* The workspace arrives from the caller, which got it from `requireMember`,
+     which got it from the URL. It is never looked up here: this function also
+     runs for uploads, and a second resolution is a second chance to disagree
+     with the one the permission was checked against. */
+  await (async () => {
     try {
       return await client.begin(async (transaction) => {
-        const [workspace] = await transaction<{ id: string }[]>`
-          SELECT id FROM workspaces WHERE name = 'default'
-        `;
-        if (!workspace) throw new Error('Default workspace is unavailable');
-
         await transaction`
           INSERT INTO sources (
             id, workspace_id, source_type, status, authority, current_revision_id,
             current_content_hash, created_by, created_by_admin_id, last_verified_at
           ) VALUES (
-            ${sourceId}, ${workspace.id}, ${input.sourceType}, 'indexing', 'approved', ${revisionId},
+            ${sourceId}, ${workspaceId}, ${input.sourceType}, 'indexing', 'approved', ${revisionId},
             ${contentHash}, NULL, ${administrator}, now()
           )
         `;
@@ -806,11 +844,9 @@ async function writeNewSource(
 
         await transaction`
           INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-          VALUES (${workspace.id}, ${administrator}, 'source_submitted', ${sourceId},
+          VALUES (${workspaceId}, ${administrator}, 'source_submitted', ${sourceId},
             ${JSON.stringify({ sourceType: input.sourceType, authority: 'approved', revisionId, chunkTotal: chunks.length })}::jsonb)
         `;
-
-        return workspace.id;
       });
     } catch (cause) {
       if ((cause as { code?: string })?.code === '23505') {
@@ -877,7 +913,7 @@ async function indexSource(run: {
     await client.begin(async (transaction) => {
       const [updated] = await transaction<{ id: string }[]>`
         UPDATE sources SET status = 'active'
-        WHERE id = ${sourceId} AND status = 'indexing'
+        WHERE id = ${sourceId} AND workspace_id = ${workspaceId} AND status = 'indexing'
         RETURNING id
       `;
       if (!updated) return;
@@ -897,7 +933,7 @@ async function indexSource(run: {
       await client.begin(async (transaction) => {
         const [updated] = await transaction<{ id: string }[]>`
           UPDATE sources SET status = 'failed'
-          WHERE id = ${sourceId} AND status = 'indexing'
+          WHERE id = ${sourceId} AND workspace_id = ${workspaceId} AND status = 'indexing'
           RETURNING id
         `;
         if (!updated) return;
@@ -925,7 +961,7 @@ async function indexSource(run: {
 export const getIndexingProgress = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await requireMember('read');
+    const { workspaceId } = await requireMember('read', data.workspace);
     const [source] = await client<
       { status: string; current_revision_id: string; markdown_content: string; done: string }[]
     >`
@@ -934,7 +970,7 @@ export const getIndexingProgress = createServerFn({ method: 'GET' })
               WHERE chunks.source_revision_id = sources.current_revision_id) AS done
       FROM sources
       JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
-      WHERE sources.id = ${data.sourceId}
+      WHERE sources.id = ${data.sourceId} AND sources.workspace_id = ${workspaceId}
     `;
     if (!source) throw new Error('That source no longer exists');
 
@@ -942,7 +978,8 @@ export const getIndexingProgress = createServerFn({ method: 'GET' })
     if (source.status === 'failed') {
       const [failure] = await client<{ metadata: { message?: string } | null }[]>`
         SELECT metadata FROM events
-        WHERE source_id = ${data.sourceId} AND event_type = 'source_index_failed'
+        WHERE source_id = ${data.sourceId} AND workspace_id = ${workspaceId}
+          AND event_type = 'source_index_failed'
         ORDER BY created_at DESC LIMIT 1
       `;
       message = failure?.metadata?.message ?? null;
@@ -971,14 +1008,14 @@ export const getIndexingProgress = createServerFn({ method: 'GET' })
 export const retryIndexing = createServerFn({ method: 'POST' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    const administrator = await actingMember('write');
+    const { userId: administrator, workspaceId } = await requireMember('write', data.workspace);
 
     const claimed = await client.begin(async (transaction) => {
       const [source] = await transaction<
         { workspace_id: string; current_revision_id: string; markdown_content: string }[]
       >`
         UPDATE sources SET status = 'indexing'
-        WHERE id = ${data.sourceId} AND status = 'failed'
+        WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId} AND status = 'failed'
         RETURNING workspace_id, current_revision_id,
           (SELECT markdown_content FROM source_revisions
            WHERE id = sources.current_revision_id) AS markdown_content
@@ -1017,8 +1054,11 @@ export const retryIndexing = createServerFn({ method: 'POST' })
  * Conversion is now the only slow thing this request waits on; embedding
  * continues in the background once the row exists. */
 export const uploadSource = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { file: File; title: string; tags: string[] } => {
+  .validator((value: unknown): Scoped<{ file: File; title: string; tags: string[] }> => {
     if (!(value instanceof FormData)) throw new Error('Expected a file upload');
+    /* FormData, so the workspace rides as a field rather than in a JSON body —
+       same value, same check. */
+    const workspace = validateWorkspace({ workspace: String(value.get('workspace') ?? '') });
     const file = value.get('file');
     if (!(file instanceof File) || file.size === 0) throw new Error('Choose a document to upload.');
     const title = String(value.get('title') ?? '').trim();
@@ -1031,10 +1071,10 @@ export const uploadSource = createServerFn({ method: 'POST' })
           .filter(Boolean)
       ),
     ];
-    return { file, title, tags };
+    return { workspace, file, title, tags };
   })
   .handler(async ({ data }) => {
-    const administrator = await actingMember('write');
+    const { userId: administrator, workspaceId } = await requireMember('write', data.workspace);
     const limit = maxUploadBytes();
     if (data.file.size > limit) {
       throw new Error(
@@ -1048,7 +1088,7 @@ export const uploadSource = createServerFn({ method: 'POST' })
       bytes: new Uint8Array(await data.file.arrayBuffer()),
     });
 
-    return writeNewSource(administrator, {
+    return writeNewSource(administrator, workspaceId, {
       title: data.title,
       markdown: document.markdown,
       tags: data.tags,

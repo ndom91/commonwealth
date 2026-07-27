@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
-import { createSource, uploadSource } from '../../lib/knowledge.js';
+import { createSource, uploadSource } from '../../../../lib/knowledge.js';
 
-export const Route = createFileRoute('/sources/new')({
+export const Route = createFileRoute('/w/$slug/sources/new')({
   component: NewSource,
 });
 
@@ -13,6 +13,7 @@ export const Route = createFileRoute('/sources/new')({
 type Mode = 'note' | 'upload';
 
 function NewSource() {
+  const { slug } = Route.useParams();
   const router = useRouter();
   const navigate = useNavigate();
 
@@ -35,6 +36,7 @@ function NewSource() {
         /* FormData rather than base64: a 10 MB document would otherwise become
            a 13 MB string held on both sides of the request. */
         const payload = new FormData();
+        payload.set('workspace', slug);
         payload.set('file', file);
         payload.set('title', title);
         payload.set('tags', tags);
@@ -42,6 +44,7 @@ function NewSource() {
       } else {
         result = await createSource({
           data: {
+            workspace: slug,
             title,
             markdown: body,
             tags: tags
@@ -53,8 +56,8 @@ function NewSource() {
       }
       await router.invalidate();
       await navigate({
-        to: '/sources/$sourceId',
-        params: { sourceId: result.sourceId },
+        to: '/w/$slug/sources/$sourceId',
+        params: { slug, sourceId: result.sourceId },
         search: {},
       });
     } catch (cause) {
@@ -174,7 +177,7 @@ function NewSource() {
               type="button"
               className="btn btn--quiet"
               disabled={pending}
-              onClick={() => void navigate({ to: '/sources', search: {} })}
+              onClick={() => void navigate({ to: '/w/$slug/sources', search: {} })}
             >
               Cancel
             </button>

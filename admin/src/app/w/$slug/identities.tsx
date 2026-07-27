@@ -7,20 +7,19 @@ import {
   useRouter,
 } from '@tanstack/react-router';
 import { useState } from 'react';
-import { AppShell, accessionOf, SealChip } from '../components/chrome.js';
+import { AppShell, accessionOf, SealChip } from '../../../components/chrome.js';
 import {
   CredentialTag,
   type Identity,
   type Issued,
   ROLES,
   type Role,
-} from '../components/identity.js';
-import { authClient } from '../lib/auth-client.js';
-import { getNavCounts } from '../lib/knowledge.js';
-import { createIdentity, listIdentities } from '../lib/management.js';
-import { readFailure } from '../lib/read-failure.js';
-import { can } from '../lib/roles.js';
-import { getViewer } from '../lib/session.js';
+} from '../../../components/identity.js';
+import { authClient } from '../../../lib/auth-client.js';
+import { getNavCounts } from '../../../lib/knowledge.js';
+import { createIdentity, listIdentities } from '../../../lib/management.js';
+import { readFailure } from '../../../lib/read-failure.js';
+import { can } from '../../../lib/roles.js';
 
 export type IdentitySearch = { after?: string };
 
@@ -43,14 +42,14 @@ function parseCursor(after: string | undefined) {
  * send another, and one `router.invalidate()` after a mutation refreshes the
  * register, the bench and the rail count together — the old route kept its own
  * effect-driven refetch, so there were two ways to reload one page. */
-export const Route = createFileRoute('/identities')({
-  beforeLoad: async () => {
-    const viewer = await getViewer();
-    if (!viewer) throw redirect({ to: '/sign-in' });
-    /* Agent credentials are an administrator's business: this register issues and
-       voids keys. Enforced again in every server function it calls. */
-    if (!can(viewer.role, 'admin')) throw redirect({ to: '/sources', search: {} });
-    return viewer;
+export const Route = createFileRoute('/w/$slug/identities')({
+  /* The `/w/$slug` layout has already resolved the workspace and confirmed
+     membership; this only narrows by role. This register issues and voids agent
+     credentials, so it is an administrator's business.
+     Enforced again in every server function this page calls. */
+  beforeLoad: ({ context }) => {
+    if (!can(context.role, 'admin'))
+      throw redirect({ to: '/w/$slug/sources', params: { slug: context.slug }, search: {} });
   },
   /* The cursor lives in the URL like every other register state, so a page of
      the register is linkable and a reload does not silently jump back to the
@@ -60,13 +59,13 @@ export const Route = createFileRoute('/identities')({
       typeof search.after === 'string' && search.after.includes('|') ? search.after : undefined,
   }),
   loaderDeps: ({ search }) => search,
-  loader: async ({ deps }) => {
+  loader: async ({ deps, params }) => {
     /* Counts are decorative and degrade to a dash; the register reports a read
        failure in full, and two alarms for one fault would be noise. */
-    const counts = await getNavCounts().catch(() => undefined);
+    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     const cursor = parseCursor(deps.after);
     try {
-      const page = await listIdentities({ data: { cursor } });
+      const page = await listIdentities({ data: { workspace: params.slug, cursor } });
       return { counts, page, failure: undefined };
     } catch (cause) {
       return { counts, page: undefined, failure: readFailure(cause, 'The register') };
@@ -76,9 +75,10 @@ export const Route = createFileRoute('/identities')({
 });
 
 function IdentitiesLayout() {
+  const { slug } = Route.useParams();
   const router = useRouter();
   const navigate = useNavigate();
-  const { holder, role: viewerRole } = Route.useRouteContext();
+  const viewer = Route.useRouteContext();
   const { counts, page, failure } = Route.useLoaderData();
   const { after } = Route.useSearch();
 
@@ -106,13 +106,16 @@ function IdentitiesLayout() {
     setPending(true);
     setError(undefined);
     try {
-      const result = await createIdentity({ data: { name, role, keyLabel } });
+      const result = await createIdentity({ data: { workspace: slug, name, role, keyLabel } });
       setIssued(result);
       setIssuing(false);
       setName('');
       setKeyLabel('');
       await router.invalidate();
-      await navigate({ to: '/identities/$identityId', params: { identityId: result.identityId } });
+      await navigate({
+        to: '/w/$slug/identities/$identityId',
+        params: { identityId: result.identityId },
+      });
     } catch (cause) {
       setError(
         cause instanceof Error && cause.message
@@ -128,8 +131,7 @@ function IdentitiesLayout() {
     <AppShell
       title="Identities"
       accession="Access register"
-      holder={holder}
-      role={viewerRole}
+      {...viewer}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
@@ -183,8 +185,8 @@ function IdentitiesLayout() {
               return (
                 <li key={identity.id}>
                   <Link
-                    to="/identities/$identityId"
-                    params={{ identityId: identity.id }}
+                    to="/w/$slug/identities/$identityId"
+                    params={{ slug, identityId: identity.id }}
                     className={`entry${identity.disabled_at ? ' entry--disabled' : ''}`}
                     activeProps={{ 'aria-current': 'page' }}
                     onClick={() => setIssuing(false)}
@@ -214,13 +216,13 @@ function IdentitiesLayout() {
           {(hasMore || after) && (
             <div className="index__note index__page">
               {after && (
-                <Link to="/identities" search={{}} className="btn btn--quiet">
+                <Link to="/w/$slug/identities" search={{}} className="btn btn--quiet">
                   Newest
                 </Link>
               )}
               {hasMore && last && (
                 <Link
-                  to="/identities"
+                  to="/w/$slug/identities"
                   search={{ after: `${last.created_at}|${last.id}` }}
                   className="btn btn--quiet"
                 >

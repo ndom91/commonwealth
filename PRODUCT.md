@@ -95,8 +95,22 @@ The MCP tool list, the role names and the source lifecycle are all readable from
   not a convenience one.
 - **Hiding a control is not authorisation.** The drawer and the benches show a
   role only what it can act on, but every server function calls
-  `requireMember(permission)` and refuses regardless. These are plain HTTP
-  endpoints; anything relying on the UI to withhold them is not protected.
+  `requireMember(permission, workspace)` and refuses regardless. These are plain
+  HTTP endpoints; anything relying on the UI to withhold them is not protected.
+- **A workspace is a corpus, and nothing crosses between them.** One instance
+  holds several — the AI team's notes and the core team's, separately — each with
+  its own sources, agent identities, review queue and activity log. Membership
+  and role are per workspace: the same person can be an administrator in one and
+  a reader in another. The workspace is in the URL (`/w/ai-team/sources`), so a
+  pasted link means the same thing to everyone, and the server re-derives it from
+  that slug on every call rather than from any remembered "active" workspace —
+  two sources of truth is a way for them to disagree. A slug you are not a member
+  of and one that does not exist get the same refusal, word for word.
+- **Scoping lives in the `WHERE`, not after the fetch.** A query that takes an id
+  carries `workspace_id` in the *same* predicate, so a foreign id reads as "not
+  found" rather than being fetched and then refused. There is exactly one write in
+  `admin/src/lib` without a workspace predicate — claiming an invitation, found by
+  token digest — and it is commented as such.
 - **One index, one model.** Embeddings from different models must never be mixed
   in one index. Changing `EMBEDDING_MODEL` or the vector dimension requires
   reindexing every chunk, and `index_configuration` refuses a silent change.
@@ -116,12 +130,13 @@ The MCP tool list, the role names and the source lifecycle are all readable from
 These are open product questions, not gaps to be closed by whoever notices them
 next. Changing one is a decision, not a fix.
 
-- **Workspaces are one deep.** The membership model is per-workspace and
-  better-auth's `organization` plugin is mapped onto the `workspaces` table, but
-  only the `default` workspace exists and no admin query filters by one. Agents
-  are already scoped — `src/access-service.ts` has always used
-  `actor.workspaceId` — so the gap is entirely on the browser side. *Treat the
-  product as single-workspace until that lands.*
+- **One embedding model for the whole instance, across all workspaces.**
+  `chunks.embedding` is `vector(1024)` for the entire table and `EMBEDDING_MODEL`
+  is one process-wide variable read by both services, so a workspace cannot pick
+  its own model without either giving up the fixed dimension (and the ANN index
+  with it) or holding a chunk table per dimension. Separate corpora were the
+  point of workspaces; separate *models* were not attempted, and whether they are
+  worth that cost is still open.
 - **The product name.** "LLM Team Knowledge Base" (repo `llm-team-kb`) is in use
   but has never been confirmed final.
 
@@ -130,12 +145,13 @@ next. Changing one is a decision, not a fix.
 The admin surface is the primary human surface over this data, and the workbench
 it was aimed at now ships: browse, search and read sources; revise them; run
 ingestion; work a review queue; inspect revision history; audit the event log;
-invite people and set what each of them may do. Remaining known gaps, in rough
-order of how much they cost:
+invite people and set what each of them may do — in any of several workspaces.
+Remaining known gaps, in rough order of how much they cost:
 
-- **Several workspaces.** Creating and switching them, scoping every admin query
-  to the active one, and per-workspace embedding configuration so a team can
-  pick its own model. This is the next substantial wave.
+- **Nothing moves between workspaces, and none can be deleted.** Moving a source
+  needs a re-embed and a decision about what the event log says happened; deleting
+  a workspace would take its corpus with it by cascade, which deserves its own
+  confirmation design. Both were left out on purpose.
 - Revisions still embed inside the request, unlike uploads. A revision cannot
   reuse the same mechanism, because the *current* revision stays live and correct
   while a new one indexes — the state would have to live on the revision.
