@@ -2,10 +2,12 @@ import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { accessionOf, authoritySeal, SealChip, stamp, stampAt } from '../../components/chrome.js';
 import {
+  getIndexingProgress,
   getSourceDetail,
   getSourceEvents,
   getSourceRevisions,
   restoreSource,
+  retryIndexing,
   reviseSource,
   setSourceAuthority,
   withdrawSource,
@@ -20,7 +22,7 @@ type Authority = 'unverified' | 'approved' | 'canonical';
 type Detail = {
   id: string;
   source_type: 'note' | 'upload';
-  status: 'active' | 'deleted' | 'failed';
+  status: 'active' | 'indexing' | 'deleted' | 'failed';
   authority: Authority;
   created_at: string;
   deleted_at: string | null;
@@ -57,6 +59,8 @@ type Event = {
   actor: string | null;
 };
 
+type Progress = { status: string; done: number; total: number; message: string | null };
+
 const AUTHORITIES: Authority[] = ['unverified', 'approved', 'canonical'];
 
 function SourceBench() {
@@ -64,6 +68,7 @@ function SourceBench() {
   const router = useRouter();
 
   const [detail, setDetail] = useState<Detail>();
+  const [progress, setProgress] = useState<Progress>();
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [error, setError] = useState<string>();
@@ -76,14 +81,18 @@ function SourceBench() {
   const load = useCallback(async () => {
     setError(undefined);
     try {
-      const [nextDetail, nextRevisions, nextEvents] = await Promise.all([
+      const [nextDetail, nextRevisions, nextEvents, nextProgress] = await Promise.all([
         getSourceDetail({ data: { sourceId } }),
         getSourceRevisions({ data: { sourceId } }),
         getSourceEvents({ data: { sourceId } }),
+        /* Fetched on every load, not only while polling: landing directly on a
+           source whose indexing failed must show why it failed. */
+        getIndexingProgress({ data: { sourceId } }),
       ]);
       setDetail(nextDetail as unknown as Detail);
       setRevisions(nextRevisions as unknown as Revision[]);
       setEvents(nextEvents as unknown as Event[]);
+      setProgress(nextProgress);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'This source could not be read.');
     }
@@ -91,8 +100,48 @@ function SourceBench() {
 
   useEffect(() => {
     setDetail(undefined);
+    setProgress(undefined);
     void load();
   }, [load]);
+
+  /* Indexing happens after the request that created the source has returned, so
+     this is the only way the page learns it finished. Polling rather than a
+     stream: the whole job is a counter climbing to a known total, one small
+     query answers it, and a stream would add a connection to hold open for a
+     job that is usually over in seconds.
+   *
+   * The interval only exists while the source is indexing, and the final tick
+   * reloads the bench and the rail so the register and drawer counts catch up
+   * with a source that just became active. */
+  useEffect(() => {
+    if (detail?.status !== 'indexing') return;
+    let live = true;
+    const tick = async () => {
+      let next: Progress;
+      try {
+        next = await getIndexingProgress({ data: { sourceId } });
+      } catch {
+        /* A transient read failure should not tear down a job that is still
+           running server-side. The next tick tries again. */
+        return;
+      }
+      if (!live) return;
+      setProgress(next);
+      if (next.status !== 'indexing') {
+        clearInterval(timer);
+        await load();
+        void router.invalidate();
+      }
+    };
+    /* Once immediately, so the bar starts at the real count rather than sitting
+       empty for a second on a source that is already part-way through. */
+    void tick();
+    const timer = setInterval(() => void tick(), 1000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [detail?.status, sourceId, load, router]);
 
   async function act(action: () => Promise<unknown>, failure: string) {
     setPending(true);
@@ -133,6 +182,12 @@ function SourceBench() {
   }
 
   const withdrawn = detail.status === 'deleted';
+  /* Both mean the same thing for the controls below: this source has no
+     complete set of chunks, so there is nothing to approve, revise or serve.
+     Only the copy differs — one is working, the other stopped. */
+  const indexing = detail.status === 'indexing';
+  const indexFailed = detail.status === 'failed';
+  const unindexed = indexing || indexFailed;
 
   return (
     <section className="detail" aria-label="Selected source">
@@ -146,14 +201,57 @@ function SourceBench() {
           <h2>{detail.title}</h2>
         </div>
         <div className="bench__seal">
+          {/* Indexing is work in progress, not a seal state — no chip, and no
+              oxide. A source part-way through being embedded has not been
+              sealed, voided or suspended; it is simply not finished. */}
+          {indexing && <span className="label">Indexing</span>}
           {withdrawn ? (
             <SealChip state="void">Withdrawn {stamp(detail.deleted_at)}</SealChip>
+          ) : indexFailed ? (
+            <SealChip state="suspended">Index failed</SealChip>
           ) : detail.is_stale ? (
             <SealChip state="suspended">Stale</SealChip>
           ) : null}
           <SealChip state={authoritySeal(detail.authority)}>{detail.authority}</SealChip>
         </div>
       </div>
+
+      {indexing && (
+        <div className="indexing">
+          <div
+            className="indexing__rule"
+            role="progressbar"
+            aria-label="Indexing progress"
+            aria-valuemin={0}
+            aria-valuemax={progress?.total ?? 0}
+            aria-valuenow={progress?.done ?? 0}
+          >
+            <span
+              className="indexing__fill"
+              style={{
+                width: progress?.total ? `${(progress.done / progress.total) * 100}%` : '0%',
+              }}
+            />
+          </div>
+          <p className="bench__consequence" aria-live="polite">
+            {progress ? `Indexing ${progress.done} of ${progress.total} chunks. ` : 'Indexing. '}
+            Agents cannot find this source until every chunk is embedded. You can leave this page —
+            indexing continues without it.
+          </p>
+        </div>
+      )}
+
+      {indexFailed && (
+        <p className="bench__consequence">
+          Indexing stopped before it finished, so this source is not in the index and no agent can
+          find it.
+          {/* Messages come from wherever the run broke and are not written to a
+              house style — the embedder's end in a URL, Postgres's in a code.
+              Punctuate here so the sentence does not run into the next one. */}
+          {progress?.message ? ` ${progress.message.replace(/[.!?]?$/, '.')}` : ''} Its text is
+          intact — retry below.
+        </p>
+      )}
 
       {detail.is_stale && !withdrawn && (
         <p className="bench__consequence">
@@ -198,7 +296,10 @@ function SourceBench() {
                     type="button"
                     className={`btn ${current ? 'btn--current' : 'btn--quiet'}`}
                     aria-pressed={current}
-                    disabled={pending || withdrawn || current}
+                    /* Authority is a judgement about what agents are served.
+                       Nothing is being served until the chunks exist, so there
+                       is nothing to pass judgement on yet. */
+                    disabled={pending || withdrawn || current || unindexed}
                     onClick={() =>
                       void act(
                         () => setSourceAuthority({ data: { sourceId, authority: value } }),
@@ -213,6 +314,21 @@ function SourceBench() {
             </div>
           </fieldset>
           <span className="authority-set__spacer" />
+          {indexFailed && (
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={pending}
+              onClick={() =>
+                void act(
+                  () => retryIndexing({ data: { sourceId } }),
+                  'Indexing could not be restarted.'
+                )
+              }
+            >
+              {pending ? 'Restarting…' : 'Retry indexing'}
+            </button>
+          )}
           {withdrawn ? (
             <button
               type="button"
@@ -282,7 +398,7 @@ function SourceBench() {
               editing the text alone would leave the two disagreeing about what
               the source is. The server refuses it; the button does not offer
               it. */}
-          {!editing && !withdrawn && detail.source_type === 'note' && (
+          {!editing && !withdrawn && !unindexed && detail.source_type === 'note' && (
             <button
               type="button"
               className="btn btn--quiet"

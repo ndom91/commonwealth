@@ -53,6 +53,8 @@ type EventRow = {
    opened out — a new event type shows up legibly without a code change. */
 const PHRASING: Record<string, string> = {
   source_submitted: 'Submitted a source',
+  source_indexed: 'Finished indexing a source',
+  source_index_failed: 'Failed to index a source',
   source_revised: 'Revised a source',
   source_authority_changed: 'Changed authority',
   source_deleted: 'Withdrew a source',
@@ -85,6 +87,13 @@ function detailOf(event: EventRow): string | null {
     const auto = meta.auto === true ? ' (auto)' : '';
     if (!to) return null;
     return from ? `${from} → ${to}${auto}` : `→ ${to}${auto}`;
+  }
+  if (event.event_type === 'source_index_failed') {
+    return text('message');
+  }
+  if (event.event_type === 'source_indexed') {
+    const count = typeof meta.chunkCount === 'number' ? meta.chunkCount : null;
+    return count === null ? null : `${count} chunk${count === 1 ? '' : 's'}`;
   }
   if (event.event_type === 'identity_amended' && meta.changed && typeof meta.changed === 'object') {
     const fields = Object.keys(meta.changed as Record<string, unknown>);

@@ -102,6 +102,30 @@ where the fragment was, and reports success. Build fragments from the
 the pool are fine — see the shared `IS_STALE` / `NEEDS_REVIEW` fragments in
 `admin/src/lib/knowledge.ts`.
 
+## Indexing runs after the request that created the source
+
+`writeNewSource` in `admin/src/lib/knowledge.ts` writes the source as
+`indexing` and returns; `indexSource` embeds afterwards, without being awaited.
+Three things follow from that:
+
+- **Nothing in `indexSource` may touch the request.** `adminId()` reads
+  `getRequest()`, and by the time it runs the response has been sent. The
+  administrator and workspace ids are passed in as arguments for this reason.
+  The module-scoped `client` is unaffected and safe to use.
+- **`active` is an invariant, not a default.** Every MCP read filters on
+  `status = 'active'`, so it must mean "every chunk of the current revision is
+  in the table". Anything that sets a source active — `indexSource`,
+  `restoreSource` — has to establish that first, which is why `restoreSource`
+  counts chunks against `chunkMarkdown` and restores to `failed` when they
+  disagree.
+- **A dead process leaves rows stuck.** There is no queue; the sweep at the top
+  of `admin/scripts/migrate.ts` marks any surviving `indexing` row `failed` on
+  the next migration, and Retry recovers it. This assumes one admin process.
+
+`reviseSource` deliberately still embeds inline. A revision cannot use the same
+mechanism, because the *current* revision stays live and good while a new one
+indexes — the state would have to live on the revision, not the source.
+
 ## Two migration chains, on purpose
 
 - `admin/drizzle/` is the **live schema**. `pnpm migrate` runs this. Anything

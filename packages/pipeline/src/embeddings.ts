@@ -35,10 +35,32 @@ export class Embeddings {
 
   async embed(texts: string[]): Promise<number[][]> {
     const vectors: number[][] = [];
-    for (let start = 0; start < texts.length; start += BATCH_SIZE) {
-      vectors.push(...(await this.embedBatch(texts.slice(start, start + BATCH_SIZE))));
-    }
+    await this.embedInBatches(texts, (batch) => {
+      vectors.push(...batch);
+    });
     return vectors;
+  }
+
+  /* The same sequence as `embed`, but handing each batch back as it lands.
+   *
+   * A caller that must hold every vector before it can do anything — the MCP
+   * write path, which embeds inside one transaction — wants `embed`. A caller
+   * that writes incrementally wants this, because a hundred-chunk document is
+   * over a minute of embedding and buffering all of it means a crash at the end
+   * loses the lot.
+   *
+   * The batch boundary is deliberately not exported as a number for callers to
+   * re-derive their own loop from. It is a property of how this class talks to
+   * Ollama, and a second loop keyed to a copy of it is a second thing to keep
+   * in step. `start` is passed so the caller can address the vectors by their
+   * position in the original array without counting. */
+  async embedInBatches(
+    texts: string[],
+    onBatch: (vectors: number[][], start: number) => void | Promise<void>
+  ): Promise<void> {
+    for (let start = 0; start < texts.length; start += BATCH_SIZE) {
+      await onBatch(await this.embedBatch(texts.slice(start, start + BATCH_SIZE)), start);
+    }
   }
 
   private async embedBatch(texts: string[]): Promise<number[][]> {

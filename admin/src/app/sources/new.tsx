@@ -58,10 +58,15 @@ function NewSource() {
         search: {},
       });
     } catch (cause) {
+      /* No longer promises "nothing was written": the request now covers the
+         write, and indexing continues after it returns. A failure here really
+         did write nothing — but a failure *after* this point lands on the
+         source's own page as a retry, so the blanket claim no longer holds and
+         should not be made twice in two different places. */
       setError(
         cause instanceof Error && cause.message
-          ? `${cause.message} Nothing was written — adjust it and try again.`
-          : 'The source could not be created. Nothing was written — try again.'
+          ? `${cause.message} Adjust it and try again.`
+          : 'The source could not be created. Try again.'
       );
     } finally {
       setPending(false);
@@ -145,7 +150,7 @@ function NewSource() {
 
           <p className="line__caption">
             {mode === 'upload'
-              ? 'The document is converted to Markdown for indexing and the original is kept, addressed by its content hash. Uploads cannot be edited as text afterwards — replace the file instead.'
+              ? 'The document is converted to Markdown for indexing and the original is kept, addressed by its content hash. Indexing a long document takes a few minutes and carries on after you leave the page — agents cannot find it until it finishes. Uploads cannot be edited as text afterwards — replace the file instead.'
               : 'Written by you, so it lands approved and verified rather than queuing for review — the queue is for text nobody has vouched for. Marking it canonical stays a separate decision.'}
           </p>
 

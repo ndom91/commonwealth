@@ -50,6 +50,13 @@
       "when": 1784914839308,
       "tag": "0006_source_admin_author",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784914839309,
+      "tag": "0007_source_indexing_status",
+      "breakpoints": true
     }
   ]
 }

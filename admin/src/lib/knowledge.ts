@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { chunkMarkdown } from '@llm-team-kb/pipeline';
+import { type Chunk, chunkMarkdown } from '@llm-team-kb/pipeline';
 import { createServerFn } from '@tanstack/react-start';
 import { getRequest } from '@tanstack/react-start/server';
 import { auth } from './auth.js';
@@ -19,7 +19,7 @@ import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from '.
 
 const AUTHORITIES = ['unverified', 'approved', 'canonical'] as const;
 const SOURCE_TYPES = ['note', 'upload'] as const;
-const STATUSES = ['active', 'deleted', 'failed'] as const;
+const STATUSES = ['active', 'indexing', 'deleted', 'failed'] as const;
 
 type Authority = (typeof AUTHORITIES)[number];
 type SourceType = (typeof SOURCE_TYPES)[number];
@@ -342,24 +342,46 @@ export const withdrawSource = createServerFn({ method: 'POST' })
    one-way there. It can legitimately fail: a partial unique index enforces one
    active source per content hash per workspace, so if an identical source was
    submitted while this one was withdrawn, the restore collides. That is a real
-   answer, not an internal error, so it is reported as one. */
+   answer, not an internal error, so it is reported as one.
+
+   A source withdrawn while it was still indexing comes back `failed`, not
+   `active`. Its chunks are whatever the interrupted run managed to write, and
+   `active` is the status every MCP read trusts — restoring straight to it would
+   quietly serve a half-indexed source. `failed` puts a Retry in front of a
+   human instead. */
 export const restoreSource = createServerFn({ method: 'POST' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
     const administrator = await adminId();
+    let restored: 'active' | 'failed' = 'active';
     try {
       await client.begin(async (transaction) => {
-        const [source] = await transaction<{ workspace_id: string; status: string }[]>`
-          SELECT workspace_id, status FROM sources WHERE id = ${data.sourceId}
+        const [source] = await transaction<
+          { workspace_id: string; status: string; markdown_content: string; chunks: string }[]
+        >`
+          SELECT sources.workspace_id, sources.status, revision.markdown_content,
+                 (SELECT count(*) FROM chunks
+                  WHERE chunks.source_revision_id = sources.current_revision_id) AS chunks
+          FROM sources
+          JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
+          WHERE sources.id = ${data.sourceId}
         `;
         if (!source) throw new Error('That source no longer exists');
         if (source.status === 'active') return;
+        /* Counted rather than merely "has any chunks": a source withdrawn
+           half-way through indexing has some, and serving half a document is
+           the failure this guard exists to prevent. */
+        restored =
+          Number(source.chunks) === chunkMarkdown(source.markdown_content).length
+            ? 'active'
+            : 'failed';
         await transaction`
-          UPDATE sources SET status = 'active', deleted_at = NULL WHERE id = ${data.sourceId}
+          UPDATE sources SET status = ${restored}, deleted_at = NULL WHERE id = ${data.sourceId}
         `;
         await transaction`
           INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-          VALUES (${source.workspace_id}, ${administrator}, 'source_restored', ${data.sourceId}, '{}'::jsonb)
+          VALUES (${source.workspace_id}, ${administrator}, 'source_restored', ${data.sourceId},
+            ${JSON.stringify({ status: restored })}::jsonb)
         `;
       });
     } catch (cause) {
@@ -371,7 +393,7 @@ export const restoreSource = createServerFn({ method: 'POST' })
       }
       throw cause;
     }
-    return { sourceId: data.sourceId, status: 'active' as const };
+    return { sourceId: data.sourceId, status: restored };
   });
 
 /* The workspace-wide event log.
@@ -690,8 +712,19 @@ export const createSource = createServerFn({ method: 'POST' })
 /* The single writer for a source an administrator creates, whether they typed
    the Markdown or uploaded a document that MarkItDown converted. The two paths
    differ only in where the text came from; everything after that — the deferred
-   id pair, the content hash, the chunk rows, the authority decision, the event
-   — is identical, and duplicating it is how the two would quietly drift apart.
+   id pair, the content hash, the authority decision, the event — is identical,
+   and duplicating it is how the two would quietly drift apart.
+ *
+ * The source lands `indexing` and its chunks arrive afterwards, from
+ * `indexSource`. Embedding costs roughly 0.7s a chunk and runs in sequence, so
+ * a hundred-chunk document is over a minute; holding the request for it meant a
+ * closed tab threw the whole minute away and a long enough document ran past
+ * the server's request timeout. Now the request covers only the write.
+ *
+ * A note usually chunks into one or two pieces and passes through `indexing` in
+ * about a second. It takes this path anyway: a size threshold would buy a
+ * second behaviour that only diverges on the largest inputs, which are exactly
+ * the ones hardest to exercise.
  *
  * An upload passes the hash of the *original bytes*, so the source is identified
  * by the file rather than by whatever Markdown the converter happened to emit.
@@ -714,83 +747,256 @@ async function writeNewSource(
   if (chunks.length === 0) throw new Error('That text contains nothing indexable.');
   const contentHash =
     input.contentHash ?? createHash('sha256').update(input.markdown).digest('hex');
-  const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
-  if (vectors.length !== chunks.length)
-    throw new Error('Embedding provider returned an incomplete result');
-  const model = embeddingModel();
 
   const sourceId = randomUUID();
   const revisionId = randomUUID();
 
-  try {
-    return await client.begin(async (transaction) => {
-      const [workspace] = await transaction<{ id: string }[]>`
-        SELECT id FROM workspaces WHERE name = 'default'
-      `;
-      if (!workspace) throw new Error('Default workspace is unavailable');
-
-      await transaction`
-        INSERT INTO sources (
-          id, workspace_id, source_type, authority, current_revision_id,
-          current_content_hash, created_by, created_by_admin_id, last_verified_at
-        ) VALUES (
-          ${sourceId}, ${workspace.id}, ${input.sourceType}, 'approved', ${revisionId},
-          ${contentHash}, NULL, ${administrator}, now()
-        )
-      `;
-
-      await transaction`
-        INSERT INTO source_revisions (
-          id, source_id, revision_number, title, content_hash, markdown_content,
-          original_filename, mime_type, storage_path,
-          supersedes_revision_id, created_by, created_by_admin_id
-        ) VALUES (
-          ${revisionId}, ${sourceId}, 1, ${input.title}, ${contentHash}, ${input.markdown},
-          ${input.originalFilename ?? null}, ${input.mimeType ?? null}, ${input.storagePath ?? null},
-          NULL, NULL, ${administrator}
-        )
-      `;
-
-      for (const [ordinal, chunk] of chunks.entries()) {
-        const vector = vectors[ordinal];
-        if (!vector) throw new Error('Embedding provider returned an incomplete result');
-        await transaction`
-          INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
-          VALUES (${sourceId}, ${revisionId}, ${ordinal}, ${chunk.heading}, ${chunk.content},
-                  ${chunk.tokenCount}, ${`[${vector.join(',')}]`}::vector, ${model})
+  const workspaceId = await (async () => {
+    try {
+      return await client.begin(async (transaction) => {
+        const [workspace] = await transaction<{ id: string }[]>`
+          SELECT id FROM workspaces WHERE name = 'default'
         `;
-      }
+        if (!workspace) throw new Error('Default workspace is unavailable');
 
-      for (const tag of input.tags) {
-        await transaction`INSERT INTO source_tags (source_id, tag) VALUES (${sourceId}, ${tag})`;
-      }
+        await transaction`
+          INSERT INTO sources (
+            id, workspace_id, source_type, status, authority, current_revision_id,
+            current_content_hash, created_by, created_by_admin_id, last_verified_at
+          ) VALUES (
+            ${sourceId}, ${workspace.id}, ${input.sourceType}, 'indexing', 'approved', ${revisionId},
+            ${contentHash}, NULL, ${administrator}, now()
+          )
+        `;
 
+        await transaction`
+          INSERT INTO source_revisions (
+            id, source_id, revision_number, title, content_hash, markdown_content,
+            original_filename, mime_type, storage_path,
+            supersedes_revision_id, created_by, created_by_admin_id
+          ) VALUES (
+            ${revisionId}, ${sourceId}, 1, ${input.title}, ${contentHash}, ${input.markdown},
+            ${input.originalFilename ?? null}, ${input.mimeType ?? null}, ${input.storagePath ?? null},
+            NULL, NULL, ${administrator}
+          )
+        `;
+
+        for (const tag of input.tags) {
+          await transaction`INSERT INTO source_tags (source_id, tag) VALUES (${sourceId}, ${tag})`;
+        }
+
+        await transaction`
+          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
+          VALUES (${workspace.id}, ${administrator}, 'source_submitted', ${sourceId},
+            ${JSON.stringify({ sourceType: input.sourceType, authority: 'approved', revisionId, chunkTotal: chunks.length })}::jsonb)
+        `;
+
+        return workspace.id;
+      });
+    } catch (cause) {
+      if ((cause as { code?: string })?.code === '23505') {
+        throw new Error(
+          'An active source already holds exactly this content. Open that one and revise it instead of creating a duplicate'
+        );
+      }
+      throw cause;
+    }
+  })();
+
+  /* Deliberately not awaited. The response is what releases the browser, and
+     the whole point of this shape is that it should not wait for embedding.
+     `indexSource` never rejects — it records its own failure — so there is no
+     unhandled rejection to catch here. */
+  void indexSource({ sourceId, revisionId, workspaceId, administrator, chunks });
+
+  return { sourceId, chunkTotal: chunks.length };
+}
+
+/* Embedding, after the source row already exists.
+ *
+ * This runs outside any request. It must never call `adminId()` or anything
+ * else reading `getRequest()`, because by the time it starts the response has
+ * been sent and there is no request to read — hence `administrator` and
+ * `workspaceId` arriving as arguments. The pooled `client` is module-scoped and
+ * stays valid.
+ *
+ * Chunks are written per batch rather than accumulated and written at the end,
+ * so `getIndexingProgress` can count real rows instead of tracking a number
+ * that could disagree with the table, and so a crash keeps whatever finished.
+ *
+ * The final status change is guarded on the source still being `indexing`. A
+ * source withdrawn while its chunks were still landing must stay withdrawn, not
+ * be resurrected to `active` by a run that started before the withdrawal. */
+async function indexSource(run: {
+  sourceId: string;
+  revisionId: string;
+  workspaceId: string;
+  administrator: string;
+  chunks: Chunk[];
+}): Promise<void> {
+  const { sourceId, revisionId, workspaceId, administrator, chunks } = run;
+  try {
+    const model = embeddingModel();
+    await embeddings().embedInBatches(
+      chunks.map((chunk) => chunk.content),
+      async (vectors, start) => {
+        await client.begin(async (transaction) => {
+          for (const [offset, vector] of vectors.entries()) {
+            const ordinal = start + offset;
+            const chunk = chunks[ordinal];
+            if (!chunk) throw new Error('Embedding provider returned an incomplete result');
+            await transaction`
+              INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
+              VALUES (${sourceId}, ${revisionId}, ${ordinal}, ${chunk.heading}, ${chunk.content},
+                      ${chunk.tokenCount}, ${`[${vector.join(',')}]`}::vector, ${model})
+            `;
+          }
+        });
+      }
+    );
+
+    await client.begin(async (transaction) => {
+      const [updated] = await transaction<{ id: string }[]>`
+        UPDATE sources SET status = 'active'
+        WHERE id = ${sourceId} AND status = 'indexing'
+        RETURNING id
+      `;
+      if (!updated) return;
       await transaction`
         INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-        VALUES (${workspace.id}, ${administrator}, 'source_submitted', ${sourceId},
-          ${JSON.stringify({ sourceType: input.sourceType, authority: 'approved', revisionId, chunkCount: chunks.length })}::jsonb)
+        VALUES (${workspaceId}, ${administrator}, 'source_indexed', ${sourceId},
+          ${JSON.stringify({ revisionId, chunkCount: chunks.length })}::jsonb)
       `;
-
-      return { sourceId, chunkCount: chunks.length };
     });
   } catch (cause) {
-    if ((cause as { code?: string })?.code === '23505') {
-      throw new Error(
-        'An active source already holds exactly this content. Open that one and revise it instead of creating a duplicate'
-      );
+    const message = cause instanceof Error && cause.message ? cause.message : 'Indexing failed.';
+    /* The failure is the product of this run, so recording it must not depend
+       on the same connection that just broke. If even this fails there is
+       nothing left to do but log — the source stays `indexing` and the sweep in
+       `admin/scripts/migrate.ts` catches it on the next restart. */
+    try {
+      await client.begin(async (transaction) => {
+        const [updated] = await transaction<{ id: string }[]>`
+          UPDATE sources SET status = 'failed'
+          WHERE id = ${sourceId} AND status = 'indexing'
+          RETURNING id
+        `;
+        if (!updated) return;
+        await transaction`
+          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
+          VALUES (${workspaceId}, ${administrator}, 'source_index_failed', ${sourceId},
+            ${JSON.stringify({ revisionId, message })}::jsonb)
+        `;
+      });
+    } catch (recordingFailure) {
+      console.error(`Could not record indexing failure for source ${sourceId}`, recordingFailure);
     }
-    throw cause;
+    console.error(`Indexing source ${sourceId} failed`, cause);
   }
 }
+
+/* What the browser polls while a source is indexing.
+ *
+ * `done` counts chunk rows, which is the same thing retrieval will read, so the
+ * bar cannot claim progress that is not actually in the table. `total` is
+ * recomputed with `chunkMarkdown` rather than stored: it is the deterministic
+ * function that produced those rows in the first place, so a column would only
+ * be a second copy of an answer already available, with the usual risk of the
+ * two disagreeing. */
+export const getIndexingProgress = createServerFn({ method: 'GET' })
+  .validator(validateSourceId)
+  .handler(async ({ data }) => {
+    await adminId();
+    const [source] = await client<
+      { status: string; current_revision_id: string; markdown_content: string; done: string }[]
+    >`
+      SELECT sources.status, sources.current_revision_id, revision.markdown_content,
+             (SELECT count(*) FROM chunks
+              WHERE chunks.source_revision_id = sources.current_revision_id) AS done
+      FROM sources
+      JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
+      WHERE sources.id = ${data.sourceId}
+    `;
+    if (!source) throw new Error('That source no longer exists');
+
+    let message: string | null = null;
+    if (source.status === 'failed') {
+      const [failure] = await client<{ metadata: { message?: string } | null }[]>`
+        SELECT metadata FROM events
+        WHERE source_id = ${data.sourceId} AND event_type = 'source_index_failed'
+        ORDER BY created_at DESC LIMIT 1
+      `;
+      message = failure?.metadata?.message ?? null;
+    }
+
+    return {
+      status: source.status,
+      done: Number(source.done),
+      total: chunkMarkdown(source.markdown_content).length,
+      message,
+    };
+  });
+
+/* Re-run indexing for a source whose run died.
+ *
+ * The status flip is the claim: `WHERE status = 'failed'` is atomic, so two
+ * browser tabs both pressing Retry produce one runner and one no-op rather than
+ * two runners racing to insert the same ordinals.
+ *
+ * Deleting chunks here is a deliberate exception to the rule that chunks are
+ * inserted and never deleted (see `reviseSource`). That rule protects
+ * *superseded* chunks — history reachable through an older revision. These are
+ * the partial output of a revision that never finished indexing and was never
+ * served to anyone; keeping them would only collide with the retry on
+ * `(source_revision_id, ordinal)`. */
+export const retryIndexing = createServerFn({ method: 'POST' })
+  .validator(validateSourceId)
+  .handler(async ({ data }) => {
+    const administrator = await adminId();
+
+    const claimed = await client.begin(async (transaction) => {
+      const [source] = await transaction<
+        { workspace_id: string; current_revision_id: string; markdown_content: string }[]
+      >`
+        UPDATE sources SET status = 'indexing'
+        WHERE id = ${data.sourceId} AND status = 'failed'
+        RETURNING workspace_id, current_revision_id,
+          (SELECT markdown_content FROM source_revisions
+           WHERE id = sources.current_revision_id) AS markdown_content
+      `;
+      if (!source) return undefined;
+      await transaction`
+        DELETE FROM chunks WHERE source_revision_id = ${source.current_revision_id}
+      `;
+      return source;
+    });
+
+    /* Not an error: the source was withdrawn, already retried from another tab,
+       or has since finished. The page reloads and shows whatever is true now. */
+    if (!claimed) return { sourceId: data.sourceId, restarted: false };
+
+    void indexSource({
+      sourceId: data.sourceId,
+      revisionId: claimed.current_revision_id,
+      workspaceId: claimed.workspace_id,
+      administrator,
+      chunks: chunkMarkdown(claimed.markdown_content),
+    });
+
+    return { sourceId: data.sourceId, restarted: true };
+  });
 
 /* Upload. The file is sent as FormData rather than base64 so a 10 MB document
    does not become a 13 MB string in memory on both sides.
  *
- * Conversion happens before the transaction, like embedding: MarkItDown is a
- * network round trip and a slow one, and it also writes the original to disk. If
- * the database write then fails, the blob is left behind deliberately — it is
- * content-addressed, so a retry finds it rather than duplicating it, and an
- * orphan is recoverable where a lost original is not. */
+ * Conversion happens before the transaction: MarkItDown is a network round trip
+ * and a slow one, and it also writes the original to disk. If the database write
+ * then fails, the blob is left behind deliberately — it is content-addressed, so
+ * a retry finds it rather than duplicating it, and an orphan is recoverable
+ * where a lost original is not.
+ *
+ * Conversion is now the only slow thing this request waits on; embedding
+ * continues in the background once the row exists. */
 export const uploadSource = createServerFn({ method: 'POST' })
   .validator((value: unknown): { file: File; title: string; tags: string[] } => {
     if (!(value instanceof FormData)) throw new Error('Expected a file upload');

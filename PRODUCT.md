@@ -96,8 +96,18 @@ they created. Authority changes and deletes require reviewer.
 `canonical` by a reviewer. Every edit creates an immutable revision rather than
 overwriting. Deletion is a soft-delete. Actions append to an `events` table.
 
+**Source status** is separate from authority and gates visibility: `active` is
+the only status any MCP read returns. A source created from the admin UI is
+`indexing` until every chunk is embedded, `failed` if that run died, and only
+then `active` — so a half-embedded document is never searchable. `deleted` is
+the soft-delete.
+
 **Ingestion:** Markdown notes directly; other documents converted via
 MarkItDown. Uploads capped at 10 MB (`MAX_UPLOAD_BYTES`), requests at 15 MB.
+Embedding costs roughly 0.7s a chunk and runs after the upload request returns,
+so a long document keeps indexing while the browser is elsewhere. Progress and
+retry live on the source's own page. *The MCP submission path still embeds
+inside the request;* agents submit small text, and it has its own timeouts.
 
 **Retrieval:** hybrid search over pgvector embeddings. Default model is
 `qwen3-embedding:0.6b` (Apache-2.0, ~639 MB) and is explicitly a replaceable

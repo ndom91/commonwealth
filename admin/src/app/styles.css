@@ -1125,6 +1125,48 @@ select {
   font-size: 13px;
 }
 
+/* The same shape without the oxide edge. Oxide is reserved for sealing,
+   voiding and destruction, so a line that only reports work in progress must
+   not spend it — otherwise every long upload puts a false alarm on the bench. */
+.bench__consequence--quiet {
+  border-left-color: var(--rule-strong);
+}
+
+/* ── Indexing ───────────────────────────────────────────────────────────────
+   A source exists before its chunks do. Embedding a long document runs for
+   minutes after the upload request has returned, and this is the only thing on
+   the bench that says so.
+
+   A measured rule, not a spinner: the count is known on both ends, so the bar
+   reports a real fraction of real rows rather than miming activity. It is drawn
+   in ink, never oxide — nothing here is sealed or voided, it is simply not
+   finished yet. */
+.indexing {
+  margin-top: var(--s-base);
+}
+
+.indexing__rule {
+  height: 2px;
+  max-width: 60ch;
+  background: var(--rule-hair);
+  overflow: hidden;
+}
+
+.indexing__fill {
+  display: block;
+  height: 100%;
+  background: var(--ink-2);
+  /* Width is the measurement itself, so this is the one property that moves.
+     The global reduced-motion rule collapses the duration, leaving the bar
+     accurate and instant rather than absent. */
+  transition: width 240ms linear;
+}
+
+.indexing .bench__consequence {
+  margin-top: var(--s-snug);
+  border-left-color: var(--rule-strong);
+}
+
 /* A suspended holder still has to be readable in the register; it is dimmed
    to secondary ink rather than hidden or struck. */
 .entry--disabled .entry__name {

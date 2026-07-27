@@ -25,7 +25,7 @@ import { getSession } from '../lib/session.js';
 export type SourceFilters = {
   authority?: 'unverified' | 'approved' | 'canonical';
   type?: 'note' | 'upload';
-  status?: 'active' | 'deleted' | 'failed';
+  status?: 'active' | 'indexing' | 'deleted' | 'failed';
   /* The identity that submitted the source — `sources.created_by`, an agent
      holder rather than an administrator. */
   submitter?: string;
@@ -62,7 +62,7 @@ export const Route = createFileRoute('/sources')({
   validateSearch: (search: Record<string, unknown>): SourceFilters => ({
     authority: oneOf(search.authority, ['unverified', 'approved', 'canonical'] as const),
     type: oneOf(search.type, ['note', 'upload'] as const),
-    status: oneOf(search.status, ['active', 'deleted', 'failed'] as const),
+    status: oneOf(search.status, ['active', 'indexing', 'deleted', 'failed'] as const),
     submitter:
       typeof search.submitter === 'string' && UUID.test(search.submitter)
         ? search.submitter
@@ -113,7 +113,7 @@ export const Route = createFileRoute('/sources')({
 export type SourceRow = {
   id: string;
   source_type: 'note' | 'upload';
-  status: 'active' | 'deleted' | 'failed';
+  status: 'active' | 'indexing' | 'deleted' | 'failed';
   authority: 'unverified' | 'approved' | 'canonical';
   created_at: string;
   deleted_at: string | null;
@@ -242,6 +242,7 @@ function Sources() {
               >
                 <option value="">All</option>
                 <option value="active">Active</option>
+                <option value="indexing">Indexing</option>
                 <option value="deleted">Withdrawn</option>
                 <option value="failed">Failed</option>
               </select>
@@ -315,6 +316,12 @@ function Sources() {
                   <span className="entry__role">
                     {source.status === 'deleted' ? (
                       <SealChip state="void">Withdrawn</SealChip>
+                    ) : source.status === 'indexing' ? (
+                      /* Not a chip: being embedded is work in progress, not a
+                         seal state. See the bench for the same distinction. */
+                      <span className="label">Indexing</span>
+                    ) : source.status === 'failed' ? (
+                      <SealChip state="suspended">Index failed</SealChip>
                     ) : source.is_stale ? (
                       <SealChip state="suspended">Stale</SealChip>
                     ) : (
