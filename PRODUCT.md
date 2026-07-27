@@ -2,6 +2,11 @@
 
 <!-- impeccable:product-schema 1 -->
 
+This file holds product intent, decisions and their reasoning — the things that
+cannot be recovered by reading the code. Anything discoverable in a minute from
+`compose.yaml`, the migrations, or a grep does not belong here. Architectural
+gotchas live in `AGENTS.md`; the embedding decision lives in `PLAN.md`.
+
 ## Platform
 
 web
@@ -10,23 +15,21 @@ web
 
 **Primary: any engineer on a team that self-hosts this instance.** Not only the
 person who deployed it. They arrive through a link from a teammate or a README,
-sign in with email and password, and expect the surface to be safe to use
-without having read the source. Two distinct moments:
+sign in, and expect the surface to be safe to use without having read the
+source. Two distinct moments:
 
-- **Credentialing** — mint an MCP identity and API key for their own agent
-  (Claude Code, OpenCode, Cursor), or revoke one that leaked or belongs to
-  someone who left. Infrequent, usually urgent, must not be gotten wrong.
+- **Credentialing** — mint an MCP identity and API key for their own agent, or
+  revoke one that leaked. Infrequent, usually urgent, must not be gotten wrong.
 - **Curating** — read, correct, and vouch for what the knowledge base tells
   agents. This is the recurring job and the reason the surface earns return
   visits.
 
-**Secondary: the operator doing first-run setup.** Runs `docker compose up`,
-sets `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`, and is the only
-account until they invite others. Same person as a primary user afterwards.
+**Secondary: the operator doing first-run setup.** Same person as a primary user
+afterwards.
 
-**High-volume consumer: the agents themselves.** Agents read and write far more
-than humans do, but only over MCP — they never touch the admin UI. Human
-attention is the scarce resource; agent throughput is not.
+**High-volume consumer: the agents themselves.** They read and write far more
+than humans, but only over MCP — never the admin UI. Human attention is the
+scarce resource; agent throughput is not.
 
 ## Product Purpose
 
@@ -35,123 +38,111 @@ on the team can read from and write to, so agents answer from the team's own
 documented truth instead of guessing or re-deriving it per session.
 
 Success is that an engineer trusts an agent's answer because they can see which
-source it came from, who vouched for that source, and what it said before it
-was last revised.
+source it came from, who vouched for that source, and what it said before it was
+last revised.
 
 ## Positioning
 
-Three things a neighboring RAG or docs tool could not truthfully copy at once:
+Three things a neighbouring RAG or docs tool could not truthfully copy at once:
 
-1. **Nothing leaves the host.** Embeddings run locally through Ollama; storage
-   is local Postgres with pgvector. There is no vendor to trust and no egress
-   for proprietary product knowledge.
-2. **Provenance is a first-class primitive, not metadata.** Every source carries
-   an authority level (`canonical`, `approved`, `unverified`), an immutable
-   revision chain, and an append-only event log. Revisions are never destructive
-   and sources are only ever soft-deleted.
+1. **Nothing leaves the host.** Embeddings run locally through Ollama; storage is
+   local Postgres with pgvector. No vendor to trust, no egress for proprietary
+   product knowledge.
+2. **Provenance is a first-class primitive, not metadata.** Authority level,
+   immutable revision chain, append-only event log. Revisions are never
+   destructive and sources are only ever soft-deleted.
 3. **Retrieved content is treated as untrusted by design.** Tool descriptions
    tell the calling model outright that submitted content is untrusted reference
-   material and that returned excerpts are quoted references, not instructions.
-   The prompt-injection surface of shared agent memory is addressed in the
-   contract, not left to the client.
+   material and returned excerpts are quoted references, not instructions. The
+   prompt-injection surface of shared agent memory is addressed in the contract,
+   not left to the client.
 
 ## Operating Context
 
-- **Distribution:** open source, GPL-3.0-only. Other teams clone the repo and
-  run it themselves. First boot must make sense to someone with zero context.
-- **Deployment:** `docker compose up --build`. Services: `app` (MCP server),
-  `admin` (this web surface), `admin-migrate`, `postgres` (pgvector), `ollama`
-  + `ollama-init`, `markitdown`, `caddy` for optional HTTPS.
-- **Endpoints:** MCP at `:3000/mcp`, admin UI at `:3001`.
-- **Bootstrap:** the `admin-migrate` service applies migrations and then seeds
-  the first administrator from `BOOTSTRAP_ADMIN_EMAIL`,
-  `BOOTSTRAP_ADMIN_PASSWORD` and optional `BOOTSTRAP_ADMIN_NAME` — creating a
-  better-auth account and granting it `admin_role`. It is idempotent: an
-  existing account with that email is reused rather than recreated. No agent API
-  key is issued at bootstrap; those are minted from the admin UI afterwards.
-  `.env.example` leaves the password blank on purpose and the README generates
-  it with `openssl rand -base64 33`.
-- **Agent auth:** MCP clients send `Authorization: Bearer <key>`. Keys are shown
-  once at creation and never again; the UI stores and displays only a prefix.
-- **Human auth:** email and password via better-auth. Sign-up is disabled unless
-  `BETTER_AUTH_ALLOW_SIGN_UP=true`, so the admin surface is closed by default.
-  Further administrators are added from **Settings** inside the admin UI, which
-  provisions the account directly — so the flag should stay off. It exists for
-  the bootstrap script, not as the way to onboard a colleague. The new
-  administrator is given an initial password and is expected to replace it from
-  the same screen; `BOOTSTRAP_ADMIN_PASSWORD` is likewise a first-boot
-  credential to be rotated there, not a permanent one.
+- **Distribution:** open source, GPL-3.0-only. Other teams clone the repo and run
+  it themselves, so first boot must make sense to someone with zero context and
+  every default must be defensible without a conversation.
+- **Human auth is closed by default, deliberately.**
+  `BETTER_AUTH_ALLOW_SIGN_UP` exists for the bootstrap script, **not** as the way
+  to onboard a colleague — further administrators are provisioned from Settings
+  with the flag off. Anyone reaching for that flag to add a teammate has
+  misread it.
+- **Credentials are first-boot, not permanent.** `BOOTSTRAP_ADMIN_PASSWORD` and
+  any initial password an administrator hands out are expected to be rotated
+  from Settings. Agent API keys are shown once at creation; only a prefix is
+  ever stored or displayed.
 
 ## Capabilities and Constraints
 
-**MCP tools today:** `submit_note`, `submit_document`, `update_source`,
-`search_knowledge`, `get_source`, `get_source_history`, `set_source_authority`,
-`delete_source`.
+The MCP tool list, the role names and the source lifecycle are all readable from
+`src/` and the migrations in a minute. What is not:
 
-**Roles and permissions** (cumulative): `reader` → read; `writer` → read, write;
-`reviewer` → read, write, review; `admin` → all. Writers may revise only sources
-they created. Authority changes and deletes require reviewer.
+- **Roles are cumulative, and a writer's reach is scoped to its own work.**
+  `reader` → read; `writer` → read and write; `reviewer` → adds authority
+  changes and deletes; `admin` → all. A writer may revise **only sources it
+  created**, and that holds even for a trusted holder whose submissions
+  auto-approve. Loosening either boundary is a security decision, not a
+  convenience one.
+- **One index, one model.** Embeddings from different models must never be mixed
+  in one index. Changing `EMBEDDING_MODEL` or the vector dimension requires
+  reindexing every chunk, and `index_configuration` refuses a silent change.
+  `qwen3-embedding:0.6b` is explicitly a replaceable baseline, not a choice the
+  product is built around.
+- **`active` is an invariant, not a default.** It is the only status any MCP read
+  returns, so it has to mean *every chunk of the current revision is in the
+  table*. Admin-created sources pass through `indexing`, and land `failed` if
+  that run dies. Anything that sets a source active must establish the invariant
+  first.
+- **Embedding is the slow part** — roughly 0.7s a chunk, in sequence. Uploads
+  index after the request returns, so a long document keeps going while the
+  browser is elsewhere.
 
-**Source lifecycle:** submitted as `unverified`; promoted to `approved` or
-`canonical` by a reviewer. Every edit creates an immutable revision rather than
-overwriting. Deletion is a soft-delete. Actions append to an `events` table.
+### Undecided, on purpose
 
-**Source status** is separate from authority and gates visibility: `active` is
-the only status any MCP read returns. A source created from the admin UI is
-`indexing` until every chunk is embedded, `failed` if that run died, and only
-then `active` — so a half-embedded document is never searchable. `deleted` is
-the soft-delete.
+These are open product questions, not gaps to be closed by whoever notices them
+next. Changing one is a decision, not a fix.
 
-**Ingestion:** Markdown notes directly; other documents converted via
-MarkItDown. Uploads capped at 10 MB (`MAX_UPLOAD_BYTES`), requests at 15 MB.
-Embedding costs roughly 0.7s a chunk and runs after the upload request returns,
-so a long document keeps indexing while the browser is elsewhere. Progress and
-retry live on the source's own page. *The MCP submission path still embeds
-inside the request;* agents submit small text, and it has its own timeouts.
+- **Workspaces.** Every row is scoped by `workspace_id` and an actor's workspace
+  comes from their key, but no tool or screen lets anyone choose or manage one.
+  *Treat the product as single-workspace until this is settled.* It is the
+  largest open fork: making workspaces visible is what would justify adopting
+  better-auth's `organization` plugin, which in turn requires a mailer — this
+  project has none — and would supersede the `admin_role` table.
+- **The product name.** "LLM Team Knowledge Base" (repo `llm-team-kb`) is in use
+  but has never been confirmed final.
 
-**Retrieval:** hybrid search over pgvector embeddings. Default model is
-`qwen3-embedding:0.6b` (Apache-2.0, ~639 MB) and is explicitly a replaceable
-baseline. Embeddings from different models must never be mixed in one index;
-changing the model or dimension requires reindexing every chunk.
+### Direction
 
-**Admin UI today:** sign-in, and one dashboard that creates identities with a
-key and revokes keys. None of the reviewer, authority, revision, or search
-capability above is reachable from the browser.
+The admin surface is the primary human surface over this data, and the workbench
+it was aimed at now ships: browse, search and read sources; revise them; run
+ingestion; work a review queue; inspect revision history; audit the event log;
+manage accounts. Remaining known gaps, in rough order of how much they cost:
 
-**Confirmed direction — full knowledge workbench.** The admin surface is
-intended to become the primary human surface over this data: browse, search and
-read sources; edit and revise them; run ingestion; work a review queue for
-authority decisions; inspect revision history; and audit what agents retrieved
-from the event log. *Sequencing across those areas is undecided.*
-
-**Latent, not yet a product concept:** every row is scoped by `workspace_id`,
-and an actor's workspace is derived from their key. No tool or screen lets
-anyone choose or manage a workspace. *Whether multi-workspace becomes visible is
-undecided;* treat the product as single-workspace until it is settled.
+- Revisions still embed inside the request, unlike uploads. A revision cannot
+  reuse the same mechanism, because the *current* revision stays live and correct
+  while a new one indexes — the state would have to live on the revision.
+- Removing an administrator is not possible from the browser. It needs
+  last-administrator protection and a decision about sources they authored.
+- No retrieval quality work has happened at all. See below.
 
 ## Brand Commitments
 
-- Name in use: **LLM Team Knowledge Base** (repo `llm-team-kb`). The admin UI
-  currently reads "Team knowledge base" / "Control room". *Neither the product
-  name nor a wordmark has been confirmed as final.*
-- License: GPL-3.0-only, stated in `LICENSE.md` and `package.json`.
+- The admin UI reads **Team knowledge base** / **Custody bench**. The design
+  system is documented in `admin/DESIGN.md` and is binding.
+- License: GPL-3.0-only.
 - No logo, wordmark, illustration, photography, or icon set exists in the repo.
 - No confirmed voice guide. Existing copy is terse, concrete and unhedged
-  ("Copy now. It will not be shown again.") — treat that as observed habit, not
-  a ratified rule.
+  ("Copy now. It will not be shown again.") — observed habit, not a ratified
+  rule.
 
 ## Evidence on Hand
 
-**Real:** `README.md` (quick start, stack, licensing), `PLAN.md` (embedding
-decision and its reasoning), `LICENSE.md`, `compose.yaml`, and the working
-implementation in `src/` and `admin/src/`. Integration tests in `test/`.
-
 **Deliberately absent — do not fabricate:**
 
-- No retrieval benchmarks. `PLAN.md` requires measuring Recall@5, MRR, indexing
-  throughput, query latency, RAM, image size and CPU cold-start on a
+- **No retrieval benchmarks.** `PLAN.md` requires measuring Recall@5, MRR,
+  indexing throughput, query latency, RAM, image size and CPU cold-start on a
   representative corpus *before* any model is called a release default. No such
-  numbers have been produced. Never publish a quality or speed figure.
+  numbers exist. **Never publish a quality or speed figure.**
 - No users, teams, adopters, testimonials, case studies, press, or stars.
 - No pricing, hosted offering, support commitment, or SLA. Self-hosted only.
 - No security audit or compliance certification.

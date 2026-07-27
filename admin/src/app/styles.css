@@ -1219,6 +1219,15 @@ select {
   z-index: 40;
 }
 
+/* An icon control's own name, which is language rather than data — so it takes
+   the UI face. The register face is for the values it sits next to: a
+   timestamp is data, "Settings" is a word. */
+.tip--label {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-variant-numeric: normal;
+}
+
 .tip__arrow {
   fill: var(--rule-strong);
 }

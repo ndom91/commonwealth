@@ -1,3 +1,4 @@
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { Link } from '@tanstack/react-router';
 import { type LucideIcon, UserRoundCog } from 'lucide-react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
@@ -5,6 +6,31 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 /* Application chrome for the Custody Bench. Every workbench screen mounts
    inside AppShell and reuses the index-and-bench split: a ruled register of
    objects on the left, the selected object on the bench to its right. */
+
+/* The label of an icon-only control, made visible on hover.
+ *
+ * Distinct from the tooltip on a timestamp, which supplies information that is
+ * not otherwise on screen and so belongs in `aria-describedby`. Here the
+ * tooltip only shows what the control is *already called* — the trigger keeps
+ * its own `aria-label`, which is what a screen reader announces.
+ *
+ * Hence the `aria-hidden` wrapper. Radix points the trigger's
+ * `aria-describedby` at this content; without it the same word is announced
+ * twice, once as the name and once as the description. Hiding the subtree makes
+ * the computed description empty and leaves the name alone. */
+function Hint({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content className="tip tip--label" sideOffset={6} collisionPadding={8}>
+          <span aria-hidden="true">{label}</span>
+          <Tooltip.Arrow className="tip__arrow" width={9} height={4} />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
 
 type Mark = 'sources' | 'review' | 'identities' | 'activity';
 
@@ -167,17 +193,18 @@ export function AppShell({
                   `user-round-cog` rather than a bare cog: a lone gear beside a
                   name reads as app configuration, and a gear drawn small enough
                   to fit reads as a sun. The person makes it unmistakably
-                  *your account*. Label moves to `aria-label` and `title` per
+                  *your account*. Label moves to `aria-label` and the hint per
                   the Icon Button rule. */}
-              <Link
-                to="/settings"
-                className="icon-btn"
-                aria-label="Settings"
-                title="Settings"
-                activeProps={{ 'aria-current': 'page' }}
-              >
-                <UserRoundCog size={15} strokeWidth={1.75} aria-hidden="true" />
-              </Link>
+              <Hint label="Settings">
+                <Link
+                  to="/settings"
+                  className="icon-btn"
+                  aria-label="Settings"
+                  activeProps={{ 'aria-current': 'page' }}
+                >
+                  <UserRoundCog size={15} strokeWidth={1.75} aria-hidden="true" />
+                </Link>
+              </Hint>
             </div>
           )}
           <button type="button" className="btn btn--quiet" onClick={onSignOut}>
@@ -215,9 +242,9 @@ export function SealChip({ state, children }: { state: SealState; children: Reac
 }
 
 /* A control small enough to sit inside a field row, where a worded button would
-   crowd out the field itself. The label is never dropped — it moves to the
-   accessible name and the tooltip — so the control is still reachable by
-   screen reader and still explains itself on hover.
+   crowd out the field itself. The label is never dropped — it stays the
+   accessible name and appears on hover through `Hint` — so the control is
+   still reachable by screen reader and still explains itself.
  *
  * Icon-only is reserved for actions whose meaning is carried entirely by a
  * conventional glyph. Anything consequential keeps its word: a magnifier is
@@ -233,15 +260,16 @@ export function IconButton({
   tone?: 'quiet' | 'void';
 } & Omit<ComponentPropsWithoutRef<'button'>, 'children' | 'className' | 'aria-label' | 'title'>) {
   return (
-    <button
-      {...button}
-      type={button.type ?? 'button'}
-      className={`icon-btn icon-btn--${tone}`}
-      aria-label={label}
-      title={label}
-    >
-      <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
-    </button>
+    <Hint label={label}>
+      <button
+        {...button}
+        type={button.type ?? 'button'}
+        className={`icon-btn icon-btn--${tone}`}
+        aria-label={label}
+      >
+        <Icon size={15} strokeWidth={1.75} aria-hidden="true" />
+      </button>
+    </Hint>
   );
 }
 
