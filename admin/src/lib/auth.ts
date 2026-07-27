@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { createAccessControl } from 'better-auth/plugins/access';
@@ -82,8 +81,15 @@ const shared = {
      A function rather than the built-in `'uuid'`, which does not mean "generate
      a uuid in JS" — it means "let the database do it", and none of the
      better-auth tables have a default on `id`. Using it makes every sign-up
-     fail with `Failed to create user` on a not-null violation. */
-  advanced: { database: { generateId: () => randomUUID() } },
+     fail with `Failed to create user` on a not-null violation.
+   *
+     Web Crypto rather than `node:crypto`. This module is reachable from the
+     client module graph — routes import `getViewer` from `session.ts`, which
+     imports this — and a `node:` builtin here pulls a shim that throws
+     `Buffer is not defined` at import time, which kills hydration for the whole
+     application. The page still renders, so the only symptom is that nothing
+     responds to a click. */
+  advanced: { database: { generateId: () => globalThis.crypto.randomUUID() } },
 };
 
 /* The instance every request goes through. Sign-up is closed unless the

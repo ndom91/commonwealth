@@ -175,7 +175,7 @@ function PersonRow({ person }: { person: Person }) {
         {person.email} · since <Stamp at={person.createdAt} withTime />
       </span>
       <span className="stub__action">
-        <label className="field field--inline">
+        <label className="field field--inline stub__role">
           <span className="sr-only">Role for {person.name}</span>
           <select
             value={person.role}
@@ -197,42 +197,46 @@ function PersonRow({ person }: { person: Person }) {
             ))}
           </select>
         </label>
-        {/* No way to remove yourself. The server refuses it regardless — a
-            register nobody can reach is not a recoverable state — but offering
-            the control and then explaining is worse than not offering it. */}
-        {!person.isYou &&
-          (confirming ? (
-            <>
+        {/* The slot is always present, empty on your own row, so the role
+            selects stay in one column. No way to remove yourself: the server
+            refuses it regardless — a register nobody can reach is not a
+            recoverable state — but offering the control and then explaining is
+            worse than not offering it. */}
+        <span className="stub__slot">
+          {!person.isYou &&
+            (confirming ? (
+              <>
+                <button
+                  type="button"
+                  className="btn btn--sm btn--void"
+                  disabled={pending}
+                  onClick={() =>
+                    act(
+                      () => removePerson({ data: { userId: person.id } }),
+                      'That person could not be removed.'
+                    )
+                  }
+                >
+                  {pending ? 'Removing…' : 'Confirm'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--sm btn--quiet"
+                  onClick={() => setConfirming(false)}
+                >
+                  Keep
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
                 className="btn btn--sm btn--void"
-                disabled={pending}
-                onClick={() =>
-                  act(
-                    () => removePerson({ data: { userId: person.id } }),
-                    'That person could not be removed.'
-                  )
-                }
+                onClick={() => setConfirming(true)}
               >
-                {pending ? 'Removing…' : 'Confirm'}
+                Remove
               </button>
-              <button
-                type="button"
-                className="btn btn--sm btn--quiet"
-                onClick={() => setConfirming(false)}
-              >
-                Keep
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn btn--sm btn--void"
-              onClick={() => setConfirming(true)}
-            >
-              Remove
-            </button>
-          ))}
+            ))}
+        </span>
       </span>
       {error && (
         <p className="notice" role="alert">

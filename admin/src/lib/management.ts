@@ -1,10 +1,10 @@
 import { createHash, randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
 import { provisioning } from './auth.js';
+import { requireMember } from './authorize.js';
 import { client } from './db.js';
 import { PAGE_SIZE } from './knowledge.js';
 import { isRole, type Role } from './roles.js';
-import { requireMember } from './session.js';
 
 /* Checked before the value reaches a `::uuid` cast, so a malformed id comes
    back as a sentence rather than a Postgres syntax error. */

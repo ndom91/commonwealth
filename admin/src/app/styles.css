@@ -76,6 +76,10 @@
      ~60px on every screen to save one row two lines — that is what wrapping is
      for. */
   --index: 420px;
+  /* Column measures for the people register: the role select, and the slot the
+     withdraw control sits in whether or not the row has one. */
+  --stub-role: 104px;
+  --stub-slot: 84px;
   --issued-lift: 0 10px 28px -6px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 
@@ -1322,6 +1326,28 @@ select {
   gap: var(--s-snug);
 }
 
+/* A register reads down its columns, so a control has to sit at the same x on
+   every row. Right-aligning the group alone does not do that: a row without a
+   withdraw control lets its select slide into the space the control would have
+   occupied, and the column bends. The role select is given a fixed measure and
+   the trailing slot reserves the widest action, so both stay put whether or not
+   the row offers one. */
+.stub__role {
+  flex: 0 0 var(--stub-role);
+  width: var(--stub-role);
+}
+
+.stub__role select {
+  width: 100%;
+}
+
+.stub__slot {
+  flex: 0 0 var(--stub-slot);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-hair);
+}
+
 /* The rail belongs to the line, not to each entry. Drawn per row it was broken
    by the gap between rows, which read as unrelated ticks rather than one chain
    of custody — the opposite of what the component is for. */
@@ -1453,6 +1479,24 @@ select {
 
   .masthead {
     padding: var(--s-loose) var(--s-loose) var(--s-base);
+  }
+}
+
+/* Below this the fixed column measures cost more than the alignment buys: the
+   meta wraps around a reserved slot and the row reads as interleaved fragments.
+   Give the measures up and let the action sit under the entry instead — there
+   is no column left to line up with. */
+@media (max-width: 560px) {
+  .stub__role,
+  .stub__slot {
+    flex: 0 1 auto;
+    width: auto;
+  }
+
+  .stub__action {
+    grid-row: auto;
+    grid-column: 1;
+    justify-content: flex-start;
   }
 }
 

@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { type Chunk, chunkMarkdown } from '@llm-team-kb/pipeline';
 import { createServerFn } from '@tanstack/react-start';
+import { requireMember } from './authorize.js';
 import { client } from './db.js';
 import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from './pipeline.js';
-import { requireMember } from './session.js';
 
 /* Read and curation access to the knowledge corpus.
  *
