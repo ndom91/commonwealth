@@ -63,7 +63,19 @@
   --s-gutter: 40px;
 
   --rail: 236px;
-  --index: 340px;
+  /* Sized to the register entry, not chosen by eye. An accession line reads
+     `777ED610 · r1 · 2026-07-27 · ndom91` and wants 253px set in mono, while the
+     entry spends 150px of its width before the text starts — 48px of gutters,
+     a 79px seal chip and the gap between them. At the old 340px the line got
+     190px and wrapped on every single row, breaking the date across two lines;
+     even 400px left it 3px short. 420px gives it 270px, clearing the ordinary
+     row with slack to spare.
+
+     A long holder name (`Dashboard Smoker` wants 326px) still wraps. Sizing the
+     whole column to the longest name in the workspace would cost the bench
+     ~60px on every screen to save one row two lines — that is what wrapping is
+     for. */
+  --index: 420px;
   --issued-lift: 0 10px 28px -6px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 
