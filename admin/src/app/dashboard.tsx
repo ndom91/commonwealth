@@ -6,6 +6,6 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
    in any link a teammate has already sent. */
 export const Route = createFileRoute('/dashboard')({
   beforeLoad: () => {
-    throw redirect({ to: '/identities', replace: true });
+    throw redirect({ to: '/sources', search: {}, replace: true });
   },
 });

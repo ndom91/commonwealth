@@ -2,6 +2,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { Link } from '@tanstack/react-router';
 import { type LucideIcon, UserRoundCog } from 'lucide-react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import { can, type Role } from '../lib/roles.js';
 
 /* Application chrome for the Custody Bench. Every workbench screen mounts
    inside AppShell and reuses the index-and-bench split: a ruled register of
@@ -32,7 +33,7 @@ function Hint({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-type Mark = 'sources' | 'review' | 'identities' | 'activity';
+type Mark = 'sources' | 'review' | 'identities' | 'people' | 'activity';
 
 /* Marks are drawn in the world's own grammar — filing tabs, seals, tags and
    custody lines — rather than borrowed from a generic icon set. */
@@ -68,6 +69,16 @@ function DrawerMark({ mark }: { mark: Mark }) {
         <circle cx="4.4" cy="7" r="0.9" />
       </svg>
     );
+  /* A countersigned tag: the same issued-tag shape as identities, but with a
+     signature line struck across it. People are the holders who sign for
+     others rather than the ones being issued to. */
+  if (mark === 'people')
+    return (
+      <svg {...common}>
+        <path d="M1.8 2.6h7l3.4 2.4-3.4 2.4h-7z" />
+        <path d="M2 10.6c1.6-1 3-1 4.2 0 1.2 1 2.8 1 4.4-.6" />
+      </svg>
+    );
   return (
     <svg {...common}>
       <path d="M3.5 1.8v10.4" />
@@ -79,28 +90,62 @@ function DrawerMark({ mark }: { mark: Mark }) {
 type Drawer = { mark: Mark; label: string; to?: string; count?: number };
 type DrawerGroup = { label: string; items: Drawer[] };
 
-export type NavCounts = { identities: number; sources: number; review: number };
+export type NavCounts = {
+  identities: number;
+  people: number;
+  sources: number;
+  review: number;
+};
 
-/* Sections the MCP server already supports but the browser cannot reach yet
-   render dormant and marked PENDING. Linking them to routes that do not exist
-   would be a claim the product cannot honour. */
-function drawerGroups(counts: NavCounts | undefined): DrawerGroup[] {
-  return [
+/* The rail shows a role only what that role can act on.
+ *
+ * A reader offered a Review queue that answers "Reviewer access is required" is
+ * being told about a job that is not theirs, on every screen. Omitting the
+ * drawer is the honest version: the section is not theirs to open.
+ *
+ * This is presentation, not protection. Every server function behind these
+ * links calls `requireMember(permission)` — see `lib/session.ts` — and refuses
+ * regardless of what the rail happens to be showing.
+ *
+ * Sections the MCP server already supports but the browser cannot reach yet
+ * render dormant and marked PENDING. Linking them to routes that do not exist
+ * would be a claim the product cannot honour. */
+function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] {
+  const groups: DrawerGroup[] = [
     {
       label: 'Knowledge',
       items: [
         { mark: 'sources', label: 'Sources', to: '/sources', count: counts?.sources },
-        { mark: 'review', label: 'Review queue', to: '/review', count: counts?.review },
+        ...(can(role, 'review')
+          ? [
+              {
+                mark: 'review' as const,
+                label: 'Review queue',
+                to: '/review',
+                count: counts?.review,
+              },
+            ]
+          : []),
       ],
     },
-    {
+  ];
+  /* Both halves of "who may act": the agent holders that present API keys, and
+     the people who can sign in and decide what those agents are told. Both are
+     credentials, so both are an administrator's business only. */
+  if (can(role, 'admin')) {
+    groups.push({
       label: 'Access',
       items: [
         { mark: 'identities', label: 'Identities', to: '/identities', count: counts?.identities },
+        { mark: 'people', label: 'People', to: '/people', count: counts?.people },
       ],
-    },
-    { label: 'Custody', items: [{ mark: 'activity', label: 'Activity', to: '/activity' }] },
-  ];
+    });
+  }
+  groups.push({
+    label: 'Custody',
+    items: [{ mark: 'activity', label: 'Activity', to: '/activity' }],
+  });
+  return groups;
 }
 
 export function AppShell({
@@ -108,6 +153,7 @@ export function AppShell({
   accession,
   actions,
   holder,
+  role,
   counts,
   onSignOut,
   children,
@@ -116,6 +162,9 @@ export function AppShell({
   accession?: string;
   actions?: ReactNode;
   holder?: string;
+  /* Shapes the rail. Supplied by every route's `beforeLoad` through
+     `getViewer()`, alongside the holder name, so one round trip covers both. */
+  role: Role;
   /* Supplied by each route's loader rather than fetched here, so that
      `router.invalidate()` after a mutation moves the rail as well as the pane
      that caused it. A component-local fetch could not be reached from the
@@ -134,13 +183,15 @@ export function AppShell({
       </a>
 
       <aside className="cabinet">
-        <Link to="/identities" className="cabinet__plate">
+        {/* Sources, not Identities: the plate is the way home, and home has to
+            be somewhere every role can stand. */}
+        <Link to="/sources" search={{}} className="cabinet__plate">
           <span>Team knowledge base</span>
           <small>Custody bench</small>
         </Link>
 
         <nav className="drawers" aria-label="Sections">
-          {drawerGroups(counts).map((group) => (
+          {drawerGroups(role, counts).map((group) => (
             <div className="drawer-group" key={group.label}>
               <span className="label">{group.label}</span>
               {group.items.map((item) =>

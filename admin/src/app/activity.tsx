@@ -4,15 +4,15 @@ import { Stamp } from '../components/stamp.js';
 import { authClient } from '../lib/auth-client.js';
 import { getNavCounts, listEvents, listEventTypes } from '../lib/knowledge.js';
 import { readFailure } from '../lib/read-failure.js';
-import { getSession } from '../lib/session.js';
+import { getViewer } from '../lib/session.js';
 
 type ActivityFilters = { type?: string };
 
 export const Route = createFileRoute('/activity')({
   beforeLoad: async () => {
-    const session = await getSession();
-    if (!session) throw redirect({ to: '/sign-in' });
-    return { holder: session.user.name ?? session.user.email ?? undefined };
+    const viewer = await getViewer();
+    if (!viewer) throw redirect({ to: '/sign-in' });
+    return viewer;
   },
   validateSearch: (search: Record<string, unknown>): ActivityFilters => ({
     type:
@@ -65,6 +65,12 @@ const PHRASING: Record<string, string> = {
   identity_amended: 'Amended a holder',
   identity_disabled: 'Disabled a holder',
   identity_enabled: 'Enabled a holder',
+  member_invited: 'Invited someone',
+  member_invitation_revoked: 'Revoked an invitation',
+  member_joined: 'Joined the workspace',
+  member_added: 'Added someone to the workspace',
+  member_role_changed: 'Changed a role',
+  member_removed: 'Removed someone',
   search: 'Searched',
 };
 
@@ -103,13 +109,35 @@ function detailOf(event: EventRow): string | null {
   if (event.event_type === 'api_key_created' || event.event_type === 'api_key_revoked') {
     return text('label');
   }
+  /* Who, and at what. A role change is the one event here where the old value
+     matters as much as the new one — "reviewer → reader" is a withdrawal of
+     trust, and reading it as just "reader" loses that. */
+  if (event.event_type === 'member_role_changed') {
+    const from = text('from');
+    const to = text('to');
+    if (!to) return null;
+    return from ? `${from} → ${to}` : `→ ${to}`;
+  }
+  if (
+    event.event_type === 'member_invited' ||
+    event.event_type === 'member_added' ||
+    event.event_type === 'member_joined'
+  ) {
+    const email = text('email');
+    const role = text('role');
+    if (!email) return null;
+    return role ? `${email} as ${role}` : email;
+  }
+  if (event.event_type === 'member_invitation_revoked' || event.event_type === 'member_removed') {
+    return text('email');
+  }
   return null;
 }
 
 function Activity() {
   const router = useRouter();
   const navigate = useNavigate({ from: '/activity' });
-  const { holder } = Route.useRouteContext();
+  const { holder, role } = Route.useRouteContext();
   const filters = Route.useSearch();
   const { counts, log, types, failure } = Route.useLoaderData();
 
@@ -121,6 +149,7 @@ function Activity() {
       title="Activity"
       accession="Custody line"
       holder={holder}
+      role={role}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();

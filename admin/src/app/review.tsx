@@ -4,13 +4,17 @@ import { Stamp } from '../components/stamp.js';
 import { authClient } from '../lib/auth-client.js';
 import { getNavCounts, listReviewQueue } from '../lib/knowledge.js';
 import { readFailure } from '../lib/read-failure.js';
-import { getSession } from '../lib/session.js';
+import { can } from '../lib/roles.js';
+import { getViewer } from '../lib/session.js';
 
 export const Route = createFileRoute('/review')({
   beforeLoad: async () => {
-    const session = await getSession();
-    if (!session) throw redirect({ to: '/sign-in' });
-    return { holder: session.user.name ?? session.user.email ?? undefined };
+    const viewer = await getViewer();
+    if (!viewer) throw redirect({ to: '/sign-in' });
+    /* Approving what the corpus vouches for is a reviewer's job. A writer who
+       lands here would see a queue of buttons that all refuse. */
+    if (!can(viewer.role, 'review')) throw redirect({ to: '/sources', search: {} });
+    return viewer;
   },
   loader: async () => {
     const counts = await getNavCounts().catch(() => undefined);
@@ -39,7 +43,7 @@ type QueueRow = {
 
 function Review() {
   const router = useRouter();
-  const { holder } = Route.useRouteContext();
+  const { holder, role } = Route.useRouteContext();
   const { counts, rows: loaded, failure } = Route.useLoaderData();
 
   const rows = (loaded ?? []) as unknown as QueueRow[];
@@ -51,6 +55,7 @@ function Review() {
       title="Review queue"
       accession="Awaiting a human"
       holder={holder}
+      role={role}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();

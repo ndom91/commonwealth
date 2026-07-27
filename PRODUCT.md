@@ -62,27 +62,41 @@ Three things a neighbouring RAG or docs tool could not truthfully copy at once:
 - **Distribution:** open source, GPL-3.0-only. Other teams clone the repo and run
   it themselves, so first boot must make sense to someone with zero context and
   every default must be defensible without a conversation.
-- **Human auth is closed by default, deliberately.**
-  `BETTER_AUTH_ALLOW_SIGN_UP` exists for the bootstrap script, **not** as the way
-  to onboard a colleague — further administrators are provisioned from Settings
-  with the flag off. Anyone reaching for that flag to add a teammate has
-  misread it.
-- **Credentials are first-boot, not permanent.** `BOOTSTRAP_ADMIN_PASSWORD` and
-  any initial password an administrator hands out are expected to be rotated
-  from Settings. Agent API keys are shown once at creation; only a prefix is
-  ever stored or displayed.
+- **Human auth is closed by default, and the flag is the only thing holding it
+  closed.** `disableSignUp` is enforced *inside* better-auth's handler, not by
+  routing: `POST /api/auth/sign-up/email` is a live unauthenticated endpoint that
+  answers `EMAIL_PASSWORD_SIGN_UP_DISABLED`. Turning `BETTER_AUTH_ALLOW_SIGN_UP`
+  on opens account creation to anyone who can reach the instance, whether or not
+  a sign-up page exists. It is for the bootstrap script. Teammates arrive by
+  invitation, with the flag off.
+- **Nobody hands anyone a password.** Adding a teammate mints a single-use link
+  from `/people`; the recipient chooses a password the issuer never sees. An
+  invitation can never act on an address that already has an account — checked
+  when issuing, when the link is opened, and again at redemption — because one
+  that could would be an account-takeover primitive.
+- **Credentials are first-boot, not permanent.** `BOOTSTRAP_ADMIN_PASSWORD` is
+  expected to be rotated from Settings. Agent API keys are shown once at
+  creation; only a prefix is ever stored or displayed.
 
 ## Capabilities and Constraints
 
 The MCP tool list, the role names and the source lifecycle are all readable from
 `src/` and the migrations in a minute. What is not:
 
-- **Roles are cumulative, and a writer's reach is scoped to its own work.**
-  `reader` → read; `writer` → read and write; `reviewer` → adds authority
-  changes and deletes; `admin` → all. A writer may revise **only sources it
-  created**, and that holds even for a trusted holder whose submissions
-  auto-approve. Loosening either boundary is a security decision, not a
-  convenience one.
+- **One role vocabulary for people and agents.** `reader` → read; `writer` →
+  read and write; `reviewer` → adds authority changes and deletes; `admin` →
+  all. The same four names govern an agent presenting an API key
+  (`src/access-service.ts`) and a person signing in to the browser
+  (`admin/src/lib/roles.ts`), so "writer" means one thing. The two maps are
+  duplicated by hand — separate deploy units — and must be changed together.
+- **A writer's reach is scoped to its own work.** A writer may revise **only
+  sources it submitted**, and that holds even for a trusted holder whose
+  submissions auto-approve. Loosening either boundary is a security decision,
+  not a convenience one.
+- **Hiding a control is not authorisation.** The drawer and the benches show a
+  role only what it can act on, but every server function calls
+  `requireMember(permission)` and refuses regardless. These are plain HTTP
+  endpoints; anything relying on the UI to withhold them is not protected.
 - **One index, one model.** Embeddings from different models must never be mixed
   in one index. Changing `EMBEDDING_MODEL` or the vector dimension requires
   reindexing every chunk, and `index_configuration` refuses a silent change.
@@ -102,12 +116,12 @@ The MCP tool list, the role names and the source lifecycle are all readable from
 These are open product questions, not gaps to be closed by whoever notices them
 next. Changing one is a decision, not a fix.
 
-- **Workspaces.** Every row is scoped by `workspace_id` and an actor's workspace
-  comes from their key, but no tool or screen lets anyone choose or manage one.
-  *Treat the product as single-workspace until this is settled.* It is the
-  largest open fork: making workspaces visible is what would justify adopting
-  better-auth's `organization` plugin, which in turn requires a mailer — this
-  project has none — and would supersede the `admin_role` table.
+- **Workspaces are one deep.** The membership model is per-workspace and
+  better-auth's `organization` plugin is mapped onto the `workspaces` table, but
+  only the `default` workspace exists and no admin query filters by one. Agents
+  are already scoped — `src/access-service.ts` has always used
+  `actor.workspaceId` — so the gap is entirely on the browser side. *Treat the
+  product as single-workspace until that lands.*
 - **The product name.** "LLM Team Knowledge Base" (repo `llm-team-kb`) is in use
   but has never been confirmed final.
 
@@ -116,13 +130,17 @@ next. Changing one is a decision, not a fix.
 The admin surface is the primary human surface over this data, and the workbench
 it was aimed at now ships: browse, search and read sources; revise them; run
 ingestion; work a review queue; inspect revision history; audit the event log;
-manage accounts. Remaining known gaps, in rough order of how much they cost:
+invite people and set what each of them may do. Remaining known gaps, in rough
+order of how much they cost:
 
+- **Several workspaces.** Creating and switching them, scoping every admin query
+  to the active one, and per-workspace embedding configuration so a team can
+  pick its own model. This is the next substantial wave.
 - Revisions still embed inside the request, unlike uploads. A revision cannot
   reuse the same mechanism, because the *current* revision stays live and correct
   while a new one indexes — the state would have to live on the revision.
-- Removing an administrator is not possible from the browser. It needs
-  last-administrator protection and a decision about sources they authored.
+- `acceptInvitation` has no rate limit. A 256-bit token is not guessable, but
+  the route is unauthenticated and unthrottled.
 - No retrieval quality work has happened at all. See below.
 
 ## Brand Commitments

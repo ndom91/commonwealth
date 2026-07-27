@@ -18,7 +18,7 @@ import { Stamp } from '../components/stamp.js';
 import { authClient } from '../lib/auth-client.js';
 import { getNavCounts, listSources, listSubmitters, searchSources } from '../lib/knowledge.js';
 import { readFailure } from '../lib/read-failure.js';
-import { getSession } from '../lib/session.js';
+import { getViewer } from '../lib/session.js';
 
 /* Filters live in the URL rather than component state: a filtered register is
    a thing people send each other, and the review queue hands off into it. */
@@ -55,9 +55,9 @@ function highlight(excerpt: string) {
 
 export const Route = createFileRoute('/sources')({
   beforeLoad: async () => {
-    const session = await getSession();
-    if (!session) throw redirect({ to: '/sign-in' });
-    return { holder: session.user.name ?? session.user.email ?? undefined };
+    const viewer = await getViewer();
+    if (!viewer) throw redirect({ to: '/sign-in' });
+    return viewer;
   },
   validateSearch: (search: Record<string, unknown>): SourceFilters => ({
     authority: oneOf(search.authority, ['unverified', 'approved', 'canonical'] as const),
@@ -132,7 +132,7 @@ export type SourceRow = {
 function Sources() {
   const router = useRouter();
   const navigate = useNavigate({ from: '/sources' });
-  const { holder } = Route.useRouteContext();
+  const { holder, role } = Route.useRouteContext();
   const filters = Route.useSearch();
   const { counts, register, submitters, failure } = Route.useLoaderData();
 
@@ -159,6 +159,7 @@ function Sources() {
       title="Sources"
       accession="Knowledge register"
       holder={holder}
+      role={role}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();

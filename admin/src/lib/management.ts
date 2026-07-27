@@ -1,11 +1,15 @@
-import { randomBytes, randomUUID, scryptSync } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
-import { getRequest } from '@tanstack/react-start/server';
-import { auth, provisioning } from './auth.js';
+import { provisioning } from './auth.js';
 import { client } from './db.js';
 import { PAGE_SIZE } from './knowledge.js';
+import { isRole, type Role } from './roles.js';
+import { requireMember } from './session.js';
 
-type Role = 'reader' | 'writer' | 'reviewer' | 'admin';
+/* Checked before the value reaches a `::uuid` cast, so a malformed id comes
+   back as a sentence rather than a Postgres syntax error. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type IdentityInput = { name: string; role: Role; keyLabel: string };
 type IdentityAmendment = {
   name: string;
@@ -14,14 +18,13 @@ type IdentityAmendment = {
   autoApprove: boolean;
 };
 
+/* Everything in this module manages who may act — agent credentials and the
+   people who hold accounts — so it is uniformly behind `admin`. The one
+   exception is redeeming an invitation, where the token is the authorisation
+   and there is no session yet. */
 async function adminId(): Promise<string> {
-  const session = await auth.api.getSession({ headers: getRequest().headers });
-  if (!session) throw new Error('Unauthorized');
-  const [role] = await client<
-    { user_id: string }[]
-  >`SELECT user_id FROM admin_role WHERE user_id = ${session.user.id}`;
-  if (!role) throw new Error('Forbidden');
-  return role.user_id;
+  const { userId } = await requireMember('admin');
+  return userId;
 }
 
 /* Keyset paginated on (created_at DESC, id DESC), the same ordering the source
@@ -303,99 +306,434 @@ export const revokeKey = createServerFn({ method: 'POST' })
     return { revoked: true };
   });
 
-/* Administrators — the humans who can reach this surface at all.
+/* People — the humans who can sign in, and what each of them may do.
  *
  * Distinct from the identities above: those are agent holders in the knowledge
- * schema (`users`, uuid), these are better-auth accounts (`"user"`, text) that
- * hold a row in `admin_role`. The two never mix, which is why the register can
- * show a holder called "Admin" that is nobody's colleague. */
-export type Administrator = {
+ * schema (`users`, uuid), these are better-auth accounts (`"user"`, text) with
+ * a row in `member`. The two never mix, which is why the register can show a
+ * holder called "Admin" that is nobody's colleague.
+ *
+ * They do share a role vocabulary, deliberately — see `roles.ts`. A human
+ * writer and an agent writer are granted the same four verbs. */
+export type Person = {
   id: string;
   name: string;
   email: string;
+  role: Role;
   createdAt: string;
   isYou: boolean;
 };
 
-/* Unpaginated on purpose, unlike `listIdentities`. Administrators are people
-   with a password to this instance; if that list ever needs a cursor, something
-   has gone wrong that pagination would only hide. */
-export const listAdministrators = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<Administrator[]> => {
-    const you = await adminId();
-    /* `created_at` comes back as a string, not a Date. `drizzle()` mutates the
+/* Unpaginated on purpose, unlike `listIdentities`. These are people with a
+   password to this instance; if that list ever needs a cursor, something has
+   gone wrong that pagination would only hide. */
+export const listPeople = createServerFn({ method: 'GET' }).handler(async (): Promise<Person[]> => {
+  const { userId: you, workspaceId } = await requireMember('admin');
+  /* `created_at` comes back as a string, not a Date. `drizzle()` mutates the
      client it is handed (see `db.ts`) and that extends to its date parsers, so
      this client hands back raw Postgres timestamps while a bare postgres.js
      client would give you a Date. Pass it through untouched: `<Stamp>` takes
      either shape and normalises it, which is what every register here does. */
-    const rows = await client<{ id: string; name: string; email: string; created_at: string }[]>`
-    SELECT "user".id, "user".name, "user".email, admin_role.created_at
-    FROM admin_role
-    JOIN "user" ON "user".id = admin_role.user_id
-    ORDER BY admin_role.created_at ASC, "user".email ASC
+  const rows = await client<
+    { id: string; name: string; email: string; role: string; created_at: string }[]
+  >`
+    SELECT "user".id, "user".name, "user".email, member.role, member.created_at
+    FROM member
+    JOIN "user" ON "user".id = member.user_id
+    WHERE member.workspace_id = ${workspaceId}
+    ORDER BY member.created_at ASC, "user".email ASC
   `;
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      createdAt: row.created_at,
-      isYou: row.id === you,
-    }));
-  }
-);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: isRole(row.role) ? row.role : 'reader',
+    createdAt: row.created_at,
+    isYou: row.id === you,
+  }));
+});
 
-/* Mirrors the bootstrap at `admin/scripts/migrate.ts:81-87`, the only other
-   place an administrator is created.
+/* Raising or lowering what someone may do.
  *
- * Goes through `provisioning` rather than `auth`: `disableSignUp` is enforced
- * inside the sign-up handler, so the request-facing instance refuses this even
- * server-side. See the comment in `auth.ts` for why that is a separate instance
- * rather than a flag flip.
+ * The last-administrator guard is the point of the transaction: without it,
+ * demoting yourself when you are the only admin locks the instance out of its
+ * own people register, credentials and review queue, with no way back through
+ * the browser. Counted inside the same transaction as the update so two
+ * simultaneous demotions cannot both see a second admin that is about to
+ * disappear. */
+export const updatePersonRole = createServerFn({ method: 'POST' })
+  .validator((value: unknown): { userId: string; role: Role } => {
+    const input = (value ?? {}) as Partial<{ userId: string; role: string }>;
+    const userId = input.userId?.trim();
+    if (!userId) throw new Error('Invalid person');
+    if (!isRole(input.role)) throw new Error('Invalid role');
+    return { userId, role: input.role };
+  })
+  .handler(async ({ data }) => {
+    const { userId: actor, workspaceId } = await requireMember('admin');
+    await client.begin(async (transaction) => {
+      const [before] = await transaction<{ role: string }[]>`
+        SELECT role FROM member
+        WHERE workspace_id = ${workspaceId} AND user_id = ${data.userId}
+        FOR UPDATE
+      `;
+      if (!before) throw new Error('That person is no longer a member.');
+      if (before.role === data.role) return;
+      if (before.role === 'admin' && data.role !== 'admin') {
+        const [{ count }] = await transaction<{ count: string }[]>`
+          SELECT count(*) FROM member
+          WHERE workspace_id = ${workspaceId} AND role = 'admin'
+        `;
+        if (Number(count) <= 1) {
+          throw new Error('This is the only administrator. Promote someone else first.');
+        }
+      }
+      await transaction`
+        UPDATE member SET role = ${data.role}
+        WHERE workspace_id = ${workspaceId} AND user_id = ${data.userId}
+      `;
+      await transaction`
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${workspaceId}, ${actor}, 'member_role_changed',
+          ${JSON.stringify({ userId: data.userId, from: before.role, to: data.role })}::jsonb)
+      `;
+    });
+    return { role: data.role };
+  });
+
+/* Removing someone's access.
  *
- * The existence check is not only for a nicer message. With `autoSignIn: false`
- * better-auth answers an already-registered email generically, so a duplicate
- * would otherwise look like success. Checking first also lets an existing
- * account be promoted instead of refused. */
-export const createAdministrator = createServerFn({ method: 'POST' })
-  .validator((value: unknown): { name: string; email: string; password: string } => {
-    const input = (value ?? {}) as Partial<{ name: string; email: string; password: string }>;
+ * The membership goes; the account and everything they wrote stay. Sources
+ * carry `created_by_admin_id` with `ON DELETE SET NULL`, so deleting the
+ * account would quietly unattribute their submissions — which is the opposite
+ * of what a provenance product should do when someone leaves. */
+export const removePerson = createServerFn({ method: 'POST' })
+  .validator((value: unknown): { userId: string } => {
+    const userId = (value as { userId?: string })?.userId?.trim();
+    if (!userId) throw new Error('Invalid person');
+    return { userId };
+  })
+  .handler(async ({ data }) => {
+    const { userId: actor, workspaceId } = await requireMember('admin');
+    if (data.userId === actor) throw new Error('You cannot remove your own access.');
+    await client.begin(async (transaction) => {
+      const [removed] = await transaction<{ role: string }[]>`
+        DELETE FROM member
+        WHERE workspace_id = ${workspaceId} AND user_id = ${data.userId}
+        RETURNING role
+      `;
+      /* Already gone. The register reloads without them and there is nothing
+         for the administrator to correct. */
+      if (!removed) return;
+      await transaction`
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${workspaceId}, ${actor}, 'member_removed',
+          ${JSON.stringify({ userId: data.userId, role: removed.role })}::jsonb)
+      `;
+    });
+    return { removed: true };
+  });
+
+export type Invitation = {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  invitedBy: string;
+  createdAt: string;
+  expiresAt: string;
+  expired: boolean;
+};
+
+/* Long enough to survive a weekend and a holiday Monday; short enough that a
+   link forgotten in a chat log stops working. */
+const INVITATION_DAYS = 7;
+
+const tokenDigest = (token: string) => createHash('sha256').update(token).digest('hex');
+
+/* Add a teammate without ever holding their password.
+ *
+ * This used to take an initial password, which the issuer typed, read off the
+ * screen and passed along — then told the recipient to replace it. That
+ * instruction was correct and was also an admission that the mechanism was
+ * wrong. Now the issuer mints a single-use link and the recipient chooses a
+ * password nobody else has seen.
+ *
+ * An address that already has an account takes the *add* branch: it needs no
+ * password, so there is nothing to invite them to set. That branch is not only
+ * a convenience. An invitation able to act on an existing account would be an
+ * account-takeover primitive — invite a colleague's address, redeem it
+ * yourself, own their login. This check and the matching one in
+ * `acceptInvitation` are what make that impossible.
+ *
+ * Sign-up stays closed throughout. `provisioning` (see `auth.ts`) is the only
+ * thing that creates accounts, and the public `POST /api/auth/sign-up/email`
+ * route keeps refusing. */
+export const invitePerson = createServerFn({ method: 'POST' })
+  .validator((value: unknown): { name: string; email: string; role: Role } => {
+    const input = (value ?? {}) as Partial<{ name: string; email: string; role: string }>;
     const email = input.email?.trim().toLowerCase();
     const name = input.name?.trim();
     if (!name) throw new Error('A name is required.');
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
       throw new Error('That does not look like an email address.');
-    /* Eight is better-auth's own `minPasswordLength` default, so this adds no
-       rule of its own — it just fails here, with a sentence, rather than as a
-       provider error once the account is half-made. */
-    if (!input.password || input.password.length < 8) {
-      throw new Error('Use at least 8 characters for the initial password.');
-    }
-    return { name, email, password: input.password };
+    /* No default. The inviter decides what this person may do, every time —
+       a role that arrives by omission is one nobody chose. */
+    if (!isRole(input.role)) throw new Error('Choose a role for this person.');
+    return { name, email, role: input.role };
   })
   .handler(async ({ data }) => {
-    await adminId();
+    const { userId: invitedBy, workspaceId } = await requireMember('admin');
 
     const [existing] = await client<
       { id: string }[]
     >`SELECT id FROM "user" WHERE lower(email) = ${data.email}`;
     if (existing) {
-      const [already] = await client<{ user_id: string }[]>`
-        SELECT user_id FROM admin_role WHERE user_id = ${existing.id}
+      const [already] = await client<{ role: string }[]>`
+        SELECT role FROM member
+        WHERE workspace_id = ${workspaceId} AND user_id = ${existing.id}
       `;
-      if (already) throw new Error(`${data.email} is already an administrator.`);
-      await client`INSERT INTO admin_role (user_id) VALUES (${existing.id}) ON CONFLICT DO NOTHING`;
-      return { email: data.email, promoted: true };
+      if (already) throw new Error(`${data.email} is already a member of this workspace.`);
+      await client.begin(async (transaction) => {
+        await transaction`
+          INSERT INTO member (workspace_id, user_id, role)
+          VALUES (${workspaceId}, ${existing.id}, ${data.role})
+          ON CONFLICT (workspace_id, user_id) DO NOTHING
+        `;
+        await transaction`
+          INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+          VALUES (${workspaceId}, ${invitedBy}, 'member_added',
+            ${JSON.stringify({ email: data.email, role: data.role })}::jsonb)
+        `;
+      });
+      return { email: data.email, added: true, role: data.role, token: null as string | null };
     }
 
-    await provisioning.api.signUpEmail({
-      body: { name: data.name, email: data.email, password: data.password },
+    const token = `inv_${randomBytes(32).toString('base64url')}`;
+    await client.begin(async (transaction) => {
+      /* Supersede any outstanding link for this address rather than collide
+         with the partial unique index. Re-inviting should mean "here is a fresh
+         link", not an error about one they never used. */
+      await transaction`
+        UPDATE member_invitation SET revoked_at = now()
+        WHERE lower(email) = ${data.email} AND accepted_at IS NULL AND revoked_at IS NULL
+      `;
+      await transaction`
+        INSERT INTO member_invitation (email, name, token_hash, workspace_id, role, invited_by, expires_at)
+        VALUES (${data.email}, ${data.name}, ${tokenDigest(token)}, ${workspaceId}, ${data.role},
+                ${invitedBy}, now() + ${`${INVITATION_DAYS} days`}::interval)
+      `;
+      await transaction`
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${workspaceId}, ${invitedBy}, 'member_invited',
+          ${JSON.stringify({ email: data.email, role: data.role })}::jsonb)
+      `;
     });
-    const [created] = await client<
-      { id: string }[]
-    >`SELECT id FROM "user" WHERE lower(email) = ${data.email}`;
-    if (!created) throw new Error('The account could not be created. Nothing was changed.');
-    await client`INSERT INTO admin_role (user_id) VALUES (${created.id}) ON CONFLICT DO NOTHING`;
-    return { email: data.email, promoted: false };
+
+    return { email: data.email, added: false, role: data.role, token: token as string | null };
+  });
+
+/* A pending invitation is a live credential to this surface, so it has to be
+   visible and cancellable. Expired ones stay listed: knowing a link went unused
+   is the difference between chasing someone and reissuing. */
+export const listInvitations = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Invitation[]> => {
+    const { workspaceId } = await requireMember('admin');
+    const rows = await client<
+      {
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+        invited_by: string;
+        created_at: string;
+        expires_at: string;
+        expired: boolean;
+      }[]
+    >`
+      SELECT invitation.id, invitation.email, invitation.name, invitation.role,
+             COALESCE(NULLIF(inviter.name, ''), inviter.email, 'an administrator') AS invited_by,
+             invitation.created_at, invitation.expires_at,
+             invitation.expires_at <= now() AS expired
+      FROM member_invitation AS invitation
+      LEFT JOIN "user" AS inviter ON inviter.id = invitation.invited_by
+      WHERE invitation.workspace_id = ${workspaceId}
+        AND invitation.accepted_at IS NULL AND invitation.revoked_at IS NULL
+      ORDER BY invitation.created_at DESC
+    `;
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: isRole(row.role) ? row.role : 'reader',
+      invitedBy: row.invited_by,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+      expired: row.expired,
+    }));
+  }
+);
+
+export const revokeInvitation = createServerFn({ method: 'POST' })
+  .validator((value: unknown): { invitationId: string } => {
+    const id = (value as { invitationId?: string })?.invitationId?.trim();
+    if (!id || !UUID.test(id)) throw new Error('Invalid invitation');
+    return { invitationId: id };
+  })
+  .handler(async ({ data }) => {
+    const { userId: revokedBy, workspaceId } = await requireMember('admin');
+    await client.begin(async (transaction) => {
+      const [revoked] = await transaction<{ email: string }[]>`
+        UPDATE member_invitation SET revoked_at = now()
+        WHERE id = ${data.invitationId} AND workspace_id = ${workspaceId}
+          AND accepted_at IS NULL AND revoked_at IS NULL
+        RETURNING email
+      `;
+      /* Already spent or already revoked. The list reloads without it; there is
+         nothing for the administrator to correct. */
+      if (!revoked) return;
+      await transaction`
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${workspaceId}, ${revokedBy},
+          'member_invitation_revoked', ${JSON.stringify({ email: revoked.email })}::jsonb)
+      `;
+    });
+    return { revoked: true };
+  });
+
+/* Every reason a link can fail, and the sentence for each.
+ *
+ * They are separated because they send the reader somewhere different: *used*
+ * means go and sign in, *revoked* and *expired* mean go back to whoever invited
+ * you, and *already has an account* means the link was never going to work.
+ * Collapsing them into one message would tell someone with no account to sign
+ * in — advice that cannot succeed.
+ *
+ * A token that was never issued gets the flattest sentence of the four, and
+ * nothing distinguishes it from one aimed at a different instance. */
+async function inspectInvitation(token: string) {
+  const [invitation] = await client<
+    {
+      id: string;
+      email: string;
+      name: string;
+      role: string;
+      workspace_id: string;
+      invited_by: string;
+      expired: boolean;
+      accepted: boolean;
+      revoked: boolean;
+    }[]
+  >`
+    SELECT invitation.id, invitation.email, invitation.name, invitation.role,
+           invitation.workspace_id,
+           COALESCE(NULLIF(inviter.name, ''), inviter.email, 'an administrator') AS invited_by,
+           invitation.expires_at <= now() AS expired,
+           invitation.accepted_at IS NOT NULL AS accepted,
+           invitation.revoked_at IS NOT NULL AS revoked
+    FROM member_invitation AS invitation
+    LEFT JOIN "user" AS inviter ON inviter.id = invitation.invited_by
+    WHERE invitation.token_hash = ${tokenDigest(token)}
+  `;
+  if (!invitation) throw new Error('That invitation link is not valid.');
+  if (invitation.accepted)
+    throw new Error('That invitation has already been used. Sign in instead.');
+  if (invitation.revoked)
+    throw new Error('That invitation was withdrawn. Ask whoever invited you for a new link.');
+  if (invitation.expired) throw new Error('That invitation has expired. Ask for a new link.');
+
+  /* Checked here, not only at redemption, so the page refuses up front instead
+     of showing a password form that cannot succeed. The address may have
+     acquired an account since the link was minted — by the bootstrap script, or
+     by another invitation — and a token able to set its password would be a
+     takeover. `acceptInvitation` repeats the check rather than trusting this
+     one; between the two calls is a window. */
+  const [existing] = await client<
+    { id: string }[]
+  >`SELECT id FROM "user" WHERE lower(email) = ${invitation.email.toLowerCase()}`;
+  if (existing) throw new Error(`${invitation.email} already has an account. Sign in instead.`);
+
+  return invitation;
+}
+
+/* What the invite page shows before asking for a password: who invited you,
+ * which address this is for, and what you will be able to do.
+ *
+ * Unauthenticated, necessarily — the reader has no account yet. */
+export const readInvitation = createServerFn({ method: 'GET' })
+  .validator((value: unknown): { token: string } => {
+    const token = (value as { token?: string })?.token?.trim();
+    if (!token) throw new Error('That invitation link is not valid.');
+    return { token };
+  })
+  .handler(async ({ data }) => {
+    const invitation = await inspectInvitation(data.token);
+    return {
+      email: invitation.email,
+      name: invitation.name,
+      role: isRole(invitation.role) ? invitation.role : ('reader' as Role),
+      invitedBy: invitation.invited_by,
+    };
+  });
+
+/* Redeeming an invitation. **Not gated on `requireMember()`** — the holder has
+ * no account yet, so there is no session to check. The token is the
+ * authorisation, which is why it is 256 bits, single-use, expiring, and stored
+ * only as a digest.
+ *
+ * `inspectInvitation` runs again here rather than trusting what the page was
+ * told. Between rendering the form and submitting it, the link may have been
+ * revoked, or that address may have acquired an account by another route — and
+ * a token that could then set its password would be a takeover.
+ *
+ * The invitation is claimed with a conditional UPDATE *before* the account is
+ * made, so two simultaneous redemptions cannot both pass; if account creation
+ * then fails, the transaction rolls the claim back with it. */
+export const acceptInvitation = createServerFn({ method: 'POST' })
+  .validator((value: unknown): { token: string; password: string } => {
+    const input = (value ?? {}) as Partial<{ token: string; password: string }>;
+    const token = input.token?.trim();
+    if (!token) throw new Error('That invitation link is not valid.');
+    /* Matches better-auth's `minPasswordLength` default, which is what actually
+       enforces it — checking here only saves a round trip. */
+    if (!input.password || input.password.length < 8) {
+      throw new Error('Use at least 8 characters.');
+    }
+    return { token, password: input.password };
+  })
+  .handler(async ({ data }) => {
+    const invitation = await inspectInvitation(data.token);
+    const email = invitation.email.toLowerCase();
+    const role = isRole(invitation.role) ? invitation.role : ('reader' as Role);
+
+    await client.begin(async (transaction) => {
+      const [claimed] = await transaction<{ id: string }[]>`
+        UPDATE member_invitation SET accepted_at = now()
+        WHERE id = ${invitation.id} AND accepted_at IS NULL AND revoked_at IS NULL
+        RETURNING id
+      `;
+      if (!claimed) throw new Error('That invitation has already been used. Sign in instead.');
+
+      await provisioning.api.signUpEmail({
+        body: { name: invitation.name, email: invitation.email, password: data.password },
+      });
+      const [created] = await transaction<{ id: string }[]>`
+        SELECT id FROM "user" WHERE lower(email) = ${email}
+      `;
+      if (!created) throw new Error('The account could not be created. Nothing was changed.');
+      await transaction`
+        INSERT INTO member (workspace_id, user_id, role)
+        VALUES (${invitation.workspace_id}, ${created.id}, ${role})
+        ON CONFLICT (workspace_id, user_id) DO NOTHING
+      `;
+      await transaction`
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${invitation.workspace_id}, ${created.id},
+          'member_joined', ${JSON.stringify({ email: invitation.email, role })}::jsonb)
+      `;
+    });
+
+    return { email: invitation.email, role };
   });
 
 /* Changing your own name and password goes through `authClient.updateUser` and

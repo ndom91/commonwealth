@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
-import { adminRole, user } from '../src/db/schema.js';
+import { member, user } from '../src/db/schema.js';
 import { client, db } from '../src/lib/db.js';
 
 /* Creating the first administrator is the one place sign-up must always be
@@ -84,8 +84,10 @@ if (stalled.length > 0) {
 
 const embeddingModel = process.env.EMBEDDING_MODEL;
 if (!embeddingModel) throw new Error('EMBEDDING_MODEL is required');
+/* `slug` is better-auth's, not ours — the organization plugin requires it and
+   `workspaces` is the table it is pointed at. See `lib/auth.ts`. */
 const [workspace] = await client<{ id: string }[]>`
-  INSERT INTO workspaces (name) VALUES ('default')
+  INSERT INTO workspaces (name, slug) VALUES ('default', 'default')
   ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
   RETURNING id
 `;
@@ -122,5 +124,11 @@ if (!admin) {
   [admin] = await db.select().from(user).where(eq(user.email, email));
 }
 if (!admin) throw new Error('Unable to bootstrap dashboard administrator');
-await db.insert(adminRole).values({ userId: admin.id }).onConflictDoNothing();
+/* The first person in has to be able to invite the rest, so `admin` — the only
+   role that reaches the people register. Everyone after them is invited at
+   whatever role the inviter chooses. */
+await db
+  .insert(member)
+  .values({ organizationId: workspace.id, userId: admin.id, role: 'admin' })
+  .onConflictDoNothing();
 await client.end();

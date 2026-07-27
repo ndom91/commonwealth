@@ -19,7 +19,8 @@ import { authClient } from '../lib/auth-client.js';
 import { getNavCounts } from '../lib/knowledge.js';
 import { createIdentity, listIdentities } from '../lib/management.js';
 import { readFailure } from '../lib/read-failure.js';
-import { getSession } from '../lib/session.js';
+import { can } from '../lib/roles.js';
+import { getViewer } from '../lib/session.js';
 
 export type IdentitySearch = { after?: string };
 
@@ -44,9 +45,12 @@ function parseCursor(after: string | undefined) {
  * effect-driven refetch, so there were two ways to reload one page. */
 export const Route = createFileRoute('/identities')({
   beforeLoad: async () => {
-    const session = await getSession();
-    if (!session) throw redirect({ to: '/sign-in' });
-    return { holder: session.user.name ?? session.user.email ?? undefined };
+    const viewer = await getViewer();
+    if (!viewer) throw redirect({ to: '/sign-in' });
+    /* Agent credentials are an administrator's business: this register issues and
+       voids keys. Enforced again in every server function it calls. */
+    if (!can(viewer.role, 'admin')) throw redirect({ to: '/sources', search: {} });
+    return viewer;
   },
   /* The cursor lives in the URL like every other register state, so a page of
      the register is linkable and a reload does not silently jump back to the
@@ -74,7 +78,7 @@ export const Route = createFileRoute('/identities')({
 function IdentitiesLayout() {
   const router = useRouter();
   const navigate = useNavigate();
-  const { holder } = Route.useRouteContext();
+  const { holder, role: viewerRole } = Route.useRouteContext();
   const { counts, page, failure } = Route.useLoaderData();
   const { after } = Route.useSearch();
 
@@ -125,6 +129,7 @@ function IdentitiesLayout() {
       title="Identities"
       accession="Access register"
       holder={holder}
+      role={viewerRole}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();

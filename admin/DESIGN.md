@@ -452,8 +452,8 @@ change. One line of detail rides in the *what* column and nothing more; the
 benches have room for the rest.
 
 **The Attribution Rule.** Every row names an actor or says it cannot. Agents
-carry their holder name, administrators their email, and rows written before
-events recorded an administrator read `unattributed` in dormant italic. They
+carry their holder name, people their email, and rows written before events
+recorded a person read `unattributed` in dormant italic. They
 are shown rather than hidden or backfilled — the log is append-only, and a
 gap in the record is itself part of the record.
 
@@ -476,6 +476,21 @@ that do not exist yet render as genuinely `disabled` buttons with an uppercase
 is built rather than linking to nothing. **No section is dormant today**; every
 drawer routes somewhere, so that branch is currently unexercised and kept only
 as the pattern for the next unbuilt section.
+
+**The rail is cut to the holder's role.** A reader sees Knowledge and Custody;
+Review queue appears at `reviewer`, the Access group at `admin`. Omitted, not
+disabled — a `PENDING` mark says *nobody can open this yet*, which is a
+different sentence from *this is not yours to open*, and showing a drawer that
+answers with a refusal tells someone about a job they do not have on every
+screen. Absence is the quieter and more accurate statement.
+
+Each drawer carries a hand-drawn mark in the world's own grammar — a filing tab
+for Sources, a dashed seal for the review queue, an issued tag for Identities, a
+**countersigned tag** for People (the same tag with a signature struck across
+it: these are the holders who sign for others rather than the ones issued to),
+and a custody line for Activity. Five marks, no borrowed icon set. The one
+Lucide glyph in the chrome sits by the signed-in name, where the vocabulary is
+deliberately not the drawer one.
 
 The rail is the only place a register's size is stated. A register never
 repeats its own count in a head above itself: the number is already in the rail

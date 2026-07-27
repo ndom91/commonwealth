@@ -13,12 +13,14 @@ import { Route as IndexRouteImport } from './app/index'
 import { Route as ActivityRouteImport } from './app/activity'
 import { Route as DashboardRouteImport } from './app/dashboard'
 import { Route as IdentitiesRouteImport } from './app/identities'
+import { Route as PeopleRouteImport } from './app/people'
 import { Route as ReviewRouteImport } from './app/review'
 import { Route as SettingsRouteImport } from './app/settings'
 import { Route as SignInRouteImport } from './app/sign-in'
 import { Route as SourcesRouteImport } from './app/sources'
 import { Route as IdentitiesIndexRouteImport } from './app/identities/index'
 import { Route as IdentitiesIdentityIdRouteImport } from './app/identities/$identityId'
+import { Route as InviteTokenRouteImport } from './app/invite.$token'
 import { Route as SourcesIndexRouteImport } from './app/sources/index'
 import { Route as SourcesSourceIdRouteImport } from './app/sources/$sourceId'
 import { Route as SourcesNewRouteImport } from './app/sources/new'
@@ -42,6 +44,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const IdentitiesRoute = IdentitiesRouteImport.update({
   id: '/identities',
   path: '/identities',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PeopleRoute = PeopleRouteImport.update({
+  id: '/people',
+  path: '/people',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewRoute = ReviewRouteImport.update({
@@ -74,6 +81,11 @@ const IdentitiesIdentityIdRoute = IdentitiesIdentityIdRouteImport.update({
   path: '/$identityId',
   getParentRoute: () => IdentitiesRoute,
 } as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SourcesIndexRoute = SourcesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -100,11 +112,13 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/dashboard': typeof DashboardRoute
   '/identities': typeof IdentitiesRouteWithChildren
+  '/people': typeof PeopleRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sources': typeof SourcesRouteWithChildren
   '/identities/$identityId': typeof IdentitiesIdentityIdRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/sources/new': typeof SourcesNewRoute
   '/identities/': typeof IdentitiesIndexRoute
@@ -115,10 +129,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/dashboard': typeof DashboardRoute
+  '/people': typeof PeopleRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/identities/$identityId': typeof IdentitiesIdentityIdRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/sources/new': typeof SourcesNewRoute
   '/identities': typeof IdentitiesIndexRoute
@@ -131,11 +147,13 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/dashboard': typeof DashboardRoute
   '/identities': typeof IdentitiesRouteWithChildren
+  '/people': typeof PeopleRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sources': typeof SourcesRouteWithChildren
   '/identities/$identityId': typeof IdentitiesIdentityIdRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/sources/new': typeof SourcesNewRoute
   '/identities/': typeof IdentitiesIndexRoute
@@ -149,11 +167,13 @@ export interface FileRouteTypes {
     | '/activity'
     | '/dashboard'
     | '/identities'
+    | '/people'
     | '/review'
     | '/settings'
     | '/sign-in'
     | '/sources'
     | '/identities/$identityId'
+    | '/invite/$token'
     | '/sources/$sourceId'
     | '/sources/new'
     | '/identities/'
@@ -164,10 +184,12 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/dashboard'
+    | '/people'
     | '/review'
     | '/settings'
     | '/sign-in'
     | '/identities/$identityId'
+    | '/invite/$token'
     | '/sources/$sourceId'
     | '/sources/new'
     | '/identities'
@@ -179,11 +201,13 @@ export interface FileRouteTypes {
     | '/activity'
     | '/dashboard'
     | '/identities'
+    | '/people'
     | '/review'
     | '/settings'
     | '/sign-in'
     | '/sources'
     | '/identities/$identityId'
+    | '/invite/$token'
     | '/sources/$sourceId'
     | '/sources/new'
     | '/identities/'
@@ -196,10 +220,12 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   DashboardRoute: typeof DashboardRoute
   IdentitiesRoute: typeof IdentitiesRouteWithChildren
+  PeopleRoute: typeof PeopleRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
   SignInRoute: typeof SignInRoute
   SourcesRoute: typeof SourcesRouteWithChildren
+  InviteTokenRoute: typeof InviteTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -231,6 +257,13 @@ declare module '@tanstack/react-router' {
       path: '/identities'
       fullPath: '/identities'
       preLoaderRoute: typeof IdentitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/people': {
+      id: '/people'
+      path: '/people'
+      fullPath: '/people'
+      preLoaderRoute: typeof PeopleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/review': {
@@ -274,6 +307,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/identities/$identityId'
       preLoaderRoute: typeof IdentitiesIdentityIdRouteImport
       parentRoute: typeof IdentitiesRoute
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/sources/': {
       id: '/sources/'
@@ -340,10 +380,12 @@ const rootRouteChildren: RootRouteChildren = {
   ActivityRoute: ActivityRoute,
   DashboardRoute: DashboardRoute,
   IdentitiesRoute: IdentitiesRouteWithChildren,
+  PeopleRoute: PeopleRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
   SignInRoute: SignInRoute,
   SourcesRoute: SourcesRouteWithChildren,
+  InviteTokenRoute: InviteTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

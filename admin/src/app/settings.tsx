@@ -1,61 +1,54 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppShell } from '../components/chrome.js';
-import { Stamp } from '../components/stamp.js';
 import { authClient } from '../lib/auth-client.js';
 import { getNavCounts } from '../lib/knowledge.js';
-import { type Administrator, createAdministrator, listAdministrators } from '../lib/management.js';
-import { readFailure } from '../lib/read-failure.js';
-import { getSession } from '../lib/session.js';
+import { getSession, getViewer } from '../lib/session.js';
 
-/* The only surface that is about the people holding keys to the cabinet rather
-   than about what is in it. Two concerns, one page, because they answer the
-   same question — who can open this, and how do they change their own key.
+/* Your own account, and nothing else.
  *
- * A single bench rather than the register/bench split used by Sources and
- * Identities: there is nothing here to browse. Administrators are a handful of
- * people, listed in full. */
+ * This page used to carry the roster of everyone who can administer the
+ * instance as well. Those are different jobs — one is a preference, the other
+ * is granting people access — and the split was already half-argued by the
+ * chrome, which puts this behind the signed-in name rather than in a drawer
+ * because it is *yours*. The roster moved to `/people`, in the Access drawer
+ * beside the agent holders, where a register of people belongs.
+ *
+ * Reachable at every role: changing your own name and password is not a
+ * privilege. */
 export const Route = createFileRoute('/settings')({
   beforeLoad: async () => {
-    const session = await getSession();
-    if (!session) throw redirect({ to: '/sign-in' });
+    /* Both, because this route needs what neither returns alone: the role for
+       the rail, and the raw name and email for the form. */
+    const [viewer, session] = await Promise.all([getViewer(), getSession()]);
+    if (!viewer || !session) throw redirect({ to: '/sign-in' });
     return {
-      holder: session.user.name ?? session.user.email ?? undefined,
+      ...viewer,
       account: { name: session.user.name ?? '', email: session.user.email ?? '' },
     };
   },
-  loader: async () => {
-    const counts = await getNavCounts().catch(() => undefined);
-    try {
-      return { counts, administrators: await listAdministrators(), failure: undefined };
-    } catch (cause) {
-      return {
-        counts,
-        administrators: [] as Administrator[],
-        failure: readFailure(cause, 'The administrator list'),
-      };
-    }
-  },
+  loader: async () => ({ counts: await getNavCounts().catch(() => undefined) }),
   component: Settings,
 });
 
 function Settings() {
   const router = useRouter();
-  const { holder, account } = Route.useRouteContext();
-  const { counts, administrators, failure } = Route.useLoaderData();
+  const { holder, role, account } = Route.useRouteContext();
+  const { counts } = Route.useLoaderData();
 
   return (
     <AppShell
       title="Settings"
-      accession="Account and access"
+      accession="Your account"
       holder={holder}
+      role={role}
       counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: '/sign-in' });
       }}
     >
-      <section className="detail" aria-label="Settings">
+      <section className="detail" aria-label="Your account">
         <div className="bench__head">
           <div>
             <span className="label">Signed in as</span>
@@ -65,7 +58,6 @@ function Settings() {
 
         <DisplayName current={account.name} />
         <Password />
-        <Administrators administrators={administrators} failure={failure} />
       </section>
     </AppShell>
   );
@@ -241,143 +233,5 @@ function Password() {
         </div>
       </form>
     </div>
-  );
-}
-
-function Administrators({
-  administrators,
-  failure,
-}: {
-  administrators: Administrator[];
-  failure: string | undefined;
-}) {
-  const router = useRouter();
-  const [adding, setAdding] = useState(false);
-
-  return (
-    <div className="bench__section">
-      <div className="bench__section-head">
-        <span className="label">Administrators</span>
-        <button
-          type="button"
-          className="btn btn--sm btn--quiet"
-          onClick={() => setAdding((open) => !open)}
-        >
-          {adding ? 'Cancel' : 'Add administrator'}
-        </button>
-      </div>
-
-      {adding && (
-        <AddAdministrator
-          onAdded={async () => {
-            setAdding(false);
-            await router.invalidate();
-          }}
-        />
-      )}
-
-      {failure && (
-        <p className="notice" role="alert">
-          {failure}
-        </p>
-      )}
-
-      {!failure && (
-        <div className="stubs">
-          {administrators.map((administrator) => (
-            <div className="stub" key={administrator.id}>
-              <span className="stub__label">
-                {administrator.name}
-                {administrator.isYou && ' — you'}
-              </span>
-              <span className="stub__meta register">
-                {administrator.email} · since <Stamp at={administrator.createdAt} withTime />
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* No mailer exists in this project, so there is no invitation to send. The
-   initial password is shown once and handed over the way an agent credential
-   is, and the recipient replaces it from the section above — which is what
-   keeps a password the issuer has seen from being permanent. */
-function AddAdministrator({ onAdded }: { onAdded: () => Promise<void> }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setPending(true);
-    setError(undefined);
-    try {
-      await createAdministrator({ data: { name, email, password } });
-      await onAdded();
-    } catch (cause) {
-      setError(
-        cause instanceof Error && cause.message
-          ? `${cause.message} Nothing was changed.`
-          : 'The administrator could not be added. Nothing was changed.'
-      );
-      setPending(false);
-    }
-  }
-
-  return (
-    <form className="bench__inline" onSubmit={submit}>
-      <label className={`field${error ? ' field--error' : ''}`}>
-        <span className="label">Name</span>
-        <input
-          required
-          autoFocus
-          value={name}
-          disabled={pending}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <label className="field">
-        <span className="label">Email</span>
-        <input
-          required
-          type="email"
-          autoComplete="off"
-          value={email}
-          disabled={pending}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-      </label>
-      <label className="field">
-        <span className="label">Initial password</span>
-        <input
-          required
-          type="text"
-          autoComplete="off"
-          value={password}
-          disabled={pending}
-          onChange={(event) => setPassword(event.target.value)}
-          placeholder="At least 8 characters"
-        />
-      </label>
-      <p className="line__caption">
-        Shown as text so you can copy it once and pass it on. They should change it as soon as they
-        sign in. An address that already has an account is promoted rather than recreated.
-      </p>
-      {error && (
-        <p className="notice" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="bench__controls">
-        <button className="btn btn--primary" disabled={pending}>
-          {pending ? 'Adding…' : 'Add administrator'}
-        </button>
-      </div>
-    </form>
   );
 }

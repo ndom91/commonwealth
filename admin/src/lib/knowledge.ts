@@ -1,10 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { type Chunk, chunkMarkdown } from '@llm-team-kb/pipeline';
 import { createServerFn } from '@tanstack/react-start';
-import { getRequest } from '@tanstack/react-start/server';
-import { auth } from './auth.js';
 import { client } from './db.js';
 import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from './pipeline.js';
+import { requireMember } from './session.js';
 
 /* Read and curation access to the knowledge corpus.
  *
@@ -48,14 +47,11 @@ const NEEDS_REVIEW = client`
     AND (sources.authority = 'unverified' OR (${IS_STALE}))
 `;
 
-async function adminId(): Promise<string> {
-  const session = await auth.api.getSession({ headers: getRequest().headers });
-  if (!session) throw new Error('Unauthorized');
-  const [role] = await client<
-    { user_id: string }[]
-  >`SELECT user_id FROM admin_role WHERE user_id = ${session.user.id}`;
-  if (!role) throw new Error('Forbidden');
-  return role.user_id;
+/* Authorship, once the caller has been allowed through. `requireMember` is the
+   gate; this is the id to write into `created_by_member_id` and the event log. */
+async function actingMember(permission: Parameters<typeof requireMember>[0]): Promise<string> {
+  const { userId } = await requireMember(permission);
+  return userId;
 }
 
 function optionalOneOf<T extends string>(
@@ -119,7 +115,7 @@ function validateList(value: unknown): ListInput {
 export const listSources = createServerFn({ method: 'GET' })
   .validator(validateList)
   .handler(async ({ data }) => {
-    await adminId();
+    await requireMember('read');
     const rows = await client`
       SELECT sources.id, sources.source_type, sources.status, sources.authority,
              sources.created_at, sources.deleted_at, sources.last_verified_at,
@@ -157,7 +153,7 @@ export const listSources = createServerFn({ method: 'GET' })
    and sources that changed after someone did. The second is the one a
    provenance product must not let slip. */
 export const listReviewQueue = createServerFn({ method: 'GET' }).handler(async () => {
-  await adminId();
+  await requireMember('read');
   const rows = await client`
     SELECT sources.id, sources.source_type, sources.authority, sources.created_at,
            sources.last_verified_at, revision.title, revision.revision_number,
@@ -179,10 +175,13 @@ export const listReviewQueue = createServerFn({ method: 'GET' }).handler(async (
    chrome consistent across routes instead of each page counting what it
    happens to have already fetched. */
 export const getNavCounts = createServerFn({ method: 'GET' }).handler(async () => {
-  await adminId();
-  const [row] = await client<{ identities: string; sources: string; review: string }[]>`
+  const { workspaceId } = await requireMember('read');
+  const [row] = await client<
+    { identities: string; people: string; sources: string; review: string }[]
+  >`
     SELECT
       (SELECT count(*) FROM users) AS identities,
+      (SELECT count(*) FROM member WHERE workspace_id = ${workspaceId}) AS people,
       (SELECT count(*) FROM sources WHERE status = 'active') AS sources,
       (SELECT count(*)
        FROM sources
@@ -191,6 +190,7 @@ export const getNavCounts = createServerFn({ method: 'GET' }).handler(async () =
   `;
   return {
     identities: Number(row?.identities ?? 0),
+    people: Number(row?.people ?? 0),
     sources: Number(row?.sources ?? 0),
     review: Number(row?.review ?? 0),
   };
@@ -205,7 +205,7 @@ function validateSourceId(value: unknown): { sourceId: string } {
 export const getSourceDetail = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await adminId();
+    await requireMember('read');
     const [source] = await client`
       SELECT sources.id, sources.source_type, sources.status, sources.authority,
              sources.created_at, sources.deleted_at, sources.last_verified_at,
@@ -232,7 +232,7 @@ export const getSourceDetail = createServerFn({ method: 'GET' })
 export const getSourceRevisions = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await adminId();
+    await requireMember('read');
     return client`
       SELECT source_revisions.id, source_revisions.revision_number,
              source_revisions.content_hash, source_revisions.content_updated_at,
@@ -271,7 +271,7 @@ function eventMetadata(raw: unknown): Record<string, JsonValue> {
 export const getSourceEvents = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await adminId();
+    await requireMember('read');
     const rows = await client`
       SELECT events.id, events.event_type, events.metadata, events.created_at,
              actor.display_name AS actor
@@ -295,7 +295,7 @@ export const setSourceAuthority = createServerFn({ method: 'POST' })
     return { sourceId: input.sourceId.trim(), authority: input.authority as Authority };
   })
   .handler(async ({ data }) => {
-    const administrator = await adminId();
+    const administrator = await actingMember('review');
     await client.begin(async (transaction) => {
       const [source] = await transaction<{ workspace_id: string; authority: string }[]>`
         SELECT workspace_id, authority FROM sources WHERE id = ${data.sourceId}
@@ -320,7 +320,7 @@ export const setSourceAuthority = createServerFn({ method: 'POST' })
 export const withdrawSource = createServerFn({ method: 'POST' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    const administrator = await adminId();
+    const administrator = await actingMember('review');
     await client.begin(async (transaction) => {
       const [source] = await transaction<{ workspace_id: string; status: string }[]>`
         SELECT workspace_id, status FROM sources WHERE id = ${data.sourceId}
@@ -352,7 +352,7 @@ export const withdrawSource = createServerFn({ method: 'POST' })
 export const restoreSource = createServerFn({ method: 'POST' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    const administrator = await adminId();
+    const administrator = await actingMember('review');
     let restored: 'active' | 'failed' = 'active';
     try {
       await client.begin(async (transaction) => {
@@ -425,7 +425,7 @@ export const listEvents = createServerFn({ method: 'GET' })
     }
   )
   .handler(async ({ data }) => {
-    await adminId();
+    await requireMember('read');
     const rows = await client`
       SELECT events.id, events.event_type, events.metadata, events.created_at,
              events.source_id, revision.title AS source_title,
@@ -456,7 +456,7 @@ export const listEvents = createServerFn({ method: 'GET' })
 /* The distinct event types actually present, so the filter offers what this
    workspace has rather than a hardcoded list that drifts from the writers. */
 export const listEventTypes = createServerFn({ method: 'GET' }).handler(async () => {
-  await adminId();
+  await requireMember('read');
   const rows = await client<{ event_type: string; count: string }[]>`
     SELECT event_type, count(*) AS count FROM events GROUP BY event_type ORDER BY event_type
   `;
@@ -501,7 +501,7 @@ export const searchSources = createServerFn({ method: 'GET' })
     return { ...validateFilters(input), query };
   })
   .handler(async ({ data }) => {
-    await adminId();
+    await requireMember('read');
     return client`
       WITH terms AS (SELECT websearch_to_tsquery('english', ${data.query}) AS value)
       SELECT sources.id, sources.authority, sources.source_type, sources.status,
@@ -545,7 +545,7 @@ export const searchSources = createServerFn({ method: 'GET' })
    only sources were withdrawn must stay selectable, or the Withdrawn status
    filter has nobody to combine with. */
 export const listSubmitters = createServerFn({ method: 'GET' }).handler(async () => {
-  await adminId();
+  await requireMember('read');
   const rows = await client<{ id: string; name: string; count: string }[]>`
     SELECT users.id, users.display_name AS name, count(*) AS count
     FROM sources
@@ -585,7 +585,7 @@ export const reviseSource = createServerFn({ method: 'POST' })
     return { sourceId, title, markdown };
   })
   .handler(async ({ data }) => {
-    const administrator = await adminId();
+    const { userId: administrator, role } = await requireMember('write');
 
     const chunks = chunkMarkdown(data.markdown);
     if (chunks.length === 0) throw new Error('That text contains nothing indexable.');
@@ -603,14 +603,31 @@ export const reviseSource = createServerFn({ method: 'POST' })
             current_revision_id: string;
             source_type: string;
             status: string;
+            authority: string;
+            created_by_admin_id: string | null;
           }[]
         >`
-          SELECT workspace_id, current_revision_id, source_type, status
+          SELECT workspace_id, current_revision_id, source_type, status, authority,
+                 created_by_admin_id
           FROM sources WHERE id = ${data.sourceId} FOR UPDATE
         `;
         if (!source) throw new Error('That source no longer exists');
         if (source.status !== 'active') {
           throw new Error('Restore this source before revising it');
+        }
+        /* The two ownership rules the MCP server already applies to agents
+           (`src/knowledge-repository.ts:103-124`), applied to people on the
+           same terms. A writer keeps their own work; changing what the corpus
+           vouches for is a reviewer's job.
+         *
+           A source submitted by an *agent* has a null `created_by_admin_id`,
+           so a writer cannot revise it — correct, and the same answer the MCP
+           server gives an agent about someone else's source. */
+        if (role === 'writer' && source.created_by_admin_id !== administrator) {
+          throw new Error('Writers can only revise sources they submitted.');
+        }
+        if (source.authority !== 'unverified' && role !== 'reviewer' && role !== 'admin') {
+          throw new Error('Reviewer access is required to revise an approved or canonical source.');
         }
         /* Same rule the MCP server enforces: an upload's revision carries the
            converted text of a stored file, so replacing the text alone would
@@ -707,7 +724,9 @@ export const createSource = createServerFn({ method: 'POST' })
       : [];
     return { title, markdown, tags };
   })
-  .handler(async ({ data }) => writeNewSource(await adminId(), { ...data, sourceType: 'note' }));
+  .handler(async ({ data }) =>
+    writeNewSource(await actingMember('write'), { ...data, sourceType: 'note' })
+  );
 
 /* The single writer for a source an administrator creates, whether they typed
    the Markdown or uploaded a document that MarkItDown converted. The two paths
@@ -814,7 +833,7 @@ async function writeNewSource(
 
 /* Embedding, after the source row already exists.
  *
- * This runs outside any request. It must never call `adminId()` or anything
+ * This runs outside any request. It must never call `requireMember()` or anything
  * else reading `getRequest()`, because by the time it starts the response has
  * been sent and there is no request to read — hence `administrator` and
  * `workspaceId` arriving as arguments. The pooled `client` is module-scoped and
@@ -906,7 +925,7 @@ async function indexSource(run: {
 export const getIndexingProgress = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    await adminId();
+    await requireMember('read');
     const [source] = await client<
       { status: string; current_revision_id: string; markdown_content: string; done: string }[]
     >`
@@ -952,7 +971,7 @@ export const getIndexingProgress = createServerFn({ method: 'GET' })
 export const retryIndexing = createServerFn({ method: 'POST' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
-    const administrator = await adminId();
+    const administrator = await actingMember('write');
 
     const claimed = await client.begin(async (transaction) => {
       const [source] = await transaction<
@@ -1015,7 +1034,7 @@ export const uploadSource = createServerFn({ method: 'POST' })
     return { file, title, tags };
   })
   .handler(async ({ data }) => {
-    const administrator = await adminId();
+    const administrator = await actingMember('write');
     const limit = maxUploadBytes();
     if (data.file.size > limit) {
       throw new Error(

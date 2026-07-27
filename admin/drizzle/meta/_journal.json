@@ -57,6 +57,13 @@
       "when": 1784914839309,
       "tag": "0007_source_indexing_status",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784914839310,
+      "tag": "0008_membership",
+      "breakpoints": true
     }
   ]
 }

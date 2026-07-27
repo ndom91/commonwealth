@@ -3,7 +3,7 @@ import { getSession } from '../lib/session.js';
 
 export const Route = createFileRoute('/')({
   beforeLoad: async () => {
-    throw redirect({ to: (await getSession()) ? '/identities' : '/sign-in' });
+    throw redirect((await getSession()) ? { to: '/sources', search: {} } : { to: '/sign-in' });
   },
   component: () => null,
 });

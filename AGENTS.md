@@ -131,10 +131,10 @@ the pool are fine — see the shared `IS_STALE` / `NEEDS_REVIEW` fragments in
 `indexing` and returns; `indexSource` embeds afterwards, without being awaited.
 Three things follow from that:
 
-- **Nothing in `indexSource` may touch the request.** `adminId()` reads
-  `getRequest()`, and by the time it runs the response has been sent. The
-  administrator and workspace ids are passed in as arguments for this reason.
-  The module-scoped `client` is unaffected and safe to use.
+- **Nothing in `indexSource` may touch the request.** `requireMember()` reads
+  `getRequest()`, and by the time it runs the response has been sent. The member
+  and workspace ids are passed in as arguments for this reason. The
+  module-scoped `client` is unaffected and safe to use.
 - **`active` is an invariant, not a default.** Every MCP read filters on
   `status = 'active'`, so it must mean "every chunk of the current revision is
   in the table". Anything that sets a source active — `indexSource`,
