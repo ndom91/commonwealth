@@ -47,7 +47,7 @@ function AcceptInvite() {
   if (!invitation) {
     return (
       <main className="intake">
-        <span className="intake__plate">Team knowledge base</span>
+        <span className="intake__plate">Commonwealth</span>
         <div className="intake__form">
           <div>
             <span className="label">Invitation</span>
@@ -101,7 +101,7 @@ function AcceptInvite() {
 
   return (
     <main className="intake">
-      <span className="intake__plate">Team knowledge base</span>
+      <span className="intake__plate">Commonwealth</span>
 
       <form className="intake__form" onSubmit={submit}>
         <div>

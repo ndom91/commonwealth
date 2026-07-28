@@ -96,9 +96,11 @@ if (!embeddingModel) throw new Error('EMBEDDING_MODEL is required');
  *
  * The name here seeds *new* instances only. It used to be `default`, which
  * nobody chose and which became visible on the rail the moment workspaces went
- * plural; existing instances keep whatever they have. */
+ * plural; existing instances keep whatever they have. It names the *workspace*,
+ * not the product — the plate carries "Commonwealth" underneath it — so this is
+ * a plausible first corpus rather than a second place the product is named. */
 const [workspace] = await client<{ id: string }[]>`
-  INSERT INTO workspaces (name, slug) VALUES ('Team knowledge base', 'default')
+  INSERT INTO workspaces (name, slug) VALUES ('Core team', 'default')
   ON CONFLICT (slug) DO UPDATE SET slug = EXCLUDED.slug
   RETURNING id
 `;

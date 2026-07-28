@@ -14,7 +14,7 @@ RUN corepack enable
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY db ./db
-# node_modules/@llm-team-kb/pipeline is a symlink to ../../packages/pipeline, so
+# node_modules/@commonwealth/pipeline is a symlink to ../../packages/pipeline, so
 # the target has to exist at the same relative path or the import dangles.
 COPY packages ./packages
 COPY src ./src

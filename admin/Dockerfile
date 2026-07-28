@@ -17,7 +17,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # enough to build against.
 COPY packages ./packages
 COPY admin ./admin
-RUN corepack enable && pnpm --filter @llm-team-kb/admin build
+RUN corepack enable && pnpm --filter @commonwealth/admin build
 
 FROM node:24-alpine
 WORKDIR /app

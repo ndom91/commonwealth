@@ -7,13 +7,18 @@ type Migration = { name: string; sql: string; checksum: string };
 
 const migrationsDirectory = fileURLToPath(new URL('../db/migrations/', import.meta.url));
 
+/* The lock key is a literal, and both services must use the *same* literal or
+   they stop excluding each other. It changed with the rename, so the two images
+   have to be deployed together — which the shipped compose does anyway, since
+   both build from one tree and `admin-migrate` runs to completion before
+   anything else starts. Worth knowing before hand-rolling a partial deploy. */
 export async function runMigrations(sql: Sql): Promise<void> {
   const connection = await sql.reserve();
   try {
-    await connection`SELECT pg_advisory_lock(hashtext('llm-team-kb:migrations'))`;
+    await connection`SELECT pg_advisory_lock(hashtext('commonwealth:migrations'))`;
     await runMigrationsLocked(sql);
   } finally {
-    await connection`SELECT pg_advisory_unlock(hashtext('llm-team-kb:migrations'))`.catch(
+    await connection`SELECT pg_advisory_unlock(hashtext('commonwealth:migrations'))`.catch(
       () => undefined
     );
     connection.release();

@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { Embeddings } from '@llm-team-kb/pipeline';
+import { Embeddings } from '@commonwealth/pipeline';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler, type McpRequestContext, McpServer } from '@modelcontextprotocol/server';
 import { toStandardJsonSchema } from '@valibot/to-json-schema';
@@ -65,7 +65,9 @@ const authorityValue = v.picklist(['canonical', 'approved', 'unverified']);
 const tagList = v.optional(v.array(nonEmpty), []);
 
 function serverFor(actor: Actor): McpServer {
-  const server = new McpServer({ name: 'llm-team-kb', version: '0.1.0' });
+  /* Advertised in the initialize response, so this is the name an agent's
+     client shows for the connection. */
+  const server = new McpServer({ name: 'commonwealth', version: '0.1.0' });
 
   server.registerTool(
     'submit_note',

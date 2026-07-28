@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { type Chunk, chunkMarkdown } from '@llm-team-kb/pipeline';
+import { type Chunk, chunkMarkdown } from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateScope, validateWorkspace } from './authorize.js';
 import { client } from './db.js';

@@ -1,5 +1,5 @@
 {
-  "name": "@llm-team-kb/admin",
+  "name": "@commonwealth/admin",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "db:studio": "node --env-file=../.env ./node_modules/drizzle-kit/bin.cjs studio"
   },
   "dependencies": {
-    "@llm-team-kb/pipeline": "workspace:*",
+    "@commonwealth/pipeline": "workspace:*",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@tanstack/react-router": "^1.168.2",
     "@tanstack/react-start": "^1.167.3",

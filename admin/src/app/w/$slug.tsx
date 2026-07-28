@@ -47,7 +47,7 @@ export const Route = createFileRoute('/w/$slug')({
 function Unavailable() {
   return (
     <main className="intake">
-      <span className="intake__plate">Team knowledge base</span>
+      <span className="intake__plate">Commonwealth</span>
       <div className="intake__form">
         <div>
           <span className="label">Not on your card</span>

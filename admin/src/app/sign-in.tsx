@@ -35,7 +35,7 @@ function SignIn() {
 
   return (
     <main className="intake">
-      <span className="intake__plate">Team knowledge base</span>
+      <span className="intake__plate">Commonwealth</span>
 
       <form className="intake__form" onSubmit={submit}>
         <div>

@@ -57,7 +57,7 @@ agents actually consume, so it is the thing worth diffing across the upgrade.
 
 ## The shared pipeline is TypeScript source, not a build
 
-`@llm-team-kb/pipeline` (`packages/pipeline/`) holds chunking, embedding and
+`@commonwealth/pipeline` (`packages/pipeline/`) holds chunking, embedding and
 document conversion — the parts the MCP server and the admin must never
 implement twice, because two embedders disagreeing on model or dimension
 silently poisons the index rather than raising anything.
@@ -209,11 +209,11 @@ referencing it cannot be created.
 ## Running the tests
 
 The integration test skips unless `TEST_DATABASE_URL` is set, and it refuses
-any database not named `llm_team_kb_test` because it drops the public schema:
+any database not named `commonwealth_test` because it drops the public schema:
 
 ```bash
-createdb llm_team_kb_test   # once; also needs CREATE EXTENSION vector
-TEST_DATABASE_URL='postgres://team_kb:team_kb@localhost:5432/llm_team_kb_test' pnpm test
+createdb commonwealth_test   # once; also needs CREATE EXTENSION vector
+TEST_DATABASE_URL='postgres://team_kb:team_kb@localhost:5432/commonwealth_test' pnpm test
 ```
 
 A bare `pnpm test` passes with the integration test skipped, which is easy to

@@ -10,6 +10,21 @@ import { isRole, type Role } from './roles.js';
    back as a sentence rather than a Postgres syntax error. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/* Marks a credential as this product's, and its first 12 characters are stored
+ * as `api_keys.key_prefix` — the indexed column a presented key is looked up by.
+ *
+ * It was `tkb_` before the rename. Changing it is not a migration and not a
+ * break: lookup goes through the *stored* prefix, never a literal, so keys
+ * already in agents' configs keep authenticating. They also cannot be rewritten
+ * — the secret exists only where the holder put it — so a workspace that
+ * predates the rename will show both markings in its register indefinitely.
+ * That is the honest cost of the change, and it is cosmetic. */
+const KEY_PREFIX = 'cw_';
+
+function mintSecret(): string {
+  return `${KEY_PREFIX}${randomBytes(32).toString('base64url')}`;
+}
+
 type IdentityInput = { name: string; role: Role; keyLabel: string };
 type IdentityAmendment = {
   name: string;
@@ -88,7 +103,7 @@ export const createIdentity = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }) => {
     const { userId: createdByAdminId, workspaceId } = await requireMember('admin', data.workspace);
-    const secret = `tkb_${randomBytes(32).toString('base64url')}`;
+    const secret = mintSecret();
     const salt = randomBytes(16).toString('hex');
     const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
     const keyId = randomUUID();
@@ -262,7 +277,7 @@ export const issueCredential = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }) => {
     const { userId: createdByAdminId, workspaceId } = await requireMember('admin', data.workspace);
-    const secret = `tkb_${randomBytes(32).toString('base64url')}`;
+    const secret = mintSecret();
     const salt = randomBytes(16).toString('hex');
     const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
     const keyId = randomUUID();

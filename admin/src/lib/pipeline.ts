@@ -1,4 +1,4 @@
-import { DocumentIngestion, Embeddings } from '@llm-team-kb/pipeline';
+import { DocumentIngestion, Embeddings } from '@commonwealth/pipeline';
 
 /* The admin's half of the shared pipeline. Chunking is a pure function and
    needs nothing from here; embedding needs Ollama, which the admin service

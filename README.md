@@ -1,4 +1,4 @@
-# LLM Team Knowledge Base
+# Commonwealth
 
 A self-hosted, source-cited knowledge base for MCP clients such as Claude Code,
 OpenCode, and Cursor.
@@ -42,7 +42,7 @@ the evaluation corpus described in `PLAN.md` before changing the default.
 pnpm install --frozen-lockfile
 docker compose up -d postgres ollama ollama-init markitdown app
 docker compose up admin-migrate
-pnpm --filter @llm-team-kb/admin dev
+pnpm --filter @commonwealth/admin dev
 ```
 
 The development server runs on the host and connects through `DATABASE_URL`, which

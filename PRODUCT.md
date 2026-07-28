@@ -147,8 +147,6 @@ next. Changing one is a decision, not a fix.
   with it) or holding a chunk table per dimension. Separate corpora were the
   point of workspaces; separate *models* were not attempted, and whether they are
   worth that cost is still open.
-- **The product name.** "LLM Team Knowledge Base" (repo `llm-team-kb`) is in use
-  but has never been confirmed final.
 
 ### Direction
 
@@ -171,8 +169,17 @@ Remaining known gaps, in rough order of how much they cost:
 
 ## Brand Commitments
 
-- The admin UI reads **Team knowledge base** / **Custody bench**. The design
-  system is documented in `admin/DESIGN.md` and is binding.
+- **The product is called Commonwealth.** Settled, after shipping for a while as
+  the placeholder "LLM Team Knowledge Base". A commonwealth is property held in
+  common by the people who use it and administered by them rather than owned
+  over them — which is the whole argument of a self-hosted, source-cited corpus
+  that agents write to and a team vouches for.
+- The plate reads the **workspace name** over **Commonwealth**; the admin surface
+  is the **Custody bench**. The design system is documented in `admin/DESIGN.md`
+  and is binding.
+- Agent credentials mint as `cw_…`. Keys issued before the rename mint as
+  `tkb_…` and keep working — a live secret cannot be rewritten — so both
+  markings will appear in an older instance's register indefinitely.
 - License: GPL-3.0-only.
 - No logo, wordmark, illustration, photography, or icon set exists in the repo.
 - No confirmed voice guide. Existing copy is terse, concrete and unhedged

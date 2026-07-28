@@ -1,5 +1,5 @@
 ---
-name: LLM Team Knowledge Base — Admin
+name: Commonwealth — Admin
 description: An evidence-custody bench for knowledge an AI agent is allowed to trust.
 colors:
   slate-ground: "#0E1214"
@@ -127,7 +127,7 @@ components:
     typography: "{typography.register}"
 ---
 
-# Design System: LLM Team Knowledge Base — Admin
+# Design System: Commonwealth — Admin
 
 ## Overview
 

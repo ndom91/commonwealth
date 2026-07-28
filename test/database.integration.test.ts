@@ -11,9 +11,9 @@ const databaseName = databaseUrl ? new URL(databaseUrl).pathname.slice(1) : unde
 
 if (!databaseUrl) {
   test.skip('database integration tests require TEST_DATABASE_URL');
-} else if (databaseName !== 'llm_team_kb_test') {
-  test('database integration tests require the dedicated llm_team_kb_test database', () => {
-    throw new Error('TEST_DATABASE_URL must target the dedicated llm_team_kb_test database');
+} else if (databaseName !== 'commonwealth_test') {
+  test('database integration tests require the dedicated commonwealth_test database', () => {
+    throw new Error('TEST_DATABASE_URL must target the dedicated commonwealth_test database');
   });
 } else {
   test('migrates, revises, filters, and retrieves knowledge', async () => {
@@ -23,7 +23,7 @@ if (!databaseUrl) {
       EMBEDDING_MODEL: 'test-embedding-model',
       PORT: 3000,
       MARKITDOWN_URL: 'http://unused',
-      SOURCE_STORAGE_PATH: '/tmp/llm-team-kb-test',
+      SOURCE_STORAGE_PATH: '/tmp/commonwealth-test',
       MAX_UPLOAD_BYTES: 1024,
       MAX_REQUEST_BYTES: 4096,
     };

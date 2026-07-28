@@ -168,7 +168,7 @@ export type WorkspaceRef = { id: string; name: string; slug: string; role: Role 
 
 /* The plate names the corpus you are in, and is how you leave it.
  *
- * It used to read "Team knowledge base / Custody bench" on every screen, which
+ * It used to read the product name over "Custody bench" on every screen, which
  * was true and told you nothing. With more than one workspace the single most
  * important fact on the page is *which* one you are looking at — every count,
  * every register and every search below is scoped to it — so the plate says so
@@ -200,7 +200,7 @@ function WorkspacePlate({
     return (
       <div className="cabinet__plate">
         <span>{name}</span>
-        <small>Team knowledge base</small>
+        <small>Commonwealth</small>
       </div>
     );
   }
@@ -208,7 +208,7 @@ function WorkspacePlate({
     <details className="cabinet__switch">
       <summary className="cabinet__plate">
         <span>{name}</span>
-        <small>Team knowledge base</small>
+        <small>Commonwealth</small>
       </summary>
       <div className="cabinet__workspaces">
         <span className="label">Switch to</span>

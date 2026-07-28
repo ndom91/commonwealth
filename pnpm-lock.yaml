@@ -8,7 +8,7 @@ importers:
 
   .:
     dependencies:
-      '@llm-team-kb/pipeline':
+      '@commonwealth/pipeline':
         specifier: workspace:*
         version: link:packages/pipeline
       '@modelcontextprotocol/node':
@@ -42,7 +42,7 @@ importers:
 
   admin:
     dependencies:
-      '@llm-team-kb/pipeline':
+      '@commonwealth/pipeline':
         specifier: workspace:*
         version: link:../packages/pipeline
       '@radix-ui/react-tooltip':

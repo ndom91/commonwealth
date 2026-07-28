@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { chunkMarkdown, DocumentIngestion, type Embeddings } from '@llm-team-kb/pipeline';
+import { chunkMarkdown, DocumentIngestion, type Embeddings } from '@commonwealth/pipeline';
 import postgres, { type JSONValue, type Sql, type TransactionSql } from 'postgres';
 import { requirePermission } from './access-service.js';
 import type { Config } from './config.js';

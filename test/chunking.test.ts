@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chunkMarkdown } from '@llm-team-kb/pipeline';
+import { chunkMarkdown } from '@commonwealth/pipeline';
 
 test('chunks Markdown by section while retaining headings', () => {
   const chunks = chunkMarkdown(
