@@ -145,8 +145,10 @@ next. Changing one is a decision, not a fix.
   is one process-wide variable read by both services, so a workspace cannot pick
   its own model without either giving up the fixed dimension (and the ANN index
   with it) or holding a chunk table per dimension. Separate corpora were the
-  point of workspaces; separate *models* were not attempted, and whether they are
-  worth that cost is still open.
+  point of workspaces; separate *models* were not. Affirmed once since workspaces
+  shipped and kept as it is — but it stays here rather than under Direction,
+  because it is a standing constraint someone could reasonably want to lift, not
+  a thing that is finished.
 
 ### Direction
 
@@ -154,18 +156,25 @@ The admin surface is the primary human surface over this data, and the workbench
 it was aimed at now ships: browse, search and read sources; revise them; run
 ingestion; work a review queue; inspect revision history; audit the event log;
 invite people and set what each of them may do — in any of several workspaces.
-Remaining known gaps, in rough order of how much they cost:
+Settled, having been looked at and left as they are — not gaps waiting to be
+closed by whoever notices them next:
 
 - **Nothing moves between workspaces, and none can be deleted.** Moving a source
-  needs a re-embed and a decision about what the event log says happened; deleting
-  a workspace would take its corpus with it by cascade, which deserves its own
-  confirmation design. Both were left out on purpose.
-- Revisions still embed inside the request, unlike uploads. A revision cannot
-  reuse the same mechanism, because the *current* revision stays live and correct
-  while a new one indexes — the state would have to live on the revision.
-- `acceptInvitation` has no rate limit. A 256-bit token is not guessable, but
-  the route is unauthenticated and unthrottled.
-- No retrieval quality work has happened at all. See below.
+  needs a re-embed and a decision about what the event log says happened;
+  deleting a workspace would take its corpus with it by cascade, which deserves
+  its own confirmation design. Reviewed and kept out.
+- **Revisions embed inside the request, unlike uploads.** A revision cannot reuse
+  the background mechanism, because the *current* revision stays live and correct
+  while a new one indexes — the state would have to move onto the revision. Notes
+  are typed by hand and rarely large, so the wait is not felt. Revisit when a
+  revision is big enough to notice.
+
+Remaining known gaps, in rough order of how much they cost:
+
+- **No retrieval quality work has happened at all.** The largest one, and the one
+  that gates calling any embedding model a default. See below.
+- Nothing else outstanding at this size. Rate limiting closed the last of the
+  unthrottled routes; the admin's session reads were the last obvious waste.
 
 ## Brand Commitments
 
