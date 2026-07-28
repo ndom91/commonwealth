@@ -16,7 +16,8 @@
     "format:fix": "biome check --write .",
     "migrate": "pnpm --filter @commonwealth/admin migrate",
     "db:studio": "pnpm --filter @commonwealth/admin db:studio",
-    "reindex": "pnpm --filter @commonwealth/admin reindex"
+    "reindex": "pnpm --filter @commonwealth/admin reindex",
+    "bench": "node --import tsx bench/run.ts"
   },
   "dependencies": {
     "@commonwealth/pipeline": "workspace:*",

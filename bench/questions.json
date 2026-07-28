@@ -1,0 +1,122 @@
+{
+  "note": "Hand-written gold set for bench/run.ts. Each `relevant` entry names a corpus document and an `anchor` — a distinctive phrase that must appear in the retrieved chunk's excerpt. Anchors deliberately avoid chunk ids and headings: both move when chunking changes, and the point of this set is to survive that. Questions are phrased the way a teammate would ask, not by restating the sentence they should match.",
+  "questions": [
+    {
+      "question": "why does the rate limiter count in memory instead of using Postgres?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "query in order to avoid a query" }]
+    },
+    {
+      "question": "what breaks about rate limiting if we run two copies of a container?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "each get a full allowance" }]
+    },
+    {
+      "question": "why is the per-credential bucket keyed on the prefix rather than the whole token?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "share one allowance" }]
+    },
+    {
+      "question": "should the admin service trust X-Forwarded-For?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "loopback so it defaults false" }]
+    },
+    {
+      "question": "my update inside a transaction silently wrote nothing and reported success",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "writes nothing where the fragment was" }]
+    },
+    {
+      "question": "where do I add a column that the MCP server needs to read?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "must ship in" }]
+    },
+    {
+      "question": "can I make a uuid foreign key pointing at the user table?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "issues string ids" }]
+    },
+    {
+      "question": "why are the member and workspace ids passed into indexing as arguments?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "the response has been sent" }]
+    },
+    {
+      "question": "which database does the integration suite insist on?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "commonwealth_test" }]
+    },
+    {
+      "question": "I changed something under src/ and nothing happened",
+      "relevant": [
+        { "doc": "AGENTS.md", "anchor": "keeps answering with the code it was built with" }
+      ]
+    },
+    {
+      "question": "can I widen the version range on the model context protocol packages?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "breaking changes ship" }]
+    },
+    {
+      "question": "my throwaway script fails with ERR_MODULE_NOT_FOUND on the shared package",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "node --import tsx" }]
+    },
+    {
+      "question": "why is the knowledge repository not in the shared package?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "Each package keeps its own SQL" }]
+    },
+    {
+      "question": "what counts as this product succeeding?",
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "which source it came from" }]
+    },
+    {
+      "question": "can one workspace use a different embedding model from another?",
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "cannot pick its own model" }]
+    },
+    {
+      "question": "how slow is embedding?",
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "0.7s a chunk" }]
+    },
+    {
+      "question": "are we allowed to put a recall figure in the README?",
+      "relevant": [
+        { "doc": "PRODUCT.md", "anchor": "Never publish a quality or speed figure" },
+        { "doc": "PLAN.md", "anchor": "Recall@5" }
+      ]
+    },
+    {
+      "question": "what happens to a source when someone removes it?",
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "deletes are soft" }]
+    },
+    {
+      "question": "how do we stop an agent treating stored content as instructions?",
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "quoted references, not instructions" }]
+    },
+    {
+      "question": "what does the status active guarantee?",
+      "relevant": [
+        { "doc": "PRODUCT.md", "anchor": "every chunk of the current revision is in the" }
+      ]
+    },
+    {
+      "question": "how do I start the whole thing for the first time?",
+      "relevant": [{ "doc": "README.md", "anchor": "docker compose up --build" }]
+    },
+    {
+      "question": "how should I generate the bootstrap admin password?",
+      "relevant": [{ "doc": "README.md", "anchor": "openssl rand -base64 33" }]
+    },
+    {
+      "question": "what licence is this released under?",
+      "relevant": [{ "doc": "README.md", "anchor": "GPL-3.0-only" }]
+    },
+    {
+      "question": "why can't I run the admin container while developing?",
+      "relevant": [{ "doc": "README.md", "anchor": "both use port 3001" }]
+    },
+    {
+      "question": "what has to be measured before we call an embedding model the default?",
+      "relevant": [
+        { "doc": "PLAN.md", "anchor": "indexing throughput" },
+        { "doc": "PRODUCT.md", "anchor": "indexing throughput" }
+      ]
+    },
+    {
+      "question": "can I mix embeddings from two models in one index?",
+      "relevant": [
+        { "doc": "PLAN.md", "anchor": "Do not mix embeddings" },
+        { "doc": "PRODUCT.md", "anchor": "must never be mixed" }
+      ]
+    }
+  ]
+}
