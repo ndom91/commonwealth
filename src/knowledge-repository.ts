@@ -1,5 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { chunkMarkdown, DocumentIngestion, type Embeddings } from '@commonwealth/pipeline';
+import {
+  chunkMarkdown,
+  DocumentIngestion,
+  type Embeddings,
+  embeddingInput,
+} from '@commonwealth/pipeline';
 import postgres, { type JSONValue, type Sql, type TransactionSql } from 'postgres';
 import { requirePermission } from './access-service.js';
 import type { Config } from './config.js';
@@ -371,7 +376,7 @@ export class KnowledgeRepository {
     if (!markdown) throw new Error('Knowledge source cannot be empty');
     const chunks = chunkMarkdown(markdown);
     if (chunks.length === 0) throw new Error('Knowledge source does not contain indexable text');
-    const vectors = await this.embeddings.embed(chunks.map((chunk) => chunk.content));
+    const vectors = await this.embeddings.embed(chunks.map(embeddingInput));
     return { markdown, contentHash: contentHash ?? digest(markdown), chunks, vectors };
   }
 

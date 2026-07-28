@@ -32,7 +32,7 @@
  * this package** — it resolves the barrel, then fails on `./chunking.js`, which
  * only exists as `.ts`. */
 
-export { type Chunk, chunkMarkdown } from './chunking.js';
+export { type Chunk, chunkMarkdown, embeddingInput } from './chunking.js';
 export {
   type ConvertedDocument,
   DocumentIngestion,

@@ -71,6 +71,13 @@
       "when": 1784914839311,
       "tag": "0009_invitation_per_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784914839312,
+      "tag": "0010_search_vector_covers_heading",
+      "breakpoints": true
     }
   ]
 }

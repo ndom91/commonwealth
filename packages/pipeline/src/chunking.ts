@@ -161,3 +161,18 @@ function pack(section: Section): Chunk[] {
 export function chunkMarkdown(markdown: string): Chunk[] {
   return parseSections(markdown).flatMap(pack);
 }
+
+/* What actually gets embedded, which is not what gets stored.
+ *
+ * `chunks.content` is the body alone, because it is returned verbatim as
+ * `excerpt` and a heading pasted onto the front of a quote would be a lie about
+ * the document. The vector wants the opposite: a chunk under `Deploy > Ports`
+ * whose body never says "port" is unreachable without it.
+ *
+ * Lives here rather than at the three call sites that embed, so the two halves
+ * of the index — this and the `search_vector` expression — can be kept in step
+ * by reading one function. */
+export function embeddingInput(chunk: Chunk): string {
+  if (chunk.headingPath.length === 0) return chunk.content;
+  return `${chunk.headingPath.join(' > ')}\n\n${chunk.content}`;
+}

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { type Chunk, chunkMarkdown } from '@commonwealth/pipeline';
+import { type Chunk, chunkMarkdown, embeddingInput } from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateScope, validateWorkspace } from './authorize.js';
 import { client } from './db.js';
@@ -627,7 +627,7 @@ export const reviseSource = createServerFn({ method: 'POST' })
     const chunks = chunkMarkdown(data.markdown);
     if (chunks.length === 0) throw new Error('That text contains nothing indexable.');
     const contentHash = createHash('sha256').update(data.markdown).digest('hex');
-    const vectors = await embeddings().embed(chunks.map((chunk) => chunk.content));
+    const vectors = await embeddings().embed(chunks.map(embeddingInput));
     if (vectors.length !== chunks.length)
       throw new Error('Embedding provider returned an incomplete result');
     const model = embeddingModel();
@@ -903,23 +903,20 @@ async function indexSource(run: {
   const { sourceId, revisionId, workspaceId, administrator, chunks } = run;
   try {
     const model = embeddingModel();
-    await embeddings().embedInBatches(
-      chunks.map((chunk) => chunk.content),
-      async (vectors, start) => {
-        await client.begin(async (transaction) => {
-          for (const [offset, vector] of vectors.entries()) {
-            const ordinal = start + offset;
-            const chunk = chunks[ordinal];
-            if (!chunk) throw new Error('Embedding provider returned an incomplete result');
-            await transaction`
+    await embeddings().embedInBatches(chunks.map(embeddingInput), async (vectors, start) => {
+      await client.begin(async (transaction) => {
+        for (const [offset, vector] of vectors.entries()) {
+          const ordinal = start + offset;
+          const chunk = chunks[ordinal];
+          if (!chunk) throw new Error('Embedding provider returned an incomplete result');
+          await transaction`
               INSERT INTO chunks (source_id, source_revision_id, ordinal, heading, content, token_count, embedding, embedding_model)
               VALUES (${sourceId}, ${revisionId}, ${ordinal}, ${chunk.heading}, ${chunk.content},
                       ${chunk.tokenCount}, ${`[${vector.join(',')}]`}::vector, ${model})
             `;
-          }
-        });
-      }
-    );
+        }
+      });
+    });
 
     await client.begin(async (transaction) => {
       const [updated] = await transaction<{ id: string }[]>`
