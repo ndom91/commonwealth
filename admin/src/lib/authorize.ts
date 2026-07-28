@@ -1,7 +1,7 @@
 import { getRequest } from '@tanstack/react-start/server';
 import { auth } from './auth.js';
 import { client } from './db.js';
-import { can, isRole, type Permission, type Role } from './roles.js';
+import { can, isRole, type Permission, type Role, type WorkspaceRef } from './roles.js';
 
 /* The authorisation gate, kept in its own module for a build reason worth
  * knowing before moving it back.
@@ -64,8 +64,6 @@ export async function readMembership(
   if (!row || !isRole(row.role)) return null;
   return { userId, workspaceId: row.workspace_id, slug, role: row.role };
 }
-
-export type WorkspaceRef = { id: string; name: string; slug: string; role: Role };
 
 /* Every workspace the caller belongs to, oldest membership first — which makes
    the first entry the one `/` lands on and the order the switcher lists. */

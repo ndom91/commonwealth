@@ -1,13 +1,17 @@
 import { useState } from 'react';
+import type { Role } from '../lib/roles.js';
 
 /* Shared between the identity register and the holder bench, which are separate
    routes now that a holder is addressable by URL. Types, the custody-line
    derivation and the one-time credential reveal all sit on the boundary between
-   the two, so they live here rather than being imported across routes. */
-
-export type Role = 'reader' | 'writer' | 'reviewer' | 'admin';
-
-export const ROLES: Role[] = ['reader', 'writer', 'reviewer', 'admin'];
+   the two, so they live here rather than being imported across routes.
+ *
+ * The role vocabulary is *not* one of them. It used to be redeclared here, which
+ * made three copies of a four-word list whose whole point is that there is one:
+ * `roles.ts` says so in its opening paragraph, and explains that the copy in
+ * `src/access-service.ts` is unavoidable only because that is a separate deploy
+ * unit. This one was avoidable — `chrome.tsx` has always imported `Role` from
+ * `roles.ts`, so it was never a client-bundle problem, just an old habit. */
 
 export type Credential = {
   id: string;

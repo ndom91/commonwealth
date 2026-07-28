@@ -2,7 +2,7 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { Link } from '@tanstack/react-router';
 import { type LucideIcon, UserRoundCog } from 'lucide-react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
-import { can, type Role } from '../lib/roles.js';
+import { can, type Role, type WorkspaceRef } from '../lib/roles.js';
 
 /* Application chrome for the Custody Bench. Every workbench screen mounts
    inside AppShell and reuses the index-and-bench split: a ruled register of
@@ -163,8 +163,6 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
   });
   return groups;
 }
-
-export type WorkspaceRef = { id: string; name: string; slug: string; role: Role };
 
 /* The plate names the corpus you are in, and is how you leave it.
  *

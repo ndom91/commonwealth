@@ -1,16 +1,11 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppShell, accessionOf, SealChip, SettingsTabs } from '../../../../components/chrome.js';
-import {
-  CredentialTag,
-  type Identity,
-  type Issued,
-  ROLES,
-  type Role,
-} from '../../../../components/identity.js';
+import { CredentialTag, type Identity, type Issued } from '../../../../components/identity.js';
 import { authClient } from '../../../../lib/auth-client.js';
 import { createIdentity, listIdentities } from '../../../../lib/management.js';
 import { readFailure } from '../../../../lib/read-failure.js';
+import { ROLES, type Role } from '../../../../lib/roles.js';
 
 export type IdentitySearch = { after?: string };
 

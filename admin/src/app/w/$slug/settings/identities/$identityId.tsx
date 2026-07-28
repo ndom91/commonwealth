@@ -7,8 +7,6 @@ import {
   type Identity,
   type Issued,
   labelOf,
-  ROLES,
-  type Role,
 } from '../../../../../components/identity.js';
 import { Stamp } from '../../../../../components/stamp.js';
 import {
@@ -17,6 +15,7 @@ import {
   setIdentityDisabled,
   updateIdentity,
 } from '../../../../../lib/management.js';
+import { ROLES, type Role } from '../../../../../lib/roles.js';
 
 export const Route = createFileRoute('/w/$slug/settings/identities/$identityId')({
   component: HolderBench,
