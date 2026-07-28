@@ -39,6 +39,9 @@ if (!databaseUrl) {
       async embed(texts: string[]): Promise<number[][]> {
         return texts.map((_, index) => Array.from({ length: 1024 }, () => index + 1));
       },
+      async embedQuery(text: string): Promise<number[] | undefined> {
+        return (await this.embed([text]))[0];
+      },
     };
     const knowledge = new KnowledgeRepository(config, embeddings);
     const access = new AccessService(knowledge.sql);

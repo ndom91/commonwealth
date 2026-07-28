@@ -31,6 +31,12 @@ const environment = v.object({
   DATABASE_URL: v.pipe(v.string(), v.url()),
   OLLAMA_URL: v.pipe(v.string(), v.url()),
   EMBEDDING_MODEL: v.pipe(v.string(), v.minLength(1)),
+  /* The task description for an asymmetric embedding model's query side. Unset
+     means queries are embedded exactly like documents, which is right for a
+     symmetric model and wrong for the shipped default — see `EmbeddingOptions`.
+     Deliberately has no built-in default: it is only correct for the model it
+     was written for, and compose pins both together. */
+  EMBEDDING_QUERY_INSTRUCTION: v.optional(v.string()),
   PORT: positiveInt(3000),
   MARKITDOWN_URL: v.optional(v.pipe(v.string(), v.url()), 'http://markitdown:8000'),
   SOURCE_STORAGE_PATH: v.optional(v.string(), '/app/storage'),

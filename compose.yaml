@@ -5,6 +5,12 @@ services:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      # Paired with EMBEDDING_MODEL above, and only correct for it.
+      # qwen3-embedding is asymmetric: queries want `Instruct: …\nQuery: …`,
+      # documents want raw text. Only this service embeds queries — the admin
+      # embeds documents and searches lexically, so it takes no instruction.
+      # Change the model and this has to change or be removed with it.
+      EMBEDDING_QUERY_INSTRUCTION: ${EMBEDDING_QUERY_INSTRUCTION:-Given a question from a teammate, retrieve passages from the team knowledge base that answer it}
       PORT: 3000
       MAX_REQUEST_BYTES: ${MAX_REQUEST_BYTES:-15000000}
       # True because Caddy is always in front of this service here. Set it false

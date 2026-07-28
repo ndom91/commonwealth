@@ -15,7 +15,11 @@ import { KnowledgeRepository } from './knowledge-repository.js';
 const config = loadConfig();
 const knowledge = new KnowledgeRepository(
   config,
-  new Embeddings({ ollamaUrl: config.OLLAMA_URL, model: config.EMBEDDING_MODEL })
+  new Embeddings({
+    ollamaUrl: config.OLLAMA_URL,
+    model: config.EMBEDDING_MODEL,
+    queryInstruction: config.EMBEDDING_QUERY_INSTRUCTION,
+  })
 );
 const access = new AccessService(knowledge.sql);
 

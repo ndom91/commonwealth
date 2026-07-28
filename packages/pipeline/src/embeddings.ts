@@ -7,6 +7,15 @@ export const EMBEDDING_DIMENSIONS = 1024;
 export type EmbeddingOptions = {
   ollamaUrl: string;
   model: string;
+  /* Asymmetric models want the query side marked. Qwen3-Embedding — the default
+     here — is trained to receive `Instruct: {task}\nQuery: {text}` for queries
+     and the raw text for documents; sending both sides raw draws them from
+     slightly different distributions than the model was tuned for.
+   *
+   * Optional and unset by default, because it is wrong for symmetric models and
+   * a prefix left behind after a model swap is worse than none. `embedQuery`
+   * with this unset behaves exactly like `embed`. */
+  queryInstruction?: string;
 };
 
 /* Chunks per request. Embedding cost is linear in chunk count — roughly 0.7s
@@ -39,6 +48,17 @@ export class Embeddings {
       vectors.push(...batch);
     });
     return vectors;
+  }
+
+  /* The query side of an asymmetric model. Separate from `embed` rather than a
+     flag on it, because every other caller embeds documents and the default has
+     to be the document form — a prefix accidentally applied to stored content
+     would poison the index silently and only show up as worse results. */
+  async embedQuery(text: string): Promise<number[] | undefined> {
+    const instruction = this.options.queryInstruction?.trim();
+    const input = instruction ? `Instruct: ${instruction}\nQuery: ${text}` : text;
+    const [vector] = await this.embed([input]);
+    return vector;
   }
 
   /* The same sequence as `embed`, but handing each batch back as it lands.

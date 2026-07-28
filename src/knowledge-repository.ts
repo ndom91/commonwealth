@@ -40,7 +40,7 @@ export class KnowledgeRepository {
 
   constructor(
     private readonly config: Config,
-    private readonly embeddings: Pick<Embeddings, 'embed'>,
+    private readonly embeddings: Pick<Embeddings, 'embed' | 'embedQuery'>,
     private readonly documentIngestion = new DocumentIngestion({
       markitdownUrl: config.MARKITDOWN_URL,
       storagePath: config.SOURCE_STORAGE_PATH,
@@ -186,7 +186,9 @@ export class KnowledgeRepository {
 
   async search(actor: Actor, input: SearchInput): Promise<unknown[]> {
     requirePermission(actor, 'read');
-    const [embedding] = await this.embeddings.embed([input.query]);
+    /* `embedQuery`, not `embed`: an asymmetric model wants the query side
+       marked. Documents are embedded raw everywhere else. */
+    const embedding = await this.embeddings.embedQuery(input.query);
     if (!embedding) throw new Error('Embedding provider returned no query embedding');
     const vector = toVector(embedding);
     const tags = input.tags.length === 0 ? null : input.tags;
