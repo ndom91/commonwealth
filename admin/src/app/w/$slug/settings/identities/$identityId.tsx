@@ -1,6 +1,6 @@
 import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
-import { accessionOf, SealChip } from '../../../../components/chrome.js';
+import { accessionOf, SealChip } from '../../../../../components/chrome.js';
 import {
   CredentialTag,
   custodyLine,
@@ -9,16 +9,16 @@ import {
   labelOf,
   ROLES,
   type Role,
-} from '../../../../components/identity.js';
-import { Stamp } from '../../../../components/stamp.js';
+} from '../../../../../components/identity.js';
+import { Stamp } from '../../../../../components/stamp.js';
 import {
   issueCredential,
   revokeKey,
   setIdentityDisabled,
   updateIdentity,
-} from '../../../../lib/management.js';
+} from '../../../../../lib/management.js';
 
-export const Route = createFileRoute('/w/$slug/identities/$identityId')({
+export const Route = createFileRoute('/w/$slug/settings/identities/$identityId')({
   component: HolderBench,
 });
 
@@ -38,7 +38,7 @@ function HolderBench() {
      already holds every holder, and one `router.invalidate()` after a mutation
      refreshes the register, this bench and the rail count from a single
      round trip. */
-  const { page } = useLoaderData({ from: '/identities' }) as {
+  const { page } = useLoaderData({ from: '/w/$slug/settings/identities' }) as {
     page: { identities: Identity[] } | undefined;
   };
   const identity = (page?.identities ?? []).find((entry) => entry.id === identityId);

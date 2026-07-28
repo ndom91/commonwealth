@@ -70,7 +70,7 @@ Three things a neighbouring RAG or docs tool could not truthfully copy at once:
   a sign-up page exists. It is for the bootstrap script. Teammates arrive by
   invitation, with the flag off.
 - **Nobody hands anyone a password.** Adding a teammate mints a single-use link
-  from `/people`; the recipient chooses a password the issuer never sees. An
+  from Settings › People; the recipient chooses a password the issuer never sees. An
   invitation can never act on an address that already has an account — checked
   when issuing, when the link is opened, and again at redemption — because one
   that could would be an account-takeover primitive.
@@ -108,9 +108,14 @@ The MCP tool list, the role names and the source lifecycle are all readable from
   of and one that does not exist get the same refusal, word for word.
 - **A workspace's name can change; its slug cannot.** The name is a label — on
   the plate, in the switcher, on an invitation — and an administrator may edit it
-  from `/people`. The slug is in every link anyone has sent, and a URL that
+  from Settings. The slug is in every link anyone has sent, and a URL that
   quietly stops meaning what it meant is a worse failure than a name nobody
   likes. Changing one would need a decision about redirects, not a text field.
+- **Administering a workspace is one page with three tabs.** Its name, the
+  people who can sign in to it, and the agent identities holding keys against it
+  are the three faces of `/w/:slug/settings`. Your own display name and password
+  are somewhere else entirely — `/w/:slug/account`, behind the signed-in name —
+  because a preference is not a grant, and the two should never be one page.
 - **Scoping lives in the `WHERE`, not after the fetch.** A query that takes an id
   carries `workspace_id` in the *same* predicate, so a foreign id reads as "not
   found" rather than being fetched and then refused. There is exactly one write in

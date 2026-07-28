@@ -119,7 +119,7 @@ export type SourceRow = {
 function Sources() {
   const { slug } = Route.useParams();
   const router = useRouter();
-  const navigate = useNavigate({ from: '/sources' });
+  const navigate = useNavigate({ from: '/w/$slug/sources' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
   const { register, submitters, failure } = Route.useLoaderData();

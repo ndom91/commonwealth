@@ -488,6 +488,70 @@ select {
   border-bottom: 1px solid var(--rule-hair);
 }
 
+/* Read-only facts about an object — label above value, register face for the
+   values because they are quoted back rather than read as prose. Columns rather
+   than rows: four short values in a stack would be a tall list of mostly white
+   space, and they are related enough to scan across. */
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-loose) var(--s-gutter);
+  margin: var(--s-tight) 0 var(--s-snug);
+}
+
+.facts dd {
+  margin: 2px 0 0;
+  color: var(--ink);
+}
+
+/* Section tabs — the faces of a section that has more than one.
+ *
+ * The active treatment is not invented: a drawer active in the rail takes a 1px
+ * hairline in tag stock on its leading edge, and at the narrow breakpoint that
+ * same rule already rotates to the bottom. This is that horizontal form, reused.
+ *
+ * The row closes with a hairline and shares the masthead's gutter, the same
+ * construction as the filter bar above a register — so it reads as a property
+ * of the section rather than as a strip of page chrome. Its own rule sits *on*
+ * the masthead's, one hairline for the pair, which is why the masthead's
+ * bottom border is dropped whenever tabs follow it.
+ *
+ * Links, not a tablist: these are routes. Tab moves between them, Back leaves
+ * them, and each one can be pasted to a colleague. */
+.masthead:has(+ .tabs) {
+  border-bottom: 0;
+  padding-bottom: var(--s-snug);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--s-loose);
+  padding: 0 var(--s-gutter);
+  border-bottom: 1px solid var(--rule-hair);
+}
+
+.tabs__link {
+  padding: var(--s-snug) 2px;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  text-decoration: none;
+  /* Reserve the weight the active state adds, so the row does not shift by a
+     pixel or two as you move between tabs. */
+  text-shadow: 0 0 currentColor;
+}
+
+.tabs__link:hover {
+  color: var(--ink);
+}
+
+.tabs__link[aria-current="page"] {
+  border-bottom-color: var(--mark);
+  color: var(--ink);
+  font-weight: 600;
+  text-shadow: none;
+}
+
 .masthead h1 {
   margin: 6px 0 0;
   font-size: 26px;

@@ -863,6 +863,40 @@ export const createWorkspace = createServerFn({ method: 'POST' })
     return { id: created, name: data.name, slug: data.slug };
   });
 
+/* What this workspace is, for the Workspace tab to state.
+ *
+ * Read-only, and gated at `read` rather than `admin`: nothing here is a
+ * credential. The tab that renders it is admin-only, but the facts themselves
+ * are the kind a writer wondering why a search missed ought to be able to see,
+ * and gating a query harder than its contents need is how a permission stops
+ * meaning anything.
+ *
+ * `index_configuration` is joined rather than left-joined: a workspace without
+ * one cannot accept a source, so its absence is a fault to surface and not a
+ * row to render blank. */
+export const getWorkspaceFacts = createServerFn({ method: 'GET' })
+  .validator(validateScope)
+  .handler(async ({ data }) => {
+    const { workspaceId } = await requireMember('read', data.workspace);
+    const [row] = await client<
+      { slug: string; created_at: string; model: string; dimensions: number }[]
+    >`
+      SELECT workspaces.slug, workspaces.created_at,
+             configuration.embedding_model AS model,
+             configuration.embedding_dimensions AS dimensions
+      FROM workspaces
+      JOIN index_configuration AS configuration ON configuration.workspace_id = workspaces.id
+      WHERE workspaces.id = ${workspaceId}
+    `;
+    if (!row) throw new Error('This workspace has no index configuration.');
+    return {
+      slug: row.slug,
+      createdAt: row.created_at,
+      model: row.model,
+      dimensions: Number(row.dimensions),
+    };
+  });
+
 /* Renaming a workspace. The name only — never the slug.
  *
  * The slug is what every link anyone has sent contains, and permanence is the

@@ -379,6 +379,23 @@ values are holder names, and four equal columns in a 340px register would
 truncate every one of them to a few characters. A filter you cannot read is not
 a filter.
 
+### Section tabs
+A section with more than one face carries them in a row directly beneath the
+masthead, sharing its gutter and closing with a hairline — the same
+construction as the filter bar, so the row reads as a property of the section
+rather than as a strip of page chrome. The masthead drops its own bottom rule
+when tabs follow it: one hairline for the pair.
+
+The active tab takes a 2px bottom edge in tag stock and an ink-weight bump.
+This is not a new treatment — it is the rail's active drawer rotated, the same
+form the drawers themselves take at the narrow breakpoint. The inactive weight
+is reserved with `text-shadow`, so the row does not shift as you move along it.
+
+Links, not an ARIA `tablist`: tabs are routes here. They are in history, Back
+moves between them, and one can be pasted to a colleague. **No counts on a
+tab** — the rail is the only place a register states its size, and repeating it
+a few inches to the right would end that rule.
+
 ### Source body
 The recessed content block: `{colors.slate-ground}` inside a hairline box,
 register type, `pre-wrap`. See the Untrusted-Body Rule — this block is never
@@ -468,6 +485,13 @@ bottom rule, tracked label above. Focus thickens the underline to 2px in
 problem and the recovery. Selects carry a drawn chevron in hairline stroke.
 
 ### Navigation
+The **plate** at the head of the rail names the corpus you are in and is how
+you leave it: a `<details>` disclosure listing the other workspaces you belong
+to, or a plain plate when there is nowhere to go. It switches and nothing else —
+creating a workspace lives in Settings, which has a drawer. A disclosure has no
+Escape and no outside-click; that is survivable here because the panel displaces
+nothing and covers nothing, and it is the trade a floating menu could not make.
+
 The cabinet rail is a drawer index. Groups carry tracked labels; items are
 14px body with a register-set count on the right. Active items take the bench
 ground plus a 1px left hairline in tag stock and an ink-weight bump. Sections
@@ -488,9 +512,16 @@ Each drawer carries a hand-drawn mark in the world's own grammar — a filing ta
 for Sources, a dashed seal for the review queue, an issued tag for Identities, a
 **countersigned tag** for People (the same tag with a signature struck across
 it: these are the holders who sign for others rather than the ones issued to),
-and a custody line for Activity. Five marks, no borrowed icon set. The one
-Lucide glyph in the chrome sits by the signed-in name, where the vocabulary is
-deliberately not the drawer one.
+a **cabinet front** for Settings (the case and its drawer pulls: Settings
+configures the thing that holds the drawers rather than indexing one), and a
+custody line for Activity. Six marks, no borrowed icon set. The one Lucide glyph
+in the chrome sits by the signed-in name, where the vocabulary is deliberately
+not the drawer one.
+
+Identities and People are also tabs of Settings, and their drawers point
+straight at those tabs. Two ways into one page on purpose: the tab bar is the
+structure, the drawer is the shortcut that keeps each register's size in the
+rail where sizes belong.
 
 The rail is the only place a register's size is stated. A register never
 repeats its own count in a head above itself: the number is already in the rail

@@ -139,7 +139,7 @@ function detailOf(event: EventRow): string | null {
 function Activity() {
   const { slug } = Route.useParams();
   const router = useRouter();
-  const navigate = useNavigate({ from: '/activity' });
+  const navigate = useNavigate({ from: '/w/$slug/activity' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
   const { log, types, failure } = Route.useLoaderData();

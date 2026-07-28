@@ -1,17 +1,16 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
-import { AppShell, accessionOf, SealChip } from '../../../components/chrome.js';
+import { AppShell, accessionOf, SealChip, SettingsTabs } from '../../../../components/chrome.js';
 import {
   CredentialTag,
   type Identity,
   type Issued,
   ROLES,
   type Role,
-} from '../../../components/identity.js';
-import { authClient } from '../../../lib/auth-client.js';
-import { createIdentity, listIdentities } from '../../../lib/management.js';
-import { readFailure } from '../../../lib/read-failure.js';
-import { requireRole } from '../../../lib/route-guards.js';
+} from '../../../../components/identity.js';
+import { authClient } from '../../../../lib/auth-client.js';
+import { createIdentity, listIdentities } from '../../../../lib/management.js';
+import { readFailure } from '../../../../lib/read-failure.js';
 
 export type IdentitySearch = { after?: string };
 
@@ -34,12 +33,7 @@ function parseCursor(after: string | undefined) {
  * send another, and one `router.invalidate()` after a mutation refreshes the
  * register, the bench and the rail count together — the old route kept its own
  * effect-driven refetch, so there were two ways to reload one page. */
-export const Route = createFileRoute('/w/$slug/identities')({
-  /* The `/w/$slug` layout has already resolved the workspace and confirmed
-     membership; this only narrows by role. This register issues and voids agent
-     credentials, so it is an administrator's business.
-     Enforced again in every server function this page calls. */
-  beforeLoad: requireRole('admin'),
+export const Route = createFileRoute('/w/$slug/settings/identities')({
   /* The cursor lives in the URL like every other register state, so a page of
      the register is linkable and a reload does not silently jump back to the
      newest holders. */
@@ -101,7 +95,7 @@ function IdentitiesLayout() {
       setKeyLabel('');
       await router.invalidate();
       await navigate({
-        to: '/w/$slug/identities/$identityId',
+        to: '/w/$slug/settings/identities/$identityId',
         params: { identityId: result.identityId },
       });
     } catch (cause) {
@@ -118,7 +112,8 @@ function IdentitiesLayout() {
   return (
     <AppShell
       title="Identities"
-      accession="Access register"
+      accession="Settings"
+      tabs={<SettingsTabs slug={slug} />}
       {...viewer}
       onSignOut={async () => {
         await authClient.signOut();
@@ -172,7 +167,7 @@ function IdentitiesLayout() {
               return (
                 <li key={identity.id}>
                   <Link
-                    to="/w/$slug/identities/$identityId"
+                    to="/w/$slug/settings/identities/$identityId"
                     params={{ slug, identityId: identity.id }}
                     className={`entry${identity.disabled_at ? ' entry--disabled' : ''}`}
                     activeProps={{ 'aria-current': 'page' }}
@@ -203,13 +198,13 @@ function IdentitiesLayout() {
           {(hasMore || after) && (
             <div className="index__note index__page">
               {after && (
-                <Link to="/w/$slug/identities" search={{}} className="btn btn--quiet">
+                <Link to="/w/$slug/settings/identities" search={{}} className="btn btn--quiet">
                   Newest
                 </Link>
               )}
               {hasMore && last && (
                 <Link
-                  to="/w/$slug/identities"
+                  to="/w/$slug/settings/identities"
                   search={{ after: `${last.created_at}|${last.id}` }}
                   className="btn btn--quiet"
                 >

@@ -33,7 +33,7 @@ function Hint({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-type Mark = 'sources' | 'review' | 'identities' | 'people' | 'activity';
+type Mark = 'sources' | 'review' | 'identities' | 'people' | 'settings' | 'activity';
 
 /* Marks are drawn in the world's own grammar — filing tabs, seals, tags and
    custody lines — rather than borrowed from a generic icon set. */
@@ -77,6 +77,19 @@ function DrawerMark({ mark }: { mark: Mark }) {
       <svg {...common}>
         <path d="M1.8 2.6h7l3.4 2.4-3.4 2.4h-7z" />
         <path d="M2 10.6c1.6-1 3-1 4.2 0 1.2 1 2.8 1 4.4-.6" />
+      </svg>
+    );
+  /* The cabinet front rather than a drawer within it: a case with two drawer
+     faces and their pulls. Settings configures the thing that holds the
+     drawers, so it is drawn as the object and not as one more index. A cog
+     would have been the reflex and would have been the only borrowed shape in
+     the rail. */
+  if (mark === 'settings')
+    return (
+      <svg {...common}>
+        <rect x="1.8" y="2.2" width="10.4" height="9.6" rx="0.5" />
+        <path d="M1.8 7h10.4" />
+        <path d="M5.8 4.6h2.4M5.8 9.4h2.4" />
       </svg>
     );
   return (
@@ -134,7 +147,13 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
   ];
   /* Both halves of "who may act": the agent holders that present API keys, and
      the people who can sign in and decide what those agents are told. Both are
-     credentials, so both are an administrator's business only. */
+     credentials, so both are an administrator's business only.
+
+     These two are also tabs of Settings, and the drawers point straight at
+     them. Two ways into one page, on purpose: the tab bar is the structure, and
+     the rail is the shortcut that keeps each register's size visible. A count
+     belongs in the rail — it is the only place one is stated — so removing the
+     drawers in favour of the tabs alone would have cost that. */
   if (can(role, 'admin')) {
     groups.push({
       label: 'Access',
@@ -142,11 +161,20 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
         {
           mark: 'identities',
           label: 'Identities',
-          to: '/w/$slug/identities',
+          to: '/w/$slug/settings/identities',
           count: counts?.identities,
         },
-        { mark: 'people', label: 'People', to: '/w/$slug/people', count: counts?.people },
+        {
+          mark: 'people',
+          label: 'People',
+          to: '/w/$slug/settings/people',
+          count: counts?.people,
+        },
       ],
+    });
+    groups.push({
+      label: 'Workspace',
+      items: [{ mark: 'settings', label: 'Settings', to: '/w/$slug/settings/workspace' }],
     });
   }
   groups.push({
@@ -167,26 +195,28 @@ export type WorkspaceRef = { id: string; name: string; slug: string; role: Role 
  * and the product name steps down to the sub-line.
  *
  * A `<details>` rather than a menu primitive: Radix's dropdown is not yet a
- * dependency and this is one list of links. `<details>` is keyboard-operable,
- * announces its own expanded state, and closes on Escape without any of that
- * being written here. A control this small should not add a dependency.
+ * dependency and this is one list of links. `<details>` is keyboard-operable
+ * and announces its own expanded state without any of that being written here.
+ * It does *not* close on Escape or on an outside click — see the note in the
+ * stylesheet for why that is survivable here and would not be for a menu that
+ * floated over the rail.
  *
- * With one workspace and no right to create another there is nothing to choose,
- * so it renders as a plain plate — no disclosure arrow promising a menu that
+ * Switching only. Creating a workspace used to hang off the bottom of this menu
+ * and deep-link into a form on the People page; it lives in Settings now, which
+ * has a drawer of its own. So the plate is a disclosure exactly when there is
+ * somewhere to go, and a plain plate otherwise — no arrow promising a menu that
  * would open onto a list of one. */
 function WorkspacePlate({
   slug,
   name,
   workspaces,
-  canCreate,
 }: {
   slug: string;
   name: string;
   workspaces: WorkspaceRef[];
-  canCreate: boolean;
 }) {
   const others = workspaces.filter((entry) => entry.slug !== slug);
-  if (others.length === 0 && !canCreate) {
+  if (others.length === 0) {
     return (
       <div className="cabinet__plate">
         <span>{name}</span>
@@ -201,7 +231,7 @@ function WorkspacePlate({
         <small>Team knowledge base</small>
       </summary>
       <div className="cabinet__workspaces">
-        {others.length > 0 && <span className="label">Switch to</span>}
+        <span className="label">Switch to</span>
         {others.map((entry) => (
           <Link
             key={entry.slug}
@@ -214,16 +244,6 @@ function WorkspacePlate({
             <span className="cabinet__workspace-role register">{entry.role}</span>
           </Link>
         ))}
-        {canCreate && (
-          <Link
-            to="/w/$slug/people"
-            params={{ slug }}
-            hash="new-workspace"
-            className="cabinet__workspace cabinet__workspace--new"
-          >
-            New workspace
-          </Link>
-        )}
       </div>
     </details>
   );
@@ -233,6 +253,7 @@ export function AppShell({
   title,
   accession,
   actions,
+  tabs,
   holder,
   role,
   slug,
@@ -262,6 +283,12 @@ export function AppShell({
      authority — `router.invalidate()` re-runs the layout, so the rail moves
      with the pane that caused it. */
   counts: NavCounts | undefined;
+  /* A section that has more than one face puts its faces here — see
+     `SettingsTabs`. Rendered by the shell rather than by each page so the bar
+     is in the same place, with the same rule under it, on every tab; passed by
+     each page rather than owned by a layout route so a tab keeps its own title
+     and its own masthead action. */
+  tabs?: ReactNode;
   onSignOut: () => void;
   children: ReactNode;
 }) {
@@ -275,12 +302,7 @@ export function AppShell({
       </a>
 
       <aside className="cabinet">
-        <WorkspacePlate
-          slug={slug}
-          name={workspaceName}
-          workspaces={workspaces}
-          canCreate={can(role, 'admin')}
-        />
+        <WorkspacePlate slug={slug} name={workspaceName} workspaces={workspaces} />
 
         <nav className="drawers" aria-label="Sections">
           {drawerGroups(role, counts).map((group) => (
@@ -329,9 +351,9 @@ export function AppShell({
                 <span className="label">Signed in</span>
                 <b>{holder}</b>
               </div>
-              {/* Settings sits with the signed-in name rather than in a drawer:
-                  it is your account and who else holds one, not a section of
-                  the corpus.
+              {/* Your account sits with the signed-in name rather than in a
+                  drawer: it is a preference, not a section of the corpus. The
+                  workspace's own settings are a drawer, because they are.
                  *
                   A Lucide glyph, like the other icon-only controls — the
                   hand-drawn marks are the drawer vocabulary, not this one.
@@ -340,12 +362,12 @@ export function AppShell({
                   to fit reads as a sun. The person makes it unmistakably
                   *your account*. Label moves to `aria-label` and the hint per
                   the Icon Button rule. */}
-              <Hint label="Settings">
+              <Hint label="Account">
                 <Link
-                  to="/w/$slug/settings"
+                  to="/w/$slug/account"
                   params={{ slug }}
                   className="icon-btn"
-                  aria-label="Settings"
+                  aria-label="Account"
                   activeProps={{ 'aria-current': 'page' }}
                 >
                   <UserRoundCog size={15} strokeWidth={1.75} aria-hidden="true" />
@@ -371,9 +393,56 @@ export function AppShell({
           </div>
           {actions && <div className="masthead__actions">{actions}</div>}
         </header>
+        {tabs}
         {children}
       </main>
     </div>
+  );
+}
+
+/* The three faces of Settings.
+ *
+ * A `<nav>` of links, not an ARIA `tablist`. These are routes: they are in
+ * history, the browser's Back moves between them, and one can be pasted to a
+ * colleague. `tablist` would describe panels swapped in place and would take
+ * arrow-key navigation away from a set of links that ought to Tab like links.
+ *
+ * No counts here, even though two of the three are registers with one. The rail
+ * is the only place a register states its size — repeat it on the tab a few
+ * inches to the right and the rule stops meaning anything.
+ *
+ * `activeOptions.exact` is off for Identities on purpose: a selected holder
+ * lives at `settings/identities/$id`, and the tab has to stay lit while you are
+ * reading one. */
+export function SettingsTabs({ slug }: { slug: string }) {
+  return (
+    <nav className="tabs" aria-label="Settings sections">
+      <Link
+        to="/w/$slug/settings/workspace"
+        params={{ slug }}
+        className="tabs__link"
+        activeProps={{ 'aria-current': 'page' }}
+      >
+        Workspace
+      </Link>
+      <Link
+        to="/w/$slug/settings/people"
+        params={{ slug }}
+        className="tabs__link"
+        activeProps={{ 'aria-current': 'page' }}
+      >
+        People
+      </Link>
+      <Link
+        to="/w/$slug/settings/identities"
+        params={{ slug }}
+        search={{}}
+        className="tabs__link"
+        activeProps={{ 'aria-current': 'page' }}
+      >
+        Identities
+      </Link>
+    </nav>
   );
 }
 
