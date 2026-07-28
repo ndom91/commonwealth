@@ -26,6 +26,14 @@ if (!databaseUrl) {
       SOURCE_STORAGE_PATH: '/tmp/commonwealth-test',
       MAX_UPLOAD_BYTES: 1024,
       MAX_REQUEST_BYTES: 4096,
+      /* Unused here — this test drives the repository directly and never goes
+         through the HTTP surface the limiters guard — but `Config` is the whole
+         environment, so it has to be complete. */
+      TRUST_FORWARDED_FOR: false,
+      RATE_LIMIT_KEY_WINDOW: 60,
+      RATE_LIMIT_KEY_MAX: 120,
+      RATE_LIMIT_ADDRESS_WINDOW: 60,
+      RATE_LIMIT_ADDRESS_MAX: 600,
     };
     const embeddings = {
       async embed(texts: string[]): Promise<number[][]> {

@@ -73,6 +73,42 @@ const shared = {
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: ['http://localhost:3001', 'http://127.0.0.1:3001'],
   database: drizzleAdapter(db, { provider: 'pg', schema }),
+  /* Covers better-auth's own endpoints only — `/api/auth/*`. Our server
+   * functions are a separate surface with a separate limiter; see
+   * `management.ts` for the invitation routes, which are the unauthenticated
+   * ones.
+   *
+   * `enabled` is set rather than left alone because better-auth turns the
+   * limiter *off* outside production, and a limiter that never runs in
+   * development is one that breaks unnoticed. The global allowance is set well
+   * above what clicking around the admin costs, so ordinary work never meets
+   * it; the rule that actually bites is the one on sign-in.
+   *
+   * Memory storage, the default, matching the limiters on our own endpoints:
+   * counters are lost on restart and are per-process. That is the accepted
+   * trade for a single-container deployment, and the thing to revisit first if
+   * this ever runs more than one.
+   *
+   * Harmless on `provisioning`, which shares this object: better-auth exempts
+   * server-side `auth.api` calls from the limiter entirely, and that instance
+   * is only ever reached that way.
+   *
+   * Addresses come from `x-forwarded-for` by default. The shipped compose binds
+   * the admin to loopback with no proxy, so that header is absent and
+   * better-auth falls back on its own. An operator who fronts this with a proxy
+   * should set `advanced.ipAddress.trustedProxies` to it — otherwise a client
+   * can write the header itself and get a fresh bucket per request. */
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    customRules: {
+      /* better-auth's own default for this path, stated here so it survives a
+         change to the global numbers above. Password guessing is the one thing
+         on this surface worth making slow. */
+      '/sign-in/email': { window: 10, max: 3 },
+    },
+  },
   /* `workspaces.id` is `uuid` and predates better-auth, so ids the plugin
      generates for it have to be uuids. Safe for the tables better-auth already
      owns: `user`, `session`, `account` and `verification` all key on `text`, so

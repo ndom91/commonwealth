@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomUUID, scryptSync } from 'node:crypto';
+import { clientIp, FixedWindow } from '@commonwealth/rate-limit';
 import { createServerFn } from '@tanstack/react-start';
+import { getRequest } from '@tanstack/react-start/server';
 import { provisioning } from './auth.js';
 import { requireMember, type Scoped, SLUG, validateScope, validateWorkspace } from './authorize.js';
 import { client } from './db.js';
@@ -707,6 +709,58 @@ async function inspectInvitation(token: string) {
   return invitation;
 }
 
+/* The two invitation routes are the only unauthenticated server functions in
+ * the product, so they are the only ones needing a limiter of their own —
+ * everything else is behind `requireMember`, which needs a session, and
+ * better-auth limits the endpoints that mint one.
+ *
+ * **By address, and separately by token**, because neither alone is enough.
+ *
+ * By token alone is no limit at all against enumeration: every guess is a new
+ * key, so every guess gets a fresh allowance.
+ *
+ * By address alone breaks a real case. With no proxy in front there is no
+ * address to tell callers apart — `fallback` is a constant, so *everyone*
+ * shares one bucket — and a team of fifteen redeeming their invitations the
+ * morning they are sent would see the last five refused. An onboarding flow
+ * that fails when onboarding works is not a limiter, it is an outage.
+ *
+ * So the address bucket is sized for a crowd and the token bucket is sized for
+ * a person: enough retries to fix a fumbled password, not enough to sit on one
+ * link. Neither is defending the token itself, which is 256 bits and is not
+ * going to be guessed — they bound cost and nothing more.
+ *
+ * Reading is cheap, a digest and one indexed lookup, so it is allowed often.
+ * Accepting is the expensive one — it creates an account and better-auth hashes
+ * the password — but only ever on a *valid, unclaimed* token, which works
+ * exactly once. A junk token is refused before any of that. */
+const inviteReads = new FixedWindow({ window: 60, max: 60 });
+const inviteAccepts = new FixedWindow({ window: 600, max: 60 });
+const inviteAcceptsPerToken = new FixedWindow({ window: 600, max: 10 });
+
+function invitationCaller(): string {
+  return clientIp((name) => getRequest().headers.get(name) ?? undefined, {
+    trustForwarded: process.env.TRUST_FORWARDED_FOR === 'true',
+    fallback: 'unproxied',
+  });
+}
+
+function refuse(retryAfter: number): never {
+  throw new Error(`Too many attempts. Wait ${retryAfter} seconds and open the link again.`);
+}
+
+function refuseIfTooFast(limiter: FixedWindow): void {
+  const decision = limiter.check(invitationCaller());
+  if (!decision.ok) refuse(decision.retryAfter);
+}
+
+/* Hashed, so a token never becomes a map key held in memory in the clear. The
+   same digest the row is stored under, so this costs nothing extra. */
+function refuseIfTokenTooFast(token: string): void {
+  const decision = inviteAcceptsPerToken.check(createHash('sha256').update(token).digest('hex'));
+  if (!decision.ok) refuse(decision.retryAfter);
+}
+
 /* What the invite page shows before asking for a password: who invited you,
  * which address this is for, and what you will be able to do.
  *
@@ -718,6 +772,7 @@ export const readInvitation = createServerFn({ method: 'GET' })
     return { token };
   })
   .handler(async ({ data }) => {
+    refuseIfTooFast(inviteReads);
     const invitation = await inspectInvitation(data.token);
     return {
       email: invitation.email,
@@ -757,6 +812,8 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
     return { token, password: input.password };
   })
   .handler(async ({ data }) => {
+    refuseIfTooFast(inviteAccepts);
+    refuseIfTokenTooFast(data.token);
     const invitation = await inspectInvitation(data.token);
     const email = invitation.email.toLowerCase();
     const role = isRole(invitation.role) ? invitation.role : ('reader' as Role);

@@ -7,6 +7,11 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       PORT: 3000
       MAX_REQUEST_BYTES: ${MAX_REQUEST_BYTES:-15000000}
+      # True because Caddy is always in front of this service here. Set it false
+      # if you publish the port directly, or the rate limiter believes an
+      # `X-Forwarded-For` the client wrote and every request gets a fresh
+      # allowance. See `clientIp` in `@commonwealth/rate-limit`.
+      TRUST_FORWARDED_FOR: ${APP_TRUST_FORWARDED_FOR:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,6 +41,11 @@ services:
       SOURCE_STORAGE_PATH: ${COMPOSE_SOURCE_STORAGE_PATH:-/app/storage}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10000000}
       PORT: 3001
+      # False, unlike `app`: this one is bound to loopback with nothing in front
+      # of it. Set it true — and configure better-auth's `trustedProxies` — if
+      # you put a proxy here, otherwise the invitation limiter counts every
+      # caller in the world as one.
+      TRUST_FORWARDED_FOR: ${ADMIN_TRUST_FORWARDED_FOR:-false}
     depends_on:
       admin-migrate:
         condition: service_completed_successfully

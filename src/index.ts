@@ -1,10 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { Embeddings } from '@commonwealth/pipeline';
+import { clientIp, FixedWindow } from '@commonwealth/rate-limit';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler, type McpRequestContext, McpServer } from '@modelcontextprotocol/server';
 import { toStandardJsonSchema } from '@valibot/to-json-schema';
 import * as v from 'valibot';
 import { AccessService } from './access-service.js';
+import { keyPrefix } from './auth.js';
 import { loadConfig } from './config.js';
 import type { Actor } from './domain.js';
 import { DomainError } from './errors.js';
@@ -230,6 +232,43 @@ function unauthorized(response: ServerResponse): void {
   response.end(JSON.stringify({ error: 'A valid Bearer API key is required' }));
 }
 
+function tooManyRequests(response: ServerResponse, retryAfter: number): void {
+  response.writeHead(429, {
+    'content-type': 'application/json',
+    /* The standard header, in seconds. better-auth answers its own endpoints
+       with `X-Retry-After` instead; this is a plain HTTP API, so it uses the
+       spelling an HTTP client already knows. */
+    'retry-after': String(retryAfter),
+  });
+  response.end(JSON.stringify({ error: 'Too many requests', retryAfter }));
+}
+
+/* Two limiters, both of which must pass, because they answer different
+ * questions.
+ *
+ * **Per credential** is the one that closes a real hole. `access.authenticate`
+ * runs `scryptSync` — a deliberately slow KDF, on the event loop of a
+ * single-threaded server — once for every `api_keys` row whose `key_prefix`
+ * matches the presented token. That prefix is the first twelve characters of
+ * the key, and it is printed in the Identities register: it is not a secret.
+ * So anyone who has seen a key can send its prefix with a wrong secret and buy
+ * one scrypt per request, which is a cheap way to stall the whole process,
+ * `/healthz` included. Counting by prefix puts a ceiling on exactly that.
+ *
+ * **Per address** is the backstop for volume that never matches a live prefix
+ * and so never reaches scrypt, but still costs a query and a connection.
+ *
+ * Both are checked *before* authentication. A limiter that runs afterwards has
+ * already paid the cost it exists to prevent. */
+const byKey = new FixedWindow({
+  window: config.RATE_LIMIT_KEY_WINDOW,
+  max: config.RATE_LIMIT_KEY_MAX,
+});
+const byAddress = new FixedWindow({
+  window: config.RATE_LIMIT_ADDRESS_WINDOW,
+  max: config.RATE_LIMIT_ADDRESS_MAX,
+});
+
 async function handleMcp(request: IncomingMessage, response: ServerResponse): Promise<void> {
   try {
     const contentLength = Number(request.headers['content-length']);
@@ -244,9 +283,26 @@ async function handleMcp(request: IncomingMessage, response: ServerResponse): Pr
       );
       return;
     }
+
+    /* Falls back to the socket address, which behind Caddy is Caddy — hence
+       `TRUST_FORWARDED_FOR`, which the shipped topology sets. */
+    const address = clientIp((name) => request.headers[name] as string | undefined, {
+      trustForwarded: config.TRUST_FORWARDED_FOR,
+      fallback: request.socket.remoteAddress ?? 'unknown',
+    });
+    const perAddress = byAddress.check(address);
+    if (!perAddress.ok) return tooManyRequests(response, perAddress.retryAfter);
+
     const authorization = request.headers.authorization;
     if (!authorization?.startsWith('Bearer ')) return unauthorized(response);
     const token = authorization.slice('Bearer '.length);
+
+    /* Keyed on the prefix rather than the whole token, so that presenting a
+       hundred different wrong secrets for one prefix shares one bucket — which
+       is the case that costs a hundred scrypts. */
+    const perKey = byKey.check(keyPrefix(token));
+    if (!perKey.ok) return tooManyRequests(response, perKey.retryAfter);
+
     const actor = await access.authenticate(token);
     if (!actor) return unauthorized(response);
 

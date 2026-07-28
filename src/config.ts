@@ -14,6 +14,19 @@ const positiveInt = (fallback: number) =>
     String(fallback)
   );
 
+/* Same treatment as `positiveInt`: the fallback goes through the same pipe as a
+   supplied value. Only the literal string `false` disables — anything else
+   present and non-empty is a yes, so a typo fails closed towards *trusting*
+   rather than silently ignoring a proxy that is really there. */
+const boolean = (fallback: boolean) =>
+  v.optional(
+    v.pipe(
+      v.string(),
+      v.transform((value) => value !== 'false')
+    ),
+    String(fallback)
+  );
+
 const environment = v.object({
   DATABASE_URL: v.pipe(v.string(), v.url()),
   OLLAMA_URL: v.pipe(v.string(), v.url()),
@@ -23,6 +36,20 @@ const environment = v.object({
   SOURCE_STORAGE_PATH: v.optional(v.string(), '/app/storage'),
   MAX_UPLOAD_BYTES: positiveInt(10 * 1024 * 1024),
   MAX_REQUEST_BYTES: positiveInt(15 * 1024 * 1024),
+  /* Defaults to true because the shipped compose always puts Caddy in front of
+     this service. Set it to `false` if you expose the port directly, or the
+     limiter counts every caller against one address it can never distinguish —
+     and worse, believes a header the client wrote. See `clientIp`. */
+  TRUST_FORWARDED_FOR: boolean(true),
+  /* Per credential. An agent working hard does a handful of calls a second in
+     bursts; this is well clear of that and still bounds the scrypt cost of a
+     flood carrying a real key prefix. See the note in `index.ts`. */
+  RATE_LIMIT_KEY_WINDOW: positiveInt(60),
+  RATE_LIMIT_KEY_MAX: positiveInt(120),
+  /* Per address, as a backstop for volume that never reaches a real prefix.
+     Generous, because a whole team can share one egress address. */
+  RATE_LIMIT_ADDRESS_WINDOW: positiveInt(60),
+  RATE_LIMIT_ADDRESS_MAX: positiveInt(600),
 });
 
 export type Config = v.InferOutput<typeof environment>;

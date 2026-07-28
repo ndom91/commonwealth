@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@commonwealth/pipeline": "workspace:*",
+    "@commonwealth/rate-limit": "workspace:*",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@tanstack/react-router": "^1.168.2",
     "@tanstack/react-start": "^1.167.3",

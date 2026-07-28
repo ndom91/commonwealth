@@ -11,6 +11,9 @@ importers:
       '@commonwealth/pipeline':
         specifier: workspace:*
         version: link:packages/pipeline
+      '@commonwealth/rate-limit':
+        specifier: workspace:*
+        version: link:packages/rate-limit
       '@modelcontextprotocol/node':
         specifier: 2.0.0-beta.5
         version: 2.0.0-beta.5(@modelcontextprotocol/server@2.0.0-beta.5)(hono@4.12.32)
@@ -45,6 +48,9 @@ importers:
       '@commonwealth/pipeline':
         specifier: workspace:*
         version: link:../packages/pipeline
+      '@commonwealth/rate-limit':
+        specifier: workspace:*
+        version: link:../packages/rate-limit
       '@radix-ui/react-tooltip':
         specifier: ^1.2.16
         version: 1.2.16(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -102,6 +108,8 @@ importers:
         version: 5.9.3
 
   packages/pipeline: {}
+
+  packages/rate-limit: {}
 
 packages:
 

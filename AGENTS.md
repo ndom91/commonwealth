@@ -73,6 +73,38 @@ Deliberately *not* shared: `knowledge-repository.ts`. It writes jsonb (see
 below) and is bound to the MCP `Actor` permission model, so sharing it would be
 wrong on the admin side in two separate ways. Each package keeps its own SQL.
 
+`@commonwealth/rate-limit` is the same arrangement and the same caveat.
+
+## Rate limiting is in memory, and that is a choice with consequences
+
+Three surfaces are limited: `POST /mcp` (`src/index.ts`), the two
+unauthenticated invitation server functions (`admin/src/lib/management.ts`), and
+better-auth's own `/api/auth/*` (configured in `admin/src/lib/auth.ts`).
+
+All of them count in process memory. **Counters reset when a process restarts,
+and two replicas of a service each get a full allowance.** That is fine for a
+single-container deployment and is not fine for a scaled one — if a second `app`
+or `admin` is ever run, this is the thing to move to shared storage first.
+better-auth offers `storage: "database"` or `"secondary-storage"` for its half;
+ours would need the equivalent.
+
+For `/mcp` in particular, memory is not a compromise but the requirement. The
+limiter runs *before* `access.authenticate`, whose job includes a `scryptSync`
+per matching key row — on the event loop of a single-threaded server, at roughly
+25ms each. A database-backed counter would do a query in order to avoid a query.
+
+The key prefix is not a secret: it is the first twelve characters of the
+credential and it is printed in the Identities register. Anyone who has seen a
+key can send its prefix with a wrong secret and buy one scrypt per request. That
+is why the per-credential bucket is keyed on the prefix rather than the whole
+token — a hundred wrong secrets for one prefix share one allowance.
+
+`TRUST_FORWARDED_FOR` differs per service and is not a preference: `app` is
+behind Caddy so it defaults true, `admin` is bound to loopback so it defaults
+false. Reading a forwarded header with no proxy in front lets any caller mint a
+fresh bucket per request by setting it, which is worse than having no limiter,
+because it looks like one.
+
 ## Two Postgres clients that behave differently
 
 Both packages use postgres.js against the same database, but the admin hands
