@@ -5,6 +5,7 @@ import { getRequest } from '@tanstack/react-start/server';
 import { provisioning } from './auth.js';
 import { requireMember, type Scoped, SLUG, validateScope, validateWorkspace } from './authorize.js';
 import { client } from './db.js';
+import { fileEvent } from './events.js';
 import { PAGE_SIZE } from './knowledge.js';
 import { isRole, type Role } from './roles.js';
 
@@ -130,11 +131,12 @@ export const createIdentity = createServerFn({ method: 'POST' })
         INSERT INTO managed_api_key (id, knowledge_user_id, label, created_by_admin_id)
         VALUES (${keyId}, ${identity.id}, ${data.keyLabel}, ${createdByAdminId})
       `;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${workspaceId}, ${createdByAdminId}, 'api_key_created',
-          ${JSON.stringify({ identityId: identity.id, keyId, label: data.keyLabel })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId,
+        actor: createdByAdminId,
+        type: 'api_key_created',
+        metadata: { identityId: identity.id, keyId, label: data.keyLabel },
+      });
     });
     if (!identityId) throw new Error('Unable to create identity');
     return { identityId, key: secret, prefix: secret.slice(0, 12) };
@@ -205,11 +207,12 @@ export const updateIdentity = createServerFn({ method: 'POST' })
       if (before.auto_approve !== data.autoApprove)
         changed.autoApprove = { from: before.auto_approve, to: data.autoApprove };
       if (Object.keys(changed).length > 0) {
-        await transaction`
-          INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-          VALUES (${before.workspace_id}, ${administrator}, 'identity_amended',
-            ${JSON.stringify({ identityId: data.identityId, changed })}::jsonb)
-        `;
+        await fileEvent(transaction, {
+          workspaceId: before.workspace_id,
+          actor: administrator,
+          type: 'identity_amended',
+          metadata: { identityId: data.identityId, changed },
+        });
       }
     });
     return { identityId: data.identityId };
@@ -253,12 +256,12 @@ export const setIdentityDisabled = createServerFn({ method: 'POST' })
           WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
         `;
       }
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${identity.workspace_id}, ${administrator},
-          ${data.disabled ? 'identity_disabled' : 'identity_enabled'},
-          ${JSON.stringify({ identityId: data.identityId })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId: identity.workspace_id,
+        actor: administrator,
+        type: data.disabled ? 'identity_disabled' : 'identity_enabled',
+        metadata: { identityId: data.identityId },
+      });
     });
     return { identityId: data.identityId, disabled: data.disabled };
   });
@@ -297,11 +300,12 @@ export const issueCredential = createServerFn({ method: 'POST' })
         INSERT INTO managed_api_key (id, knowledge_user_id, label, created_by_admin_id)
         VALUES (${keyId}, ${identity.id}, ${data.keyLabel}, ${createdByAdminId})
       `;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${identity.workspace_id}, ${createdByAdminId}, 'api_key_created',
-          ${JSON.stringify({ identityId: identity.id, keyId, label: data.keyLabel })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId: identity.workspace_id,
+        actor: createdByAdminId,
+        type: 'api_key_created',
+        metadata: { identityId: identity.id, keyId, label: data.keyLabel },
+      });
     });
     return { identityId: data.identityId, key: secret, prefix: secret.slice(0, 12) };
   });
@@ -335,16 +339,17 @@ export const revokeKey = createServerFn({ method: 'POST' })
       const [managed] = await transaction<{ label: string }[]>`
         SELECT label FROM managed_api_key WHERE id = ${data.keyId}
       `;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${identity.workspace_id}, ${administrator}, 'api_key_revoked',
-          ${JSON.stringify({
-            identityId: revoked.user_id,
-            keyId: data.keyId,
-            prefix: revoked.key_prefix,
-            label: managed?.label ?? null,
-          })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId: identity.workspace_id,
+        actor: administrator,
+        type: 'api_key_revoked',
+        metadata: {
+          identityId: revoked.user_id,
+          keyId: data.keyId,
+          prefix: revoked.key_prefix,
+          label: managed?.label ?? null,
+        },
+      });
     });
     return { revoked: true };
   });
@@ -437,11 +442,12 @@ export const updatePersonRole = createServerFn({ method: 'POST' })
         UPDATE member SET role = ${data.role}
         WHERE workspace_id = ${workspaceId} AND user_id = ${data.userId}
       `;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${workspaceId}, ${actor}, 'member_role_changed',
-          ${JSON.stringify({ userId: data.userId, from: before.role, to: data.role })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId,
+        actor,
+        type: 'member_role_changed',
+        metadata: { userId: data.userId, from: before.role, to: data.role },
+      });
     });
     return { role: data.role };
   });
@@ -470,11 +476,12 @@ export const removePerson = createServerFn({ method: 'POST' })
       /* Already gone. The register reloads without them and there is nothing
          for the administrator to correct. */
       if (!removed) return;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${workspaceId}, ${actor}, 'member_removed',
-          ${JSON.stringify({ userId: data.userId, role: removed.role })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId,
+        actor,
+        type: 'member_removed',
+        metadata: { userId: data.userId, role: removed.role },
+      });
     });
     return { removed: true };
   });
@@ -545,11 +552,12 @@ export const invitePerson = createServerFn({ method: 'POST' })
           VALUES (${workspaceId}, ${existing.id}, ${data.role})
           ON CONFLICT (workspace_id, user_id) DO NOTHING
         `;
-        await transaction`
-          INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-          VALUES (${workspaceId}, ${invitedBy}, 'member_added',
-            ${JSON.stringify({ email: data.email, role: data.role })}::jsonb)
-        `;
+        await fileEvent(transaction, {
+          workspaceId,
+          actor: invitedBy,
+          type: 'member_added',
+          metadata: { email: data.email, role: data.role },
+        });
       });
       return { email: data.email, added: true, role: data.role, token: null as string | null };
     }
@@ -574,11 +582,12 @@ export const invitePerson = createServerFn({ method: 'POST' })
         VALUES (${data.email}, ${data.name}, ${tokenDigest(token)}, ${workspaceId}, ${data.role},
                 ${invitedBy}, now() + ${`${INVITATION_DAYS} days`}::interval)
       `;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${workspaceId}, ${invitedBy}, 'member_invited',
-          ${JSON.stringify({ email: data.email, role: data.role })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId,
+        actor: invitedBy,
+        type: 'member_invited',
+        metadata: { email: data.email, role: data.role },
+      });
     });
 
     return { email: data.email, added: false, role: data.role, token: token as string | null };
@@ -643,11 +652,12 @@ export const revokeInvitation = createServerFn({ method: 'POST' })
       /* Already spent or already revoked. The list reloads without it; there is
          nothing for the administrator to correct. */
       if (!revoked) return;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${workspaceId}, ${revokedBy},
-          'member_invitation_revoked', ${JSON.stringify({ email: revoked.email })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId,
+        actor: revokedBy,
+        type: 'member_invitation_revoked',
+        metadata: { email: revoked.email },
+      });
     });
     return { revoked: true };
   });
@@ -841,11 +851,12 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
         VALUES (${invitation.workspace_id}, ${created.id}, ${role})
         ON CONFLICT (workspace_id, user_id) DO NOTHING
       `;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${invitation.workspace_id}, ${created.id},
-          'member_joined', ${JSON.stringify({ email: invitation.email, role })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId: invitation.workspace_id,
+        actor: created.id,
+        type: 'member_joined',
+        metadata: { email: invitation.email, role },
+      });
     });
 
     return { email: invitation.email, role, workspace: invitation.workspace_name };
@@ -925,11 +936,12 @@ export const createWorkspace = createServerFn({ method: 'POST' })
       }
       /* Filed in the new workspace's own log, not the one it was created from.
          The custody line of a corpus should start with its creation. */
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${workspace.id}, ${creator}, 'workspace_created',
-          ${JSON.stringify({ name: data.name, slug: data.slug })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId: workspace.id,
+        actor: creator,
+        type: 'workspace_created',
+        metadata: { name: data.name, slug: data.slug },
+      });
     });
     if (!created) throw new Error('That workspace could not be created.');
     return { id: created, name: data.name, slug: data.slug };
@@ -1006,11 +1018,12 @@ export const renameWorkspace = createServerFn({ method: 'POST' })
       await transaction`
         UPDATE workspaces SET name = ${data.name} WHERE id = ${workspaceId}
       `;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-        VALUES (${workspaceId}, ${actor}, 'workspace_renamed',
-          ${JSON.stringify({ from: before.name, to: data.name })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId,
+        actor,
+        type: 'workspace_renamed',
+        metadata: { from: before.name, to: data.name },
+      });
     });
     return { name: data.name };
   });

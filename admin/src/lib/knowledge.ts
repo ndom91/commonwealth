@@ -3,6 +3,7 @@ import { type Chunk, chunkMarkdown } from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateScope, validateWorkspace } from './authorize.js';
 import { client } from './db.js';
+import { fileEvent } from './events.js';
 import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from './pipeline.js';
 
 /* Read and curation access to the knowledge corpus.
@@ -320,11 +321,13 @@ export const setSourceAuthority = createServerFn({ method: 'POST' })
         WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
       `;
       if (source.authority !== data.authority) {
-        await transaction`
-          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-          VALUES (${source.workspace_id}, ${administrator}, 'source_authority_changed', ${data.sourceId},
-            ${JSON.stringify({ authority: data.authority, from: source.authority })}::jsonb)
-        `;
+        await fileEvent(transaction, {
+          workspaceId: source.workspace_id,
+          actor: administrator,
+          type: 'source_authority_changed',
+          sourceId: data.sourceId,
+          metadata: { authority: data.authority, from: source.authority },
+        });
       }
     });
     return { sourceId: data.sourceId, authority: data.authority };
@@ -345,10 +348,12 @@ export const withdrawSource = createServerFn({ method: 'POST' })
         UPDATE sources SET status = 'deleted', deleted_at = now()
         WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
       `;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-        VALUES (${source.workspace_id}, ${administrator}, 'source_deleted', ${data.sourceId}, '{}'::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId: source.workspace_id,
+        actor: administrator,
+        type: 'source_deleted',
+        sourceId: data.sourceId,
+      });
     });
     return { sourceId: data.sourceId, status: 'deleted' as const };
   });
@@ -394,11 +399,13 @@ export const restoreSource = createServerFn({ method: 'POST' })
           UPDATE sources SET status = ${restored}, deleted_at = NULL
           WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
         `;
-        await transaction`
-          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-          VALUES (${source.workspace_id}, ${administrator}, 'source_restored', ${data.sourceId},
-            ${JSON.stringify({ status: restored })}::jsonb)
-        `;
+        await fileEvent(transaction, {
+          workspaceId: source.workspace_id,
+          actor: administrator,
+          type: 'source_restored',
+          sourceId: data.sourceId,
+          metadata: { status: restored },
+        });
       });
     } catch (cause) {
       const code = (cause as { code?: string })?.code;
@@ -709,16 +716,18 @@ export const reviseSource = createServerFn({ method: 'POST' })
           WHERE id = ${data.sourceId} AND workspace_id = ${workspaceId}
         `;
 
-        await transaction`
-          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-          VALUES (${source.workspace_id}, ${administrator}, 'source_revised', ${data.sourceId},
-            ${JSON.stringify({
-              previousRevisionId: source.current_revision_id,
-              revisionId: revision.id,
-              revisionNumber,
-              chunkCount: chunks.length,
-            })}::jsonb)
-        `;
+        await fileEvent(transaction, {
+          workspaceId: source.workspace_id,
+          actor: administrator,
+          type: 'source_revised',
+          sourceId: data.sourceId,
+          metadata: {
+            previousRevisionId: source.current_revision_id,
+            revisionId: revision.id,
+            revisionNumber,
+            chunkCount: chunks.length,
+          },
+        });
 
         return { sourceId: data.sourceId, revisionNumber, chunkCount: chunks.length };
       });
@@ -836,11 +845,18 @@ async function writeNewSource(
           await transaction`INSERT INTO source_tags (source_id, tag) VALUES (${sourceId}, ${tag})`;
         }
 
-        await transaction`
-          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-          VALUES (${workspaceId}, ${administrator}, 'source_submitted', ${sourceId},
-            ${JSON.stringify({ sourceType: input.sourceType, authority: 'approved', revisionId, chunkTotal: chunks.length })}::jsonb)
-        `;
+        await fileEvent(transaction, {
+          workspaceId,
+          actor: administrator,
+          type: 'source_submitted',
+          sourceId,
+          metadata: {
+            sourceType: input.sourceType,
+            authority: 'approved',
+            revisionId,
+            chunkTotal: chunks.length,
+          },
+        });
       });
     } catch (cause) {
       if ((cause as { code?: string })?.code === '23505') {
@@ -911,11 +927,13 @@ async function indexSource(run: {
         RETURNING id
       `;
       if (!updated) return;
-      await transaction`
-        INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-        VALUES (${workspaceId}, ${administrator}, 'source_indexed', ${sourceId},
-          ${JSON.stringify({ revisionId, chunkCount: chunks.length })}::jsonb)
-      `;
+      await fileEvent(transaction, {
+        workspaceId,
+        actor: administrator,
+        type: 'source_indexed',
+        sourceId,
+        metadata: { revisionId, chunkCount: chunks.length },
+      });
     });
   } catch (cause) {
     const message = cause instanceof Error && cause.message ? cause.message : 'Indexing failed.';
@@ -931,11 +949,13 @@ async function indexSource(run: {
           RETURNING id
         `;
         if (!updated) return;
-        await transaction`
-          INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
-          VALUES (${workspaceId}, ${administrator}, 'source_index_failed', ${sourceId},
-            ${JSON.stringify({ revisionId, message })}::jsonb)
-        `;
+        await fileEvent(transaction, {
+          workspaceId,
+          actor: administrator,
+          type: 'source_index_failed',
+          sourceId,
+          metadata: { revisionId, message },
+        });
       });
     } catch (recordingFailure) {
       console.error(`Could not record indexing failure for source ${sourceId}`, recordingFailure);
