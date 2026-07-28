@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "start": "node .output/server/index.mjs",
     "migrate": "tsx scripts/migrate.ts",
-    "db:studio": "node --env-file=../.env ./node_modules/drizzle-kit/bin.cjs studio"
+    "db:studio": "node --env-file=../.env ./node_modules/drizzle-kit/bin.cjs studio",
+    "reindex": "tsx scripts/reindex.ts"
   },
   "dependencies": {
     "@commonwealth/pipeline": "workspace:*",
