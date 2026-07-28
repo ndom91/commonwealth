@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, Outlet, redirect } from '@tanstack/react-router';
+import { getNavCounts } from '../../lib/knowledge.js';
 import { getSession, getWorkspaceViewer } from '../../lib/session.js';
 
 /* The workspace layout: everything under `/w/:slug` is one corpus.
@@ -23,9 +24,20 @@ import { getSession, getWorkspaceViewer } from '../../lib/session.js';
 export const Route = createFileRoute('/w/$slug')({
   beforeLoad: async ({ params }) => {
     const viewer = await getWorkspaceViewer({ data: { workspace: params.slug } });
-    if (viewer) return viewer;
-    if (!(await getSession())) throw redirect({ to: '/sign-in' });
-    throw notFound();
+    if (!viewer) {
+      if (!(await getSession())) throw redirect({ to: '/sign-in' });
+      throw notFound();
+    }
+    /* The drawer counts belong to the workspace, not to whichever page happens
+       to be open, so they are read once here instead of by six loaders. Every
+       page already spreads this context into `AppShell`, so they arrive as a
+       prop with nothing else to wire.
+
+       Decorative, and they degrade to a dash. A failure here means the database
+       is unreachable, which the register's own message explains in full; two
+       alarms for one fault would be noise. */
+    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
+    return { ...viewer, counts };
   },
   notFoundComponent: Unavailable,
   component: () => <Outlet />,

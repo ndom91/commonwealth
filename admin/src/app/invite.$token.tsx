@@ -109,11 +109,18 @@ function AcceptInvite() {
           <h1>Choose a password</h1>
           {/* The role is stated before the password is chosen, not discovered
               afterwards from which drawers happen to be missing. Someone
-              invited as a reader should know that is what they are accepting. */}
+              invited as a reader should know that is what they are accepting.
+
+              The workspace, for the same reason: an instance holds several
+              corpora, an invitation is to exactly one of them, and "this
+              knowledge base" named the instance while omitting the part that
+              varies. It is also the only place the recipient will see it —
+              there is no mailer, so the link arrives with whatever the sender
+              typed alongside it. */}
           <p className="prose">
-            {invitation.invitedBy} invited <b>{invitation.email}</b> to this knowledge base as{' '}
-            <b>{role}</b> — {ROLE_SUMMARY[role].toLowerCase()}. Pick a password; nobody else will
-            see it, including whoever invited you.
+            {invitation.invitedBy} invited <b>{invitation.email}</b> to{' '}
+            <b>{invitation.workspace}</b> as <b>{role}</b> — {ROLE_SUMMARY[role].toLowerCase()}.
+            Pick a password; nobody else will see it, including whoever invited you.
           </p>
         </div>
 

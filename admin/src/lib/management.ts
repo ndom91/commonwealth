@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
 import { provisioning } from './auth.js';
-import { requireMember, SLUG, validateWorkspace } from './authorize.js';
+import { requireMember, type Scoped, SLUG, validateScope, validateWorkspace } from './authorize.js';
 import { client } from './db.js';
 import { PAGE_SIZE } from './knowledge.js';
 import { isRole, type Role } from './roles.js';
@@ -26,12 +26,6 @@ type IdentityAmendment = {
  * Both halves are per-workspace. Agent identities carry `users.workspace_id`
  * and members carry `member.workspace_id`, so an administrator of one workspace
  * can neither see nor void the credentials of another. */
-type Scoped<T> = T & { workspace: string };
-
-function validateScope(value: unknown): { workspace: string } {
-  return { workspace: validateWorkspace(value) };
-}
-
 /* Keyset paginated on (created_at DESC, id DESC), the same ordering the source
    register and the event log use.
  *
@@ -659,6 +653,7 @@ async function inspectInvitation(token: string) {
       name: string;
       role: string;
       workspace_id: string;
+      workspace_name: string;
       invited_by: string;
       expired: boolean;
       accepted: boolean;
@@ -666,12 +661,13 @@ async function inspectInvitation(token: string) {
     }[]
   >`
     SELECT invitation.id, invitation.email, invitation.name, invitation.role,
-           invitation.workspace_id,
+           invitation.workspace_id, workspace.name AS workspace_name,
            COALESCE(NULLIF(inviter.name, ''), inviter.email, 'an administrator') AS invited_by,
            invitation.expires_at <= now() AS expired,
            invitation.accepted_at IS NOT NULL AS accepted,
            invitation.revoked_at IS NOT NULL AS revoked
     FROM member_invitation AS invitation
+    JOIN workspaces AS workspace ON workspace.id = invitation.workspace_id
     LEFT JOIN "user" AS inviter ON inviter.id = invitation.invited_by
     WHERE invitation.token_hash = ${tokenDigest(token)}
   `;
@@ -713,6 +709,10 @@ export const readInvitation = createServerFn({ method: 'GET' })
       name: invitation.name,
       role: isRole(invitation.role) ? invitation.role : ('reader' as Role),
       invitedBy: invitation.invited_by,
+      /* Named on the page for the same reason the role is: an instance holds
+         several corpora now, and which one you are being let into is the part
+         that varies. */
+      workspace: invitation.workspace_name,
     };
   });
 
@@ -776,7 +776,7 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
       `;
     });
 
-    return { email: invitation.email, role };
+    return { email: invitation.email, role, workspace: invitation.workspace_name };
   });
 
 /* A second corpus on one instance.
@@ -812,10 +812,17 @@ export const createWorkspace = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { userId: creator, workspaceId: from } = await requireMember('admin', data.workspace);
 
-    const [taken] = await client<
-      { id: string }[]
-    >`SELECT id FROM workspaces WHERE slug = ${data.slug}`;
-    if (taken) throw new Error(`The slug “${data.slug}” is already in use.`);
+    /* Both columns are unique, so both are checked here. Without the name
+       check the insert still refuses — with a raw `23505` naming a constraint,
+       which is not a sentence to put in front of someone who mistyped. */
+    const [taken] = await client<{ slug: string; name: string }[]>`
+      SELECT slug, name FROM workspaces
+      WHERE slug = ${data.slug} OR lower(name) = ${data.name.toLowerCase()}
+    `;
+    if (taken?.slug === data.slug) {
+      throw new Error(`The slug “${data.slug}” is already in use.`);
+    }
+    if (taken) throw new Error(`A workspace called “${taken.name}” already exists.`);
 
     let created: string | undefined;
     await client.begin(async (transaction) => {
@@ -829,11 +836,21 @@ export const createWorkspace = createServerFn({ method: 'POST' })
         INSERT INTO member (workspace_id, user_id, role)
         VALUES (${workspace.id}, ${creator}, 'admin')
       `;
-      await transaction`
+      /* `INSERT … SELECT` inserts nothing when the source row is missing, and
+         says nothing about it. That cannot happen today — the bootstrap seeds
+         `default` and every workspace since is a copy of one that has a row —
+         so the check is here to keep it that way. A workspace with no index
+         configuration would accept sources and lose the one guard that refuses
+         a silent model change. */
+      const [configured] = await transaction<{ workspace_id: string }[]>`
         INSERT INTO index_configuration (workspace_id, embedding_model, embedding_dimensions)
         SELECT ${workspace.id}, embedding_model, embedding_dimensions
         FROM index_configuration WHERE workspace_id = ${from}
+        RETURNING workspace_id
       `;
+      if (!configured) {
+        throw new Error('This workspace has no index configuration to copy from.');
+      }
       /* Filed in the new workspace's own log, not the one it was created from.
          The custody line of a corpus should start with its creation. */
       await transaction`
@@ -844,6 +861,52 @@ export const createWorkspace = createServerFn({ method: 'POST' })
     });
     if (!created) throw new Error('That workspace could not be created.');
     return { id: created, name: data.name, slug: data.slug };
+  });
+
+/* Renaming a workspace. The name only — never the slug.
+ *
+ * The slug is what every link anyone has sent contains, and permanence is the
+ * property the URL scheme was chosen for; changing it would break history
+ * silently and is a decision that deserves more than a text field. The name is
+ * a label: it appears on the plate, in the switcher and on an invitation, and
+ * it should be correctable without a migration.
+ *
+ * This exists because the bootstrap workspace is called `default`, which nobody
+ * chose and which every self-hosted instance now reads on its own rail. */
+export const renameWorkspace = createServerFn({ method: 'POST' })
+  .validator((value: unknown): Scoped<{ name: string }> => {
+    const name = (value as { name?: string } | undefined)?.name?.trim();
+    if (!name) throw new Error('A workspace needs a name.');
+    if (name.length > 120) throw new Error('That name is too long.');
+    return { workspace: validateWorkspace(value), name };
+  })
+  .handler(async ({ data }) => {
+    const { userId: actor, workspaceId } = await requireMember('admin', data.workspace);
+
+    /* Same unique column, same courtesy as `createWorkspace` — and excluding
+       this workspace, so re-saving an unchanged name is not an error. */
+    const [taken] = await client<{ name: string }[]>`
+      SELECT name FROM workspaces
+      WHERE lower(name) = ${data.name.toLowerCase()} AND id <> ${workspaceId}
+    `;
+    if (taken) throw new Error(`A workspace called “${taken.name}” already exists.`);
+
+    await client.begin(async (transaction) => {
+      const [before] = await transaction<{ name: string }[]>`
+        SELECT name FROM workspaces WHERE id = ${workspaceId} FOR UPDATE
+      `;
+      if (!before) throw new Error('That workspace no longer exists.');
+      if (before.name === data.name) return;
+      await transaction`
+        UPDATE workspaces SET name = ${data.name} WHERE id = ${workspaceId}
+      `;
+      await transaction`
+        INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+        VALUES (${workspaceId}, ${actor}, 'workspace_renamed',
+          ${JSON.stringify({ from: before.name, to: data.name })}::jsonb)
+      `;
+    });
+    return { name: data.name };
   });
 
 /* Changing your own name and password goes through `authClient.updateUser` and

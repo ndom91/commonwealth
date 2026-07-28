@@ -1,31 +1,26 @@
-import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router';
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router';
 import { AppShell, accessionOf, SealChip } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
 import { authClient } from '../../../lib/auth-client.js';
-import { getNavCounts, listReviewQueue } from '../../../lib/knowledge.js';
+import { listReviewQueue } from '../../../lib/knowledge.js';
 import { readFailure } from '../../../lib/read-failure.js';
-import { can } from '../../../lib/roles.js';
+import { requireRole } from '../../../lib/route-guards.js';
 
 export const Route = createFileRoute('/w/$slug/review')({
   /* The `/w/$slug` layout has already resolved the workspace and confirmed
-     membership; this only narrows by role. Approving what the corpus vouches for is
-     a reviewer's job; a writer landing here would see a queue of buttons that
-     all refuse.
+     membership; this only narrows by role. Approving what the corpus vouches
+     for is a reviewer's job; a writer landing here would see a queue of buttons
+     that all refuse.
      Enforced again in every server function this page calls. */
-  beforeLoad: ({ context }) => {
-    if (!can(context.role, 'review'))
-      throw redirect({ to: '/w/$slug/sources', params: { slug: context.slug }, search: {} });
-  },
+  beforeLoad: requireRole('review'),
   loader: async ({ params }) => {
-    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     try {
       return {
-        counts,
         rows: await listReviewQueue({ data: { workspace: params.slug } }),
         failure: undefined,
       };
     } catch (cause) {
-      return { counts, rows: undefined, failure: readFailure(cause, 'The queue') };
+      return { rows: undefined, failure: readFailure(cause, 'The queue') };
     }
   },
   component: Review,
@@ -48,7 +43,7 @@ type QueueRow = {
 function Review() {
   const router = useRouter();
   const viewer = Route.useRouteContext();
-  const { counts, rows: loaded, failure } = Route.useLoaderData();
+  const { rows: loaded, failure } = Route.useLoaderData();
 
   const rows = (loaded ?? []) as unknown as QueueRow[];
   const unverified = rows.filter((row) => row.is_unverified);
@@ -59,7 +54,6 @@ function Review() {
       title="Review queue"
       accession="Awaiting a human"
       {...viewer}
-      counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: '/sign-in' });

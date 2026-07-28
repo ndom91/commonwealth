@@ -106,6 +106,11 @@ The MCP tool list, the role names and the source lifecycle are all readable from
   that slug on every call rather than from any remembered "active" workspace —
   two sources of truth is a way for them to disagree. A slug you are not a member
   of and one that does not exist get the same refusal, word for word.
+- **A workspace's name can change; its slug cannot.** The name is a label — on
+  the plate, in the switcher, on an invitation — and an administrator may edit it
+  from `/people`. The slug is in every link anyone has sent, and a URL that
+  quietly stops meaning what it meant is a worse failure than a name nobody
+  likes. Changing one would need a decision about redirects, not a text field.
 - **Scoping lives in the `WHERE`, not after the fetch.** A query that takes an id
   carries `workspace_id` in the *same* predicate, so a foreign id reads as "not
   found" rather than being fetched and then refused. There is exactly one write in

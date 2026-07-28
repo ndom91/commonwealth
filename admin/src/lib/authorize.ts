@@ -6,17 +6,22 @@ import { can, isRole, type Permission, type Role } from './roles.js';
 /* The authorisation gate, kept in its own module for a build reason worth
  * knowing before moving it back.
  *
- * TanStack's server-function split can only strip a module from the client
- * bundle when everything it exports is a server function. `requireMember` is a
- * plain function, so any module exporting it keeps its imports — and those
- * imports are `auth.ts` and `db.ts`, which pull postgres.js, which calls
- * `Buffer.allocUnsafe` at module scope. In a browser that throws
- * `ReferenceError: Buffer is not defined` during import and hydration never
- * runs: every page still renders from SSR and nothing responds to a click.
+ * TanStack's split replaces each server function with an RPC stub, and the rest
+ * of the module is then tree-shaken. An export that *reaches* a server-only
+ * import survives that shake and drags the import with it. `requireMember` is
+ * such an export: a plain function whose body touches `auth.ts` and `db.ts`,
+ * which pull postgres.js, which calls `Buffer.allocUnsafe` at module scope. In
+ * a browser that throws `ReferenceError: Buffer is not defined` during import
+ * and hydration never runs — every page still renders from SSR and nothing
+ * responds to a click. It has happened once already.
  *
- * So this file is imported only by `knowledge.ts` and `management.ts`, whose
- * exports are all server functions and which are therefore stripped whole.
- * `session.ts` next door exports server functions only, for the same reason. */
+ * A plain *data* export is fine, because it reaches nothing: `knowledge.ts`
+ * exports `PAGE_SIZE` and its client module is still free of `db.js`. The line
+ * is what the export touches, not whether it is a server function.
+ *
+ * So this file, whose every export reaches the database, is imported only by
+ * `knowledge.ts`, `management.ts` and `session.ts` — modules whose own exports
+ * are all server functions or plain data, and which are therefore stripped. */
 
 export type Membership = { userId: string; workspaceId: string; slug: string; role: Role };
 
@@ -108,4 +113,14 @@ export function validateWorkspace(value: unknown): string {
   const slug = (value as { workspace?: string } | undefined)?.workspace?.trim();
   if (!slug || !SLUG.test(slug)) throw new Error('Invalid workspace');
   return slug;
+}
+
+/* The payload shape of a scoped server function, and the validator for one that
+   takes nothing else. Both live here rather than in `knowledge.ts` and
+   `management.ts` because they belong to the gate, not to either subject — and
+   because two identical copies is how the two drift. */
+export type Scoped<T> = T & { workspace: string };
+
+export function validateScope(value: unknown): { workspace: string } {
+  return { workspace: validateWorkspace(value) };
 }

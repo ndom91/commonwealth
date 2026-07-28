@@ -1,9 +1,8 @@
-import { createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppShell } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
 import { authClient } from '../../../lib/auth-client.js';
-import { getNavCounts } from '../../../lib/knowledge.js';
 import {
   createWorkspace,
   type Invitation,
@@ -12,11 +11,13 @@ import {
   listPeople,
   type Person,
   removePerson,
+  renameWorkspace,
   revokeInvitation,
   updatePersonRole,
 } from '../../../lib/management.js';
 import { readFailure } from '../../../lib/read-failure.js';
-import { can, ROLE_SUMMARY, ROLES, type Role } from '../../../lib/roles.js';
+import { ROLE_SUMMARY, ROLES, type Role } from '../../../lib/roles.js';
+import { requireRole } from '../../../lib/route-guards.js';
 
 /* Who can open the cabinet, and how far.
  *
@@ -31,24 +32,19 @@ import { can, ROLE_SUMMARY, ROLES, type Role } from '../../../lib/roles.js';
  * next to them. */
 export const Route = createFileRoute('/w/$slug/people')({
   /* The `/w/$slug` layout has already resolved the workspace and confirmed
-     membership; this only narrows by role. Membership and invitations are credentials
-     to this workspace, so they are an administrator's business.
+     membership; this only narrows by role. Membership and invitations are
+     credentials to this workspace, so they are an administrator's business.
      Enforced again in every server function this page calls. */
-  beforeLoad: ({ context }) => {
-    if (!can(context.role, 'admin'))
-      throw redirect({ to: '/w/$slug/sources', params: { slug: context.slug }, search: {} });
-  },
+  beforeLoad: requireRole('admin'),
   loader: async ({ params }) => {
-    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     try {
       const [people, invitations] = await Promise.all([
         listPeople({ data: { workspace: params.slug } }),
         listInvitations({ data: { workspace: params.slug } }),
       ]);
-      return { counts, people, invitations, failure: undefined };
+      return { people, invitations, failure: undefined };
     } catch (cause) {
       return {
-        counts,
         people: [],
         invitations: [],
         failure: readFailure(cause, 'The people register'),
@@ -61,12 +57,7 @@ export const Route = createFileRoute('/w/$slug/people')({
 function People() {
   const router = useRouter();
   const viewer = Route.useRouteContext();
-  const {
-    counts,
-    people: loadedPeople,
-    invitations: loadedInvitations,
-    failure,
-  } = Route.useLoaderData();
+  const { people: loadedPeople, invitations: loadedInvitations, failure } = Route.useLoaderData();
   const [inviting, setInviting] = useState(false);
 
   /* Cast at the point of use, as the other registers do — a server function's
@@ -79,7 +70,6 @@ function People() {
       title="People"
       accession="Access · people"
       {...viewer}
-      counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: '/sign-in' });
@@ -137,6 +127,7 @@ function People() {
           everyone, so an invitation is the only way in.
         </p>
 
+        <ThisWorkspace />
         <NewWorkspace />
       </section>
     </AppShell>
@@ -318,6 +309,79 @@ function Invitations({ invitations }: { invitations: Invitation[] }) {
   );
 }
 
+/* The name on the plate, and the only part of a workspace's identity that can
+ * change. The slug cannot: it is in every link anyone has sent, and a URL that
+ * quietly stops meaning what it meant is worse than a name nobody likes.
+ *
+ * Here rather than in Settings for the same reason the people register is —
+ * Settings is your own account, this is the cabinet everyone shares. */
+function ThisWorkspace() {
+  const { slug } = Route.useParams();
+  const { workspaceName } = Route.useRouteContext();
+  const router = useRouter();
+  const [name, setName] = useState(workspaceName);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+  const [saved, setSaved] = useState(false);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setPending(true);
+    setError(undefined);
+    setSaved(false);
+    try {
+      await renameWorkspace({ data: { workspace: slug, name } });
+      /* Invalidating reloads the layout that supplies the rail, so the plate
+         and the switcher take the new name without a reload. */
+      await router.invalidate();
+      setSaved(true);
+    } catch (cause) {
+      setError(
+        cause instanceof Error && cause.message
+          ? `${cause.message} The name was not changed.`
+          : 'That name could not be changed.'
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="bench__section">
+      <span className="label">This workspace</span>
+      <form className="bench__inline" onSubmit={submit}>
+        <label className={`field${error ? ' field--error' : ''}`}>
+          <span className="label">Name</span>
+          <input
+            required
+            value={name}
+            disabled={pending}
+            onChange={(event) => {
+              setSaved(false);
+              setName(event.target.value);
+            }}
+          />
+        </label>
+        <p className="line__caption">
+          Shown on the plate, in everyone's switcher and on any invitation to this workspace. Its
+          slug — <span className="register">{slug}</span> — does not change, so links already sent
+          keep working.
+        </p>
+        {error && (
+          <p className="notice" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="bench__controls">
+          <button className="btn btn--quiet" disabled={pending || name.trim() === workspaceName}>
+            {pending ? 'Saving…' : saved ? 'Saved' : 'Save name'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /* A second corpus on the same instance — the AI team's notes kept apart from
  * the core team's, one deployment.
  *
@@ -430,6 +494,7 @@ function NewWorkspace() {
  * corpus by omission. */
 function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () => void }) {
   const { slug } = Route.useParams();
+  const { workspaceName } = Route.useRouteContext();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role | ''>('');
@@ -471,8 +536,9 @@ function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () 
   if (added) {
     return (
       <p className="bench__consequence">
-        {added} already had an account, so they were added to this workspace directly. No invitation
-        was needed and no password changed.
+        {added} already had an account, so they were added to {workspaceName} directly. No
+        invitation was needed and no password changed. Nothing tells them — there is no mailer here,
+        so say so yourself.
       </p>
     );
   }

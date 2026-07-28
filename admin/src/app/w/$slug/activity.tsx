@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-r
 import { AppShell, accessionOf } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
 import { authClient } from '../../../lib/auth-client.js';
-import { getNavCounts, listEvents, listEventTypes } from '../../../lib/knowledge.js';
+import { listEvents, listEventTypes } from '../../../lib/knowledge.js';
 import { readFailure } from '../../../lib/read-failure.js';
 
 type ActivityFilters = { type?: string };
@@ -16,16 +16,15 @@ export const Route = createFileRoute('/w/$slug/activity')({
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps, params }) => {
-    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     try {
       const [log, types] = await Promise.all([
         listEvents({ data: { workspace: params.slug, eventType: deps.type } }),
         listEventTypes({ data: { workspace: params.slug } }),
       ]);
-      return { counts, log, types, failure: undefined };
+      return { log, types, failure: undefined };
     } catch (cause) {
       const types: Array<{ eventType: string; count: number }> = [];
-      return { counts, log: undefined, types, failure: readFailure(cause, 'The log') };
+      return { log: undefined, types, failure: readFailure(cause, 'The log') };
     }
   },
   component: Activity,
@@ -65,6 +64,8 @@ const PHRASING: Record<string, string> = {
   member_added: 'Added someone to the workspace',
   member_role_changed: 'Changed a role',
   member_removed: 'Removed someone',
+  workspace_created: 'Created this workspace',
+  workspace_renamed: 'Renamed the workspace',
   search: 'Searched',
 };
 
@@ -91,6 +92,13 @@ function detailOf(event: EventRow): string | null {
   }
   if (event.event_type === 'source_index_failed') {
     return text('message');
+  }
+  /* The pair that carry a `from` and a `to`, like an authority change — a
+     rename is only legible as the two names together. */
+  if (event.event_type === 'workspace_renamed') {
+    const from = text('from');
+    const to = text('to');
+    return from && to ? `${from} → ${to}` : to;
   }
   if (event.event_type === 'source_indexed') {
     const count = typeof meta.chunkCount === 'number' ? meta.chunkCount : null;
@@ -134,7 +142,7 @@ function Activity() {
   const navigate = useNavigate({ from: '/activity' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
-  const { counts, log, types, failure } = Route.useLoaderData();
+  const { log, types, failure } = Route.useLoaderData();
 
   const events = (log?.events ?? []) as unknown as EventRow[];
   const eventTypes = types as Array<{ eventType: string; count: number }>;
@@ -144,7 +152,6 @@ function Activity() {
       title="Activity"
       accession="Custody line"
       {...viewer}
-      counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: '/sign-in' });

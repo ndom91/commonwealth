@@ -85,13 +85,29 @@ if (stalled.length > 0) {
 const embeddingModel = process.env.EMBEDDING_MODEL;
 if (!embeddingModel) throw new Error('EMBEDDING_MODEL is required');
 /* `slug` is better-auth's, not ours — the organization plugin requires it and
-   `workspaces` is the table it is pointed at. See `lib/auth.ts`. */
+   `workspaces` is the table it is pointed at. See `lib/auth.ts`.
+ *
+ * Conflict on the *slug*, not the name. The slug is the identity — it is in the
+ * URL and never changes — while the name is a label an administrator may edit
+ * from `/people`. Keying on the name would mean a renamed workspace no longer
+ * matched, and this would try to insert a second one under the same slug.
+ * `DO UPDATE SET slug` is a deliberate no-op: it changes nothing and lets
+ * `RETURNING` fire on the row that already existed.
+ *
+ * The name here seeds *new* instances only. It used to be `default`, which
+ * nobody chose and which became visible on the rail the moment workspaces went
+ * plural; existing instances keep whatever they have. */
 const [workspace] = await client<{ id: string }[]>`
-  INSERT INTO workspaces (name, slug) VALUES ('default', 'default')
-  ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+  INSERT INTO workspaces (name, slug) VALUES ('Team knowledge base', 'default')
+  ON CONFLICT (slug) DO UPDATE SET slug = EXCLUDED.slug
   RETURNING id
 `;
 if (!workspace) throw new Error('Unable to create default workspace');
+/* Checked against the default workspace alone, and relied on instance-wide.
+   That holds because there is one model for the whole instance: every other
+   workspace gets its configuration copied from an existing one by
+   `createWorkspace`, so they cannot disagree. If a model per workspace is ever
+   attempted, this check has to grow with it. */
 const [indexConfiguration] = await client<
   { embedding_model: string; embedding_dimensions: number }[]
 >`

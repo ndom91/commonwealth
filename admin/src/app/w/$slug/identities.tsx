@@ -1,11 +1,4 @@
-import {
-  createFileRoute,
-  Link,
-  Outlet,
-  redirect,
-  useNavigate,
-  useRouter,
-} from '@tanstack/react-router';
+import { createFileRoute, Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppShell, accessionOf, SealChip } from '../../../components/chrome.js';
 import {
@@ -16,10 +9,9 @@ import {
   type Role,
 } from '../../../components/identity.js';
 import { authClient } from '../../../lib/auth-client.js';
-import { getNavCounts } from '../../../lib/knowledge.js';
 import { createIdentity, listIdentities } from '../../../lib/management.js';
 import { readFailure } from '../../../lib/read-failure.js';
-import { can } from '../../../lib/roles.js';
+import { requireRole } from '../../../lib/route-guards.js';
 
 export type IdentitySearch = { after?: string };
 
@@ -47,10 +39,7 @@ export const Route = createFileRoute('/w/$slug/identities')({
      membership; this only narrows by role. This register issues and voids agent
      credentials, so it is an administrator's business.
      Enforced again in every server function this page calls. */
-  beforeLoad: ({ context }) => {
-    if (!can(context.role, 'admin'))
-      throw redirect({ to: '/w/$slug/sources', params: { slug: context.slug }, search: {} });
-  },
+  beforeLoad: requireRole('admin'),
   /* The cursor lives in the URL like every other register state, so a page of
      the register is linkable and a reload does not silently jump back to the
      newest holders. */
@@ -62,13 +51,12 @@ export const Route = createFileRoute('/w/$slug/identities')({
   loader: async ({ deps, params }) => {
     /* Counts are decorative and degrade to a dash; the register reports a read
        failure in full, and two alarms for one fault would be noise. */
-    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     const cursor = parseCursor(deps.after);
     try {
       const page = await listIdentities({ data: { workspace: params.slug, cursor } });
-      return { counts, page, failure: undefined };
+      return { page, failure: undefined };
     } catch (cause) {
-      return { counts, page: undefined, failure: readFailure(cause, 'The register') };
+      return { page: undefined, failure: readFailure(cause, 'The register') };
     }
   },
   component: IdentitiesLayout,
@@ -79,7 +67,7 @@ function IdentitiesLayout() {
   const router = useRouter();
   const navigate = useNavigate();
   const viewer = Route.useRouteContext();
-  const { counts, page, failure } = Route.useLoaderData();
+  const { page, failure } = Route.useLoaderData();
   const { after } = Route.useSearch();
 
   /* Loader data crosses a serialisation boundary, so the router hands it back
@@ -132,7 +120,6 @@ function IdentitiesLayout() {
       title="Identities"
       accession="Access register"
       {...viewer}
-      counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: '/sign-in' });

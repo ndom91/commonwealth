@@ -235,8 +235,14 @@ select {
 
 /* The plate is a disclosure when there is more than one corpus to choose from,
    and a plain plate when there is not. `<details>`/`<summary>` rather than a
-   menu primitive: keyboard operation, expanded state and Escape-to-close all
-   come for free, and a rail control this small should not add a dependency.
+   menu primitive: keyboard operation and expanded state come for free, and a
+   rail control this small should not add a dependency.
+
+   What does *not* come for free is dismissal — a disclosure has no Escape and
+   no outside-click, unlike `<dialog>` or a popover. Left as it is on purpose:
+   the panel displaces nothing and covers nothing, so an open one that waits to
+   be clicked shut is not in anybody's way. A menu that floated over the rail
+   would need both, and that is the trade this element declines.
 
    The marker is removed and replaced by nothing at all — the plate is already
    the only tag-stock object in the rail, and a disclosure triangle on manila

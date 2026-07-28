@@ -9,12 +9,7 @@ import {
 } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
 import { authClient } from '../../../lib/auth-client.js';
-import {
-  getNavCounts,
-  listSources,
-  listSubmitters,
-  searchSources,
-} from '../../../lib/knowledge.js';
+import { listSources, listSubmitters, searchSources } from '../../../lib/knowledge.js';
 import { readFailure } from '../../../lib/read-failure.js';
 
 /* Filters live in the URL rather than component state: a filtered register is
@@ -69,7 +64,6 @@ export const Route = createFileRoute('/w/$slug/sources')({
     /* Counts are decorative and degrade to a dash. A failure here means the
        database is unreachable, which the register's own message explains in
        full; two alarms for one fault would be noise. */
-    const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     const filters = {
       authority: deps.authority,
       sourceType: deps.type,
@@ -90,11 +84,10 @@ export const Route = createFileRoute('/w/$slug/sources')({
           : listSources({ data: { workspace: params.slug, ...filters } }),
         listSubmitters({ data: { workspace: params.slug } }),
       ]);
-      return { counts, register, submitters, failure: undefined };
+      return { register, submitters, failure: undefined };
     } catch (cause) {
       const submitters: Array<{ id: string; name: string; count: number }> = [];
       return {
-        counts,
         register: undefined,
         submitters,
         failure: readFailure(cause, 'The register'),
@@ -129,7 +122,7 @@ function Sources() {
   const navigate = useNavigate({ from: '/sources' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
-  const { counts, register, submitters, failure } = Route.useLoaderData();
+  const { register, submitters, failure } = Route.useLoaderData();
 
   const sources = (register?.sources ?? []) as unknown as SourceRow[];
   const holders = submitters as Array<{ id: string; name: string; count: number }>;
@@ -154,7 +147,6 @@ function Sources() {
       title="Sources"
       accession="Knowledge register"
       {...viewer}
-      counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: '/sign-in' });

@@ -3,9 +3,10 @@ import { getRequest } from '@tanstack/react-start/server';
 import { auth } from './auth.js';
 import { readMembership, readWorkspaces, validateWorkspace } from './authorize.js';
 
-/* Server functions only. Routes import from here, so every export has to be
-   something TanStack's split can strip from the client bundle — see the note in
-   `authorize.ts` for what happens when one is not. */
+/* Server functions only. Routes import from here, and this module reaches the
+   database through `authorize.ts`, so nothing may be exported whose body the
+   client could follow back to it — see the note in `authorize.ts` for what
+   happens when something is. */
 
 export const getSession = createServerFn({ method: 'GET' }).handler(async () => {
   return auth.api.getSession({ headers: getRequest().headers });

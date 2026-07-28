@@ -255,10 +255,12 @@ export function AppShell({
   slug: string;
   workspaceName: string;
   workspaces: WorkspaceRef[];
-  /* Supplied by each route's loader rather than fetched here, so that
-     `router.invalidate()` after a mutation moves the rail as well as the pane
-     that caused it. A component-local fetch could not be reached from the
-     bench that changes a source's authority. */
+  /* Read once by the `/w/$slug` layout and spread in with the rest of the
+     viewer, not fetched here. Two reasons it is not component-local: the counts
+     describe the workspace rather than the open page, and a fetch inside this
+     component could not be reached by the bench that changes a source's
+     authority — `router.invalidate()` re-runs the layout, so the rail moves
+     with the pane that caused it. */
   counts: NavCounts | undefined;
   onSignOut: () => void;
   children: ReactNode;

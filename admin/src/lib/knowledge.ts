@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { type Chunk, chunkMarkdown } from '@llm-team-kb/pipeline';
 import { createServerFn } from '@tanstack/react-start';
-import { requireMember, validateWorkspace } from './authorize.js';
+import { requireMember, type Scoped, validateScope, validateWorkspace } from './authorize.js';
 import { client } from './db.js';
 import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from './pipeline.js';
 
@@ -55,12 +55,6 @@ const NEEDS_REVIEW = client`
  * means the workspace predicate belongs in the *same* `WHERE` as the id, never
  * as a check on the row after it has been fetched — a foreign id must read as
  * "not found", not as "found, then refused". */
-type Scoped<T> = T & { workspace: string };
-
-function validateScope(value: unknown): { workspace: string } {
-  return { workspace: validateWorkspace(value) };
-}
-
 function optionalOneOf<T extends string>(
   value: unknown,
   allowed: readonly T[],

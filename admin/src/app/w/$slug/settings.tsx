@@ -2,7 +2,6 @@ import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppShell } from '../../../components/chrome.js';
 import { authClient } from '../../../lib/auth-client.js';
-import { getNavCounts } from '../../../lib/knowledge.js';
 import { getSession } from '../../../lib/session.js';
 
 /* Your own account, and nothing else.
@@ -26,9 +25,6 @@ export const Route = createFileRoute('/w/$slug/settings')({
     if (!session) throw redirect({ to: '/sign-in' });
     return { account: { name: session.user.name ?? '', email: session.user.email ?? '' } };
   },
-  loader: async ({ params }) => ({
-    counts: await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined),
-  }),
   component: Settings,
 });
 
@@ -36,14 +32,12 @@ function Settings() {
   const router = useRouter();
   const viewer = Route.useRouteContext();
   const { account } = viewer;
-  const { counts } = Route.useLoaderData();
 
   return (
     <AppShell
       title="Settings"
       accession="Your account"
       {...viewer}
-      counts={counts}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: '/sign-in' });
