@@ -136,6 +136,37 @@ export const auth = betterAuth({
     enabled: true,
     disableSignUp: process.env.BETTER_AUTH_ALLOW_SIGN_UP !== 'true',
   },
+  /* One page is several server functions, each its own HTTP request, and each
+   * one asks who is signed in. Nothing request-scoped can span them, so without
+   * this the People page cost six `session`⋈`user` reads before doing any work
+   * of its own. Measured on this instance: twenty queries a load before, eight
+   * after, with the session reads going to nought.
+   *
+   * Nought in the steady state, not always. The four server functions of a page
+   * load go out in parallel, so on the load *after* the cookie expires they all
+   * miss together and all read — four, once a minute, rather than six every
+   * time. Coalescing them would need a request-level lock for a saving that
+   * small, so it is left alone; the number to expect is "nought, occasionally
+   * four", not "one".
+   *
+   * **What this can and cannot make stale is the whole argument.** Roles and
+   * membership are *not* in the cookie: `readMembership` reads the `member`
+   * table on every call and never consults the session for anything but an id,
+   * so demoting someone, or removing them from a workspace, takes effect on
+   * their very next request — verified by demoting mid-session and watching the
+   * next call refuse. What lags is session revocation: signing out on another
+   * device, or the row going away, stays usable until the cookie expires. Also
+   * verified — a deleted session answered for another ~60 seconds and then
+   * stopped.
+   *
+   * Sixty seconds rather than the five minutes better-auth's example uses,
+   * because that lag is the entire cost of this and a minute is short enough
+   * not to matter. `disableCookieCache` is available per call if something ever
+   * needs the database answer.
+   *
+   * On this instance only, not `shared`: `provisioning` mints no session, so it
+   * has nothing to cache. */
+  session: { cookieCache: { enabled: true, maxAge: 60 } },
   plugins: [membership(), tanstackStartCookies()],
 });
 

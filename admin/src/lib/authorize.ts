@@ -29,7 +29,16 @@ export type Membership = { userId: string; workspaceId: string; slug: string; ro
    the same expression validates one on the way in at `createWorkspace`. */
 export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-async function signedInUser(): Promise<string | null> {
+/* Both readers take an optional pre-resolved id so a caller that has already
+ * established who is asking does not establish it again. `getWorkspaceViewer`
+ * needs the session, the membership *and* the workspace list, and used to read
+ * the session three times to get them — once itself and once inside each of
+ * these. `session.cookieCache` makes those reads cheap, but cheap is not the
+ * same as sensible, and a cache would only have hidden the duplication.
+ *
+ * Optional rather than required: every other caller has no id to hand, and
+ * making them fetch one first would move this same problem outwards. */
+export async function signedInUser(): Promise<string | null> {
   const session = await auth.api.getSession({ headers: getRequest().headers });
   return session?.user.id ?? null;
 }
@@ -40,8 +49,11 @@ async function signedInUser(): Promise<string | null> {
  * Two queries — "does this workspace exist" then "am I in it" — invite a caller
  * to be told which slugs are real, and invite a future edit to use the
  * workspace from the first without the answer from the second. */
-export async function readMembership(slug: string): Promise<Membership | null> {
-  const userId = await signedInUser();
+export async function readMembership(
+  slug: string,
+  knownUserId?: string
+): Promise<Membership | null> {
+  const userId = knownUserId ?? (await signedInUser());
   if (!userId || !SLUG.test(slug)) return null;
   const [row] = await client<{ workspace_id: string; role: string }[]>`
     SELECT member.workspace_id, member.role
@@ -57,8 +69,8 @@ export type WorkspaceRef = { id: string; name: string; slug: string; role: Role 
 
 /* Every workspace the caller belongs to, oldest membership first — which makes
    the first entry the one `/` lands on and the order the switcher lists. */
-export async function readWorkspaces(): Promise<WorkspaceRef[]> {
-  const userId = await signedInUser();
+export async function readWorkspaces(knownUserId?: string): Promise<WorkspaceRef[]> {
+  const userId = knownUserId ?? (await signedInUser());
   if (!userId) return [];
   const rows = await client<{ id: string; name: string; slug: string; role: string }[]>`
     SELECT workspaces.id, workspaces.name, workspaces.slug, member.role

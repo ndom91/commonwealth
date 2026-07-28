@@ -32,9 +32,12 @@ export const getWorkspaceViewer = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const session = await auth.api.getSession({ headers: getRequest().headers });
     if (!session) return null;
-    const membership = await readMembership(data.workspace);
+    /* The id is passed down rather than re-derived. Both of these would
+       otherwise read the session again, making three reads of the same cookie
+       to answer one question. */
+    const membership = await readMembership(data.workspace, session.user.id);
     if (!membership) return null;
-    const workspaces = await readWorkspaces();
+    const workspaces = await readWorkspaces(session.user.id);
     const current = workspaces.find((entry) => entry.slug === membership.slug);
     return {
       holder: session.user.name || session.user.email || undefined,
