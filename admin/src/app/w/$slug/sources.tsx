@@ -8,8 +8,8 @@ import {
   SealChip,
 } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
+import { readFailure } from '../../../lib/failure.js';
 import { listSources, listSubmitters, searchSources } from '../../../lib/knowledge.js';
-import { readFailure } from '../../../lib/read-failure.js';
 
 /* Filters live in the URL rather than component state: a filtered register is
    a thing people send each other, and the review queue hands off into it. */
@@ -84,12 +84,12 @@ export const Route = createFileRoute('/w/$slug/sources')({
         listSubmitters({ data: { workspace: params.slug } }),
       ]);
       return { register, submitters, failure: undefined };
-    } catch (cause) {
+    } catch {
       const submitters: Array<{ id: string; name: string; count: number }> = [];
       return {
         register: undefined,
         submitters,
-        failure: readFailure(cause, 'The register'),
+        failure: readFailure('The register'),
       };
     }
   },

@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { AppShell, accessionOf } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
+import { readFailure } from '../../../lib/failure.js';
 import { listEvents, listEventTypes } from '../../../lib/knowledge.js';
-import { readFailure } from '../../../lib/read-failure.js';
 
 type ActivityFilters = { type?: string };
 
@@ -21,9 +21,9 @@ export const Route = createFileRoute('/w/$slug/activity')({
         listEventTypes({ data: { workspace: params.slug } }),
       ]);
       return { log, types, failure: undefined };
-    } catch (cause) {
+    } catch {
       const types: Array<{ eventType: string; count: number }> = [];
-      return { log: undefined, types, failure: readFailure(cause, 'The log') };
+      return { log: undefined, types, failure: readFailure('The log') };
     }
   },
   component: Activity,

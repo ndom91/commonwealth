@@ -2,8 +2,8 @@ import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useState } from 'react';
 import { AppShell, SettingsTabs } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
+import { readFailure, writeFailure } from '../../../../lib/failure.js';
 import { createWorkspace, getWorkspaceFacts, renameWorkspace } from '../../../../lib/management.js';
-import { readFailure } from '../../../../lib/read-failure.js';
 
 /* The workspace as an object: what it is called, what it is made of, and how to
  * start another one.
@@ -26,8 +26,8 @@ export const Route = createFileRoute('/w/$slug/settings/workspace')({
         facts: await getWorkspaceFacts({ data: { workspace: params.slug } }),
         failure: undefined,
       };
-    } catch (cause) {
-      return { facts: undefined, failure: readFailure(cause, 'This workspace') };
+    } catch {
+      return { facts: undefined, failure: readFailure('This workspace') };
     }
   },
   component: Workspace,
@@ -131,11 +131,7 @@ function ThisWorkspace() {
       await router.invalidate();
       setSaved(true);
     } catch (cause) {
-      setError(
-        cause instanceof Error && cause.message
-          ? `${cause.message} The name was not changed.`
-          : 'That name could not be changed.'
-      );
+      setError(writeFailure(cause, 'That name could not be changed.', 'The name was not changed.'));
     } finally {
       setPending(false);
     }
@@ -214,9 +210,11 @@ function NewWorkspace() {
       await navigate({ to: '/w/$slug/sources', params: { slug: created.slug }, search: {} });
     } catch (cause) {
       setError(
-        cause instanceof Error && cause.message
-          ? `${cause.message} Nothing was created.`
-          : 'That workspace could not be created. Nothing was created.'
+        writeFailure(
+          cause,
+          'That workspace could not be created. Nothing was created.',
+          'Nothing was created.'
+        )
       );
       setPending(false);
     }

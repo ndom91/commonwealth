@@ -4,6 +4,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateScope, validateWorkspace } from './authorize.js';
 import { client } from './db.js';
 import { fileEvent } from './events.js';
+import { writeFailure } from './failure.js';
 import { documentIngestion, embeddingModel, embeddings, maxUploadBytes } from './pipeline.js';
 
 /* Read and curation access to the knowledge corpus.
@@ -936,7 +937,7 @@ async function indexSource(run: {
       });
     });
   } catch (cause) {
-    const message = cause instanceof Error && cause.message ? cause.message : 'Indexing failed.';
+    const message = writeFailure(cause, 'Indexing failed.');
     /* The failure is the product of this run, so recording it must not depend
        on the same connection that just broke. If even this fails there is
        nothing left to do but log — the source stays `indexing` and the sweep in

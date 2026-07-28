@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { AppShell, accessionOf, SealChip } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
+import { readFailure } from '../../../lib/failure.js';
 import { listReviewQueue } from '../../../lib/knowledge.js';
-import { readFailure } from '../../../lib/read-failure.js';
 import { requireRole } from '../../../lib/route-guards.js';
 
 export const Route = createFileRoute('/w/$slug/review')({
@@ -18,8 +18,8 @@ export const Route = createFileRoute('/w/$slug/review')({
         rows: await listReviewQueue({ data: { workspace: params.slug } }),
         failure: undefined,
       };
-    } catch (cause) {
-      return { rows: undefined, failure: readFailure(cause, 'The queue') };
+    } catch {
+      return { rows: undefined, failure: readFailure('The queue') };
     }
   },
   component: Review,

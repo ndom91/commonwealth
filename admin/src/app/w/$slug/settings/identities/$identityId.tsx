@@ -9,6 +9,7 @@ import {
   labelOf,
 } from '../../../../../components/identity.js';
 import { Stamp } from '../../../../../components/stamp.js';
+import { writeFailure } from '../../../../../lib/failure.js';
 import {
   issueCredential,
   revokeKey,
@@ -103,9 +104,11 @@ function HolderBench() {
       await router.invalidate();
     } catch (cause) {
       setIssueError(
-        cause instanceof Error && cause.message
-          ? `${cause.message}. Nothing was issued — try again.`
-          : 'The credential could not be issued. Nothing was issued — try again.'
+        writeFailure(
+          cause,
+          'The credential could not be issued. Nothing was issued — try again.',
+          'Nothing was issued — try again.'
+        )
       );
     } finally {
       setIssuePending(false);
@@ -123,9 +126,11 @@ function HolderBench() {
       await router.invalidate();
     } catch (cause) {
       setAmendError(
-        cause instanceof Error && cause.message
-          ? `${cause.message}. Nothing was changed — try again.`
-          : 'The record could not be saved. Nothing was changed — try again.'
+        writeFailure(
+          cause,
+          'The record could not be saved. Nothing was changed — try again.',
+          'Nothing was changed — try again.'
+        )
       );
     } finally {
       setAmendPending(false);
@@ -141,9 +146,11 @@ function HolderBench() {
       await router.invalidate();
     } catch (cause) {
       setToggleError(
-        cause instanceof Error && cause.message
-          ? `${cause.message}. Nothing was changed — try again.`
-          : "The holder's state could not be changed. Nothing was changed — try again."
+        writeFailure(
+          cause,
+          "The holder's state could not be changed. Nothing was changed — try again.",
+          'Nothing was changed — try again.'
+        )
       );
     } finally {
       setTogglePending(false);

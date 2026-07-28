@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { authClient } from '../lib/auth-client.js';
+import { writeFailure } from '../lib/failure.js';
 import { acceptInvitation, readInvitation } from '../lib/management.js';
 import { ROLE_SUMMARY, type Role } from '../lib/roles.js';
 
@@ -21,10 +22,7 @@ export const Route = createFileRoute('/invite/$token')({
     } catch (cause) {
       return {
         invitation: null,
-        failure:
-          cause instanceof Error && cause.message
-            ? cause.message
-            : 'That invitation link is not valid.',
+        failure: writeFailure(cause, 'That invitation link is not valid.'),
       };
     }
   },
@@ -86,11 +84,7 @@ function AcceptInvite() {
       }
       router.navigate({ to: '/' });
     } catch (cause) {
-      setError(
-        cause instanceof Error && cause.message
-          ? cause.message
-          : 'The account could not be created. Nothing was changed.'
-      );
+      setError(writeFailure(cause, 'The account could not be created. Nothing was changed.'));
       setPending(false);
     }
   }

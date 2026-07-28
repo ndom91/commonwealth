@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppShell, SettingsTabs } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
+import { readFailure, writeFailure } from '../../../../lib/failure.js';
 import {
   type Invitation,
   invitePerson,
@@ -12,7 +13,6 @@ import {
   revokeInvitation,
   updatePersonRole,
 } from '../../../../lib/management.js';
-import { readFailure } from '../../../../lib/read-failure.js';
 import { ROLE_SUMMARY, ROLES, type Role } from '../../../../lib/roles.js';
 
 /* Who can open the cabinet, and how far.
@@ -36,11 +36,11 @@ export const Route = createFileRoute('/w/$slug/settings/people')({
         listInvitations({ data: { workspace: params.slug } }),
       ]);
       return { people, invitations, failure: undefined };
-    } catch (cause) {
+    } catch {
       return {
         people: [],
         invitations: [],
-        failure: readFailure(cause, 'The people register'),
+        failure: readFailure('The people register'),
       };
     }
   },
@@ -139,7 +139,7 @@ function PersonRow({ person }: { person: Person }) {
       await work();
       await router.invalidate();
     } catch (cause) {
-      setError(cause instanceof Error && cause.message ? cause.message : fallback);
+      setError(writeFailure(cause, fallback));
     } finally {
       setPending(false);
     }
@@ -268,11 +268,7 @@ function Invitations({ invitations }: { invitations: Invitation[] }) {
                     });
                     await router.invalidate();
                   } catch (cause) {
-                    setError(
-                      cause instanceof Error && cause.message
-                        ? cause.message
-                        : 'That invitation could not be revoked.'
-                    );
+                    setError(writeFailure(cause, 'That invitation could not be revoked.'));
                   } finally {
                     setRevoking(undefined);
                   }
@@ -338,9 +334,11 @@ function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () 
       await onDone();
     } catch (cause) {
       setError(
-        cause instanceof Error && cause.message
-          ? `${cause.message} Nothing was changed.`
-          : 'That invitation could not be created. Nothing was changed.'
+        writeFailure(
+          cause,
+          'That invitation could not be created. Nothing was changed.',
+          'Nothing was changed.'
+        )
       );
     } finally {
       setPending(false);

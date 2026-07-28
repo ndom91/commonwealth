@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
+import { writeFailure } from '../../../../lib/failure.js';
 import { createSource, uploadSource } from '../../../../lib/knowledge.js';
 
 export const Route = createFileRoute('/w/$slug/sources/new')({
@@ -67,9 +68,11 @@ function NewSource() {
          source's own page as a retry, so the blanket claim no longer holds and
          should not be made twice in two different places. */
       setError(
-        cause instanceof Error && cause.message
-          ? `${cause.message} Adjust it and try again.`
-          : 'The source could not be created. Try again.'
+        writeFailure(
+          cause,
+          'The source could not be created. Try again.',
+          'Adjust it and try again.'
+        )
       );
     } finally {
       setPending(false);

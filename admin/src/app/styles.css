@@ -310,15 +310,6 @@ select {
   letter-spacing: 0.04em;
 }
 
-/* Separated by a rule because it is a different kind of act: the entries above
-   move you, this one makes something. */
-.cabinet__workspace--new {
-  margin-top: var(--s-hair);
-  border-top: 1px solid var(--rule-hair);
-  padding-top: var(--s-snug);
-  color: var(--ink-3);
-}
-
 .cabinet__plate {
   display: block;
   margin: var(--s-loose) var(--s-base) var(--s-section);
@@ -867,7 +858,6 @@ select {
   color: var(--mark);
 }
 
-.entry__seal,
 .entry__role {
   grid-row: 1 / span 2;
   grid-column: 2;
@@ -1301,13 +1291,6 @@ select {
   border-left: 1px solid var(--seal);
   color: var(--ink-2);
   font-size: 13px;
-}
-
-/* The same shape without the oxide edge. Oxide is reserved for sealing,
-   voiding and destruction, so a line that only reports work in progress must
-   not spend it — otherwise every long upload puts a false alarm on the bench. */
-.bench__consequence--quiet {
-  border-left-color: var(--rule-strong);
 }
 
 /* ── Indexing ───────────────────────────────────────────────────────────────

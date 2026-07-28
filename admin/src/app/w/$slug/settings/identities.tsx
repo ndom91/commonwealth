@@ -2,8 +2,8 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouter } from '@tanstack
 import { useState } from 'react';
 import { AppShell, accessionOf, SealChip, SettingsTabs } from '../../../../components/chrome.js';
 import { CredentialTag, type Identity, type Issued } from '../../../../components/identity.js';
+import { readFailure, writeFailure } from '../../../../lib/failure.js';
 import { createIdentity, listIdentities } from '../../../../lib/management.js';
-import { readFailure } from '../../../../lib/read-failure.js';
 import { ROLES, type Role } from '../../../../lib/roles.js';
 
 export type IdentitySearch = { after?: string };
@@ -43,8 +43,8 @@ export const Route = createFileRoute('/w/$slug/settings/identities')({
     try {
       const page = await listIdentities({ data: { workspace: params.slug, cursor } });
       return { page, failure: undefined };
-    } catch (cause) {
-      return { page: undefined, failure: readFailure(cause, 'The register') };
+    } catch {
+      return { page: undefined, failure: readFailure('The register') };
     }
   },
   component: IdentitiesLayout,
@@ -94,9 +94,11 @@ function IdentitiesLayout() {
       });
     } catch (cause) {
       setError(
-        cause instanceof Error && cause.message
-          ? `${cause.message}. Nothing was issued — adjust the details and try again.`
-          : 'The identity could not be created. Nothing was issued — try again.'
+        writeFailure(
+          cause,
+          'The identity could not be created. Nothing was issued — try again.',
+          'Nothing was issued — adjust the details and try again.'
+        )
       );
     } finally {
       setPending(false);

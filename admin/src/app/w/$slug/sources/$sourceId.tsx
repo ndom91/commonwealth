@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { accessionOf, authoritySeal, SealChip } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
+import { writeFailure } from '../../../../lib/failure.js';
 import {
   getIndexingProgress,
   getSourceDetail,
@@ -96,7 +97,7 @@ function SourceBench() {
       setEvents(nextEvents as unknown as Event[]);
       setProgress(nextProgress);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'This source could not be read.');
+      setError(writeFailure(cause, 'This source could not be read.'));
     }
   }, [sourceId]);
 
@@ -159,7 +160,7 @@ function SourceBench() {
          the whole route reloads rather than just this pane. */
       void router.invalidate();
     } catch (cause) {
-      setError(cause instanceof Error && cause.message ? cause.message : failure);
+      setError(writeFailure(cause, failure));
     } finally {
       setPending(false);
     }
