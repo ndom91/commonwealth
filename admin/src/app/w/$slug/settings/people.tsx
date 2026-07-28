@@ -2,7 +2,6 @@ import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppShell, SettingsTabs } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
-import { authClient } from '../../../../lib/auth-client.js';
 import {
   type Invitation,
   invitePerson,
@@ -66,10 +65,6 @@ function People() {
       accession="Settings"
       tabs={<SettingsTabs slug={slug} counts={viewer.counts} />}
       {...viewer}
-      onSignOut={async () => {
-        await authClient.signOut();
-        router.navigate({ to: '/sign-in' });
-      }}
       /* In the masthead, where Identities keeps *Issue identity*. The head that
          used to hold it also held the headcount, which the tab now states — and
          a head carrying a number it duplicates is a row of chrome between the

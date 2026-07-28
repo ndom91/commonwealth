@@ -2,7 +2,6 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouter } from '@tanstack
 import { useState } from 'react';
 import { AppShell, accessionOf, SealChip, SettingsTabs } from '../../../../components/chrome.js';
 import { CredentialTag, type Identity, type Issued } from '../../../../components/identity.js';
-import { authClient } from '../../../../lib/auth-client.js';
 import { createIdentity, listIdentities } from '../../../../lib/management.js';
 import { readFailure } from '../../../../lib/read-failure.js';
 import { ROLES, type Role } from '../../../../lib/roles.js';
@@ -110,10 +109,6 @@ function IdentitiesLayout() {
       accession="Settings"
       tabs={<SettingsTabs slug={slug} counts={viewer.counts} />}
       {...viewer}
-      onSignOut={async () => {
-        await authClient.signOut();
-        router.navigate({ to: '/sign-in' });
-      }}
       actions={
         <button
           type="button"

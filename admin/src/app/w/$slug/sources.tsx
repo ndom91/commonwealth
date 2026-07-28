@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router';
+import { createFileRoute, Link, Outlet, useNavigate } from '@tanstack/react-router';
 import { Search, X } from 'lucide-react';
 import {
   AppShell,
@@ -8,7 +8,6 @@ import {
   SealChip,
 } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
-import { authClient } from '../../../lib/auth-client.js';
 import { listSources, listSubmitters, searchSources } from '../../../lib/knowledge.js';
 import { readFailure } from '../../../lib/read-failure.js';
 
@@ -118,7 +117,6 @@ export type SourceRow = {
 
 function Sources() {
   const { slug } = Route.useParams();
-  const router = useRouter();
   const navigate = useNavigate({ from: '/w/$slug/sources' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
@@ -147,10 +145,6 @@ function Sources() {
       title="Sources"
       accession="Knowledge register"
       {...viewer}
-      onSignOut={async () => {
-        await authClient.signOut();
-        router.navigate({ to: '/sign-in' });
-      }}
       actions={
         <Link to="/w/$slug/sources/new" search={{}} className="btn btn--primary">
           New source

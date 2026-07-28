@@ -29,20 +29,11 @@ export const Route = createFileRoute('/w/$slug/account')({
 });
 
 function Account() {
-  const router = useRouter();
   const viewer = Route.useRouteContext();
   const { account } = viewer;
 
   return (
-    <AppShell
-      title="Account"
-      accession="Your account"
-      {...viewer}
-      onSignOut={async () => {
-        await authClient.signOut();
-        router.navigate({ to: '/sign-in' });
-      }}
-    >
+    <AppShell title="Account" accession="Your account" {...viewer}>
       <section className="detail" aria-label="Your account">
         <div className="bench__head">
           <div>

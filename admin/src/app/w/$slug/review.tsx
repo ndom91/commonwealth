@@ -1,7 +1,6 @@
-import { createFileRoute, Link, useRouter } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { AppShell, accessionOf, SealChip } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
-import { authClient } from '../../../lib/auth-client.js';
 import { listReviewQueue } from '../../../lib/knowledge.js';
 import { readFailure } from '../../../lib/read-failure.js';
 import { requireRole } from '../../../lib/route-guards.js';
@@ -41,7 +40,6 @@ type QueueRow = {
 };
 
 function Review() {
-  const router = useRouter();
   const viewer = Route.useRouteContext();
   const { rows: loaded, failure } = Route.useLoaderData();
 
@@ -50,15 +48,7 @@ function Review() {
   const stale = rows.filter((row) => !row.is_unverified && row.is_stale);
 
   return (
-    <AppShell
-      title="Review queue"
-      accession="Awaiting a human"
-      {...viewer}
-      onSignOut={async () => {
-        await authClient.signOut();
-        router.navigate({ to: '/sign-in' });
-      }}
-    >
+    <AppShell title="Review queue" accession="Awaiting a human" {...viewer}>
       <section className="queue" aria-label="Review queue">
         {failure && (
           <p className="notice" role="alert">

@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useState } from 'react';
 import { AppShell, SettingsTabs } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
-import { authClient } from '../../../../lib/auth-client.js';
 import { createWorkspace, getWorkspaceFacts, renameWorkspace } from '../../../../lib/management.js';
 import { readFailure } from '../../../../lib/read-failure.js';
 
@@ -36,7 +35,6 @@ export const Route = createFileRoute('/w/$slug/settings/workspace')({
 
 function Workspace() {
   const { slug } = Route.useParams();
-  const router = useRouter();
   const viewer = Route.useRouteContext();
   const { facts, failure } = Route.useLoaderData();
 
@@ -46,10 +44,6 @@ function Workspace() {
       accession="Settings"
       tabs={<SettingsTabs slug={slug} counts={viewer.counts} />}
       {...viewer}
-      onSignOut={async () => {
-        await authClient.signOut();
-        router.navigate({ to: '/sign-in' });
-      }}
     >
       <section className="detail" aria-label="This workspace">
         <ThisWorkspace />

@@ -1,7 +1,8 @@
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Link } from '@tanstack/react-router';
+import { Link, useRouter } from '@tanstack/react-router';
 import { type LucideIcon, UserRoundCog } from 'lucide-react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import { authClient } from '../lib/auth-client.js';
 import { can, type Role, type WorkspaceRef } from '../lib/roles.js';
 
 /* Application chrome for the Custody Bench. Every workbench screen mounts
@@ -238,7 +239,6 @@ export function AppShell({
   workspaceName,
   workspaces,
   counts,
-  onSignOut,
   children,
 }: {
   title: string;
@@ -267,9 +267,16 @@ export function AppShell({
      each page rather than owned by a layout route so a tab keeps its own title
      and its own masthead action. */
   tabs?: ReactNode;
-  onSignOut: () => void;
   children: ReactNode;
 }) {
+  /* Signing out is chrome behaviour, not page behaviour. Seven routes used to
+     pass an identical handler in, which meant seven places to find if it ever
+     needed to do more than this. */
+  const router = useRouter();
+  const signOut = async () => {
+    await authClient.signOut();
+    router.navigate({ to: '/sign-in' });
+  };
   return (
     <div className="custody">
       {/* The cabinet puts its plate and four drawer links ahead of the page's
@@ -353,7 +360,7 @@ export function AppShell({
               </Hint>
             </div>
           )}
-          <button type="button" className="btn btn--quiet" onClick={onSignOut}>
+          <button type="button" className="btn btn--quiet" onClick={signOut}>
             Sign out
           </button>
         </div>

@@ -1,7 +1,6 @@
-import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { AppShell, accessionOf } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
-import { authClient } from '../../../lib/auth-client.js';
 import { listEvents, listEventTypes } from '../../../lib/knowledge.js';
 import { readFailure } from '../../../lib/read-failure.js';
 
@@ -138,7 +137,6 @@ function detailOf(event: EventRow): string | null {
 
 function Activity() {
   const { slug } = Route.useParams();
-  const router = useRouter();
   const navigate = useNavigate({ from: '/w/$slug/activity' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
@@ -148,15 +146,7 @@ function Activity() {
   const eventTypes = types as Array<{ eventType: string; count: number }>;
 
   return (
-    <AppShell
-      title="Activity"
-      accession="Custody line"
-      {...viewer}
-      onSignOut={async () => {
-        await authClient.signOut();
-        router.navigate({ to: '/sign-in' });
-      }}
-    >
+    <AppShell title="Activity" accession="Custody line" {...viewer}>
       <section className="log" aria-label="Activity log">
         <div className="filters filters--flush">
           <label className="filters__field">
