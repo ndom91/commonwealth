@@ -545,6 +545,18 @@ select {
   color: var(--ink);
 }
 
+/* The drawer count's treatment, carried over with the registers that left the
+   rail: register face, quiet, and set off by a gap rather than a bracket. */
+.tabs__count {
+  margin-left: var(--s-tight);
+  color: var(--ink-dormant);
+  font-size: 12px;
+}
+
+.tabs__link[aria-current="page"] .tabs__count {
+  color: var(--ink-3);
+}
+
 .tabs__link[aria-current="page"] {
   border-bottom-color: var(--mark);
   color: var(--ink);

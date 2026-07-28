@@ -64,32 +64,28 @@ function People() {
     <AppShell
       title="People"
       accession="Settings"
-      tabs={<SettingsTabs slug={slug} />}
+      tabs={<SettingsTabs slug={slug} counts={viewer.counts} />}
       {...viewer}
       onSignOut={async () => {
         await authClient.signOut();
         router.navigate({ to: '/sign-in' });
       }}
+      /* In the masthead, where Identities keeps *Issue identity*. The head that
+         used to hold it also held the headcount, which the tab now states — and
+         a head carrying a number it duplicates is a row of chrome between the
+         reader and the rows. Both registers are the same shape now: the action
+         up top, the register straight away. */
+      actions={
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => setInviting((open) => !open)}
+        >
+          {inviting ? 'Cancel' : 'Invite'}
+        </button>
+      }
     >
       <section className="detail" aria-label="People">
-        <div className="bench__head">
-          <div>
-            <span className="label">Everyone who can sign in to this workspace</span>
-            <h2>
-              {people.length} {people.length === 1 ? 'person' : 'people'}
-            </h2>
-          </div>
-          <div className="bench__seal">
-            <button
-              type="button"
-              className="btn btn--quiet"
-              onClick={() => setInviting((open) => !open)}
-            >
-              {inviting ? 'Cancel' : 'Invite'}
-            </button>
-          </div>
-        </div>
-
         {inviting && (
           <Invite
             onDone={async () => {

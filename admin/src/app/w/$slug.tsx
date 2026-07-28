@@ -33,9 +33,10 @@ export const Route = createFileRoute('/w/$slug')({
        page already spreads this context into `AppShell`, so they arrive as a
        prop with nothing else to wire.
 
-       Decorative, and they degrade to a dash. A failure here means the database
-       is unreachable, which the register's own message explains in full; two
-       alarms for one fault would be noise. */
+       Decorative, and they degrade to nothing: an undefined count is omitted by
+       both the rail and the Settings tabs rather than shown as a dash. A failure
+       here means the database is unreachable, which the register's own message
+       explains in full; two alarms for one fault would be noise. */
     const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     return { ...viewer, counts };
   },

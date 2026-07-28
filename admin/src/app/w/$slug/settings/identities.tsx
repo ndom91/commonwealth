@@ -113,7 +113,7 @@ function IdentitiesLayout() {
     <AppShell
       title="Identities"
       accession="Settings"
-      tabs={<SettingsTabs slug={slug} />}
+      tabs={<SettingsTabs slug={slug} counts={viewer.counts} />}
       {...viewer}
       onSignOut={async () => {
         await authClient.signOut();

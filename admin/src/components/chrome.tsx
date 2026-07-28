@@ -145,33 +145,13 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
       ],
     },
   ];
-  /* Both halves of "who may act": the agent holders that present API keys, and
-     the people who can sign in and decide what those agents are told. Both are
-     credentials, so both are an administrator's business only.
-
-     These two are also tabs of Settings, and the drawers point straight at
-     them. Two ways into one page, on purpose: the tab bar is the structure, and
-     the rail is the shortcut that keeps each register's size visible. A count
-     belongs in the rail — it is the only place one is stated — so removing the
-     drawers in favour of the tabs alone would have cost that. */
+  /* Who may act — the people who can sign in and the agent holders that present
+     API keys — used to be an Access group here as well as tabs of Settings. Two
+     ways into one page reads as indecision, not convenience: the same two words
+     twice on one screen, and either one landing you somewhere that shows both.
+     The tabs won, and took the counts with them, so a register's size is still
+     stated exactly once in the navigation that owns it. */
   if (can(role, 'admin')) {
-    groups.push({
-      label: 'Access',
-      items: [
-        {
-          mark: 'identities',
-          label: 'Identities',
-          to: '/w/$slug/settings/identities',
-          count: counts?.identities,
-        },
-        {
-          mark: 'people',
-          label: 'People',
-          to: '/w/$slug/settings/people',
-          count: counts?.people,
-        },
-      ],
-    });
     groups.push({
       label: 'Workspace',
       items: [{ mark: 'settings', label: 'Settings', to: '/w/$slug/settings/workspace' }],
@@ -407,14 +387,16 @@ export function AppShell({
  * colleague. `tablist` would describe panels swapped in place and would take
  * arrow-key navigation away from a set of links that ought to Tab like links.
  *
- * No counts here, even though two of the three are registers with one. The rail
- * is the only place a register states its size — repeat it on the tab a few
- * inches to the right and the rule stops meaning anything.
+ * The two registers state their size here. That rule — a size appears once, in
+ * the navigation that owns the register — used to name the rail, because the
+ * rail was the only navigation there was. These two left it, so this bar is
+ * their navigation and the numbers came along. Workspace gets none: it is not a
+ * register. Nor does either page repeat its own count in a head.
  *
  * `activeOptions.exact` is off for Identities on purpose: a selected holder
  * lives at `settings/identities/$id`, and the tab has to stay lit while you are
  * reading one. */
-export function SettingsTabs({ slug }: { slug: string }) {
+export function SettingsTabs({ slug, counts }: { slug: string; counts: NavCounts | undefined }) {
   return (
     <nav className="tabs" aria-label="Settings sections">
       <Link
@@ -432,6 +414,7 @@ export function SettingsTabs({ slug }: { slug: string }) {
         activeProps={{ 'aria-current': 'page' }}
       >
         People
+        <Count value={counts?.people} />
       </Link>
       <Link
         to="/w/$slug/settings/identities"
@@ -441,9 +424,18 @@ export function SettingsTabs({ slug }: { slug: string }) {
         activeProps={{ 'aria-current': 'page' }}
       >
         Identities
+        <Count value={counts?.identities} />
       </Link>
     </nav>
   );
+}
+
+/* A count is omitted rather than shown as a dash while it is unknown: the rail
+   does the same, and a tab that reads "People —" for a moment invites the reader
+   to wonder what that means about the register. */
+function Count({ value }: { value: number | undefined }) {
+  if (value === undefined) return null;
+  return <span className="tabs__count register">{value}</span>;
 }
 
 /* Seal state escalates by material commitment rather than by hue: unsealed is

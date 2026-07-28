@@ -44,7 +44,7 @@ function Workspace() {
     <AppShell
       title="Workspace"
       accession="Settings"
-      tabs={<SettingsTabs slug={slug} />}
+      tabs={<SettingsTabs slug={slug} counts={viewer.counts} />}
       {...viewer}
       onSignOut={async () => {
         await authClient.signOut();

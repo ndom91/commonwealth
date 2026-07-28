@@ -392,9 +392,17 @@ form the drawers themselves take at the narrow breakpoint. The inactive weight
 is reserved with `text-shadow`, so the row does not shift as you move along it.
 
 Links, not an ARIA `tablist`: tabs are routes here. They are in history, Back
-moves between them, and one can be pasted to a colleague. **No counts on a
-tab** — the rail is the only place a register states its size, and repeating it
-a few inches to the right would end that rule.
+moves between them, and one can be pasted to a colleague.
+
+A tab whose page is a register carries that register's size, set in register face
+at the rail count's weight. This does not compete with the rail: a register's
+size is stated once, in the navigation that owns it, and for People and
+Identities that navigation *is* this row. A tab whose page is not a register —
+the Workspace tab — carries nothing.
+
+An unknown count is **omitted, not dashed**, here and in the rail alike: a label
+reading *People —* invites the reader to wonder what the dash says about the
+register, when in fact it says something about the database.
 
 ### Source body
 The recessed content block: `{colors.slate-ground}` inside a hairline box,
@@ -502,7 +510,8 @@ drawer routes somewhere, so that branch is currently unexercised and kept only
 as the pattern for the next unbuilt section.
 
 **The rail is cut to the holder's role.** A reader sees Knowledge and Custody;
-Review queue appears at `reviewer`, the Access group at `admin`. Omitted, not
+Review queue appears at `reviewer`, the Workspace group — Settings — at `admin`.
+Omitted, not
 disabled — a `PENDING` mark says *nobody can open this yet*, which is a
 different sentence from *this is not yours to open*, and showing a drawer that
 answers with a refusal tells someone about a job they do not have on every
@@ -518,15 +527,24 @@ custody line for Activity. Six marks, no borrowed icon set. The one Lucide glyph
 in the chrome sits by the signed-in name, where the vocabulary is deliberately
 not the drawer one.
 
-Identities and People are also tabs of Settings, and their drawers point
-straight at those tabs. Two ways into one page on purpose: the tab bar is the
-structure, the drawer is the shortcut that keeps each register's size in the
-rail where sizes belong.
+Identities and People are tabs of Settings and nothing else. They were briefly
+both — drawers in an Access group *and* tabs — and two ways into one page reads
+as indecision rather than convenience: the same two words appeared twice on
+screen a few inches apart, and either one landed you somewhere that already
+showed both. The rail indexes the corpus and the custody line; who may act on
+them is administration, and administration has one door.
 
-The rail is the only place a register's size is stated. A register never
-repeats its own count in a head above itself: the number is already in the rail
-a few inches to the left, and a head carrying nothing but a number it duplicates
-is a row of chrome between the reader and the rows.
+**A register's size is stated exactly once, in the navigation that owns it.**
+For Sources and the review queue that is the rail. For People and Identities it
+is the Settings tab bar, which took the counts with it when the drawers went —
+so the rule survived the move instead of being quietly dropped. The Workspace
+tab carries no number, because it is not a register.
+
+A register never repeats its own count in a head above itself: the number is
+already in the navigation a few inches away, and a head carrying nothing but a
+number it duplicates is a row of chrome between the reader and the rows. This is
+why People has no head — its *Invite* sits in the masthead, where Identities
+already keeps *Issue identity*, and both registers begin immediately.
 
 The rail precedes page content in the DOM on every route, so a **skip link** is
 the first focusable element: hidden by the same clip as `.sr-only` until it
