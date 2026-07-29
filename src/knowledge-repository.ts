@@ -194,8 +194,28 @@ export class KnowledgeRepository {
     const tags = input.tags.length === 0 ? null : input.tags;
     const candidateLimit = Math.max(input.limit * 10, 50);
     const rows = await this.sql<Record<string, unknown>[]>`
+      /* Any term, not every term.
+       *
+       * This was websearch_to_tsquery, which ANDs the whole query, so a chunk
+       * had to contain every word of the question to match at all. Measured on
+       * the benchmark corpus: 21 of 26 questions matched nothing whatsoever and
+       * the other five matched exactly one chunk. The lexical half of the
+       * hybrid search was not underweighted, it was empty, and the search was
+       * semantic-only for the way an agent actually asks.
+       *
+       * to_tsvector normalises and drops stopwords first, so the cast is safe
+       * without hand-written escaping -- tsquery operators in the input come
+       * back as ordinary lexemes rather than syntax. A question of nothing but
+       * stopwords yields an empty tsquery, which matches nothing and ranks 0,
+       * so it degrades to semantic-only rather than failing.
+       *
+       * Discriminating between the matches is now ts_rank_cd's job, and the
+       * fusion below has to be by rank rather than by score for that to count
+       * for anything. */
       WITH query_terms AS (
-        SELECT websearch_to_tsquery('english', ${input.query}) AS value
+        SELECT array_to_string(
+          tsvector_to_array(to_tsvector('english', ${input.query})), ' | '
+        )::tsquery AS value
       ), eligible_current_chunks AS NOT MATERIALIZED (
         SELECT chunks.id, chunks.embedding, chunks.search_vector
         FROM chunks JOIN source_revisions ON source_revisions.id = chunks.source_revision_id

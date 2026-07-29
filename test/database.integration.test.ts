@@ -92,6 +92,33 @@ if (!databaseUrl) {
       assert.equal(results[0]?.sourceId, source.id);
       assert.equal(results[0]?.revisionNumber, 2);
       assert.ok(results[0]?.scores.keywordScore > 0);
+
+      /* The lexical query is built by casting the query's own lexemes to
+         tsquery. `to_tsvector` normalises first, so operators arrive as
+         ordinary words — but that is the sort of claim worth holding a test
+         against, since the failure mode is a query that throws for a caller
+         who typed an ampersand. */
+      for (const query of ['a & b | c ! (d)', "'; DROP TABLE chunks; --", '<script>x</script>']) {
+        await assert.doesNotReject(
+          () => knowledge.search(actor, { query, tags: [], limit: 5, explain: false }),
+          `search should treat ${query} as text`
+        );
+      }
+      const [surviving] = await knowledge.sql<{ chunks: string }[]>`
+        SELECT count(*) AS chunks FROM chunks
+      `;
+      assert.ok(Number(surviving?.chunks) > 0, 'chunks survived');
+
+      /* A question of nothing but stopwords normalises to an empty tsquery.
+         Postgres matches nothing and ranks 0 for that, so the search degrades
+         to semantic-only instead of failing. */
+      const stopwords = await knowledge.search(actor, {
+        query: 'the of and to',
+        tags: [],
+        limit: 5,
+        explain: false,
+      });
+      assert.ok(Array.isArray(stopwords));
     } finally {
       await knowledge.close();
     }
