@@ -1858,12 +1858,26 @@ select {
   list-style: none;
 }
 
+/* One group per calendar day, headed once. The date used to repeat in mono on
+   every row, which is a great deal of ink to say "still the same day". */
+.log__group + .log__group {
+  margin-top: var(--s-loose);
+}
+
+.log__day {
+  display: block;
+  padding: var(--s-tight) 0;
+  border-bottom: 1px solid var(--rule-hair);
+  color: var(--ink-2);
+}
+
 .log__row {
   display: grid;
-  /* First column widened with the switch to local time — see `.line li`. This
-     face is 12px rather than 12.5px, so it needs 145px; 160px leaves the same
-     margin for wider locales. */
-  grid-template-columns: 160px minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.5fr);
+  /* First column carries a time and nothing more, the day being stated in the
+     head above. 76px rather than the 160px a full local date-time needed, which
+     hands the width back to the columns that carry the event itself. A 12-hour
+     locale's `01:15 PM` is the widest case. */
+  grid-template-columns: 76px minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.5fr);
   gap: var(--s-snug);
   align-items: baseline;
   padding: var(--s-snug) 0;
@@ -1879,6 +1893,21 @@ select {
 .log__what {
   min-width: 0;
   font-size: 14px;
+}
+
+/* An event that destroyed or withdrew something takes the oxide mark, so a voided
+   credential does not read the same as a search. Marked, not struck: the row is a
+   true record of a thing that happened, and striking it would say the record
+   itself had been withdrawn.
+
+   The detail beside it stays neutral — the verb is what carries the seal, and
+   tinting the whole row would spend oxide on a label and a name as well. */
+.log__what--void {
+  color: var(--seal);
+}
+
+.log__what--void .log__detail {
+  color: var(--ink-2);
 }
 
 .log__detail {
@@ -1912,7 +1941,7 @@ select {
 
 @media (max-width: 1080px) {
   .log__row {
-    grid-template-columns: 116px minmax(0, 1fr);
+    grid-template-columns: 76px minmax(0, 1fr);
   }
 
   .log__subject,

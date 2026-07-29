@@ -462,7 +462,7 @@ function HolderBench() {
         <ul className="line register">
           {line.map((entry, index) => (
             <li key={`${entry.at}-${index}`}>
-              <Stamp at={entry.at} withTime />
+              <Stamp at={entry.at} precision="datetime" />
               <span>{entry.what}</span>
             </li>
           ))}

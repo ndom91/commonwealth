@@ -525,8 +525,8 @@ function SourceBench() {
               </span>
               <span className="stub__meta register">
                 <b>{revision.content_hash.slice(0, 12)}…</b> ·{' '}
-                <Stamp at={revision.content_updated_at} withTime /> · {revision.content_length}{' '}
-                chars
+                <Stamp at={revision.content_updated_at} precision="datetime" /> ·{' '}
+                {revision.content_length} chars
                 {revision.author ? ` · ${revision.author}` : ''}
               </span>
               <span className="stub__action">
@@ -545,7 +545,7 @@ function SourceBench() {
           <ul className="line register">
             {events.map((event) => (
               <li key={event.id}>
-                <Stamp at={event.created_at} withTime />
+                <Stamp at={event.created_at} precision="datetime" />
                 <span>
                   {event.event_type}
                   {event.actor ? ` — ${event.actor}` : ''}

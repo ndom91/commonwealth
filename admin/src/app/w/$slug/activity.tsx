@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { AppShell, accessionOf } from '../../../components/chrome.js';
-import { Stamp } from '../../../components/stamp.js';
+import { day, Stamp, useMounted } from '../../../components/stamp.js';
 import { readFailure } from '../../../lib/failure.js';
 import { listEvents, listEventTypes } from '../../../lib/knowledge.js';
 
@@ -39,6 +39,25 @@ type EventRow = {
   actor_agent: string | null;
   actor_admin: string | null;
 };
+
+/* The events that take something out of existence or out of service for good.
+ *
+ * Oxide is the mark for exactly that, and the custody line is the one register
+ * where it recurs legitimately: each occurrence marks a real destruction, the same
+ * way a struck `WITHDRAWN` repeats down the sources register. The Reserved Seal
+ * Rule's two-place limit is about oxide spent on decoration, not about a log of
+ * destructions declining to mark them.
+ *
+ * `identity_disabled` is absent on purpose. Disabling a holder is reversible
+ * suspension, and the seal vocabulary is careful to keep that distinct from a
+ * void. `source_index_failed` is absent too: a failure is not a destruction, and
+ * its own message already rides in the detail column. */
+const DESTRUCTIVE = new Set([
+  'api_key_revoked',
+  'member_invitation_revoked',
+  'member_removed',
+  'source_deleted',
+]);
 
 /* Event types are stored as the verb the writer used. Rendering them raw would
    make the log read as a database dump, so each is given the sentence a person
@@ -135,6 +154,50 @@ function detailOf(event: EventRow): string | null {
   return null;
 }
 
+type DayGroup = { day: string; rows: EventRow[] };
+
+/* One group per calendar day, newest first, preserving the order the rows arrive
+ * in.
+ *
+ * The date was previously repeated in mono on every single row — `07/29`, `07/28`,
+ * `07/28`, `07/27` down the whole column — which is a lot of ink to say "still the
+ * same day". Heading each day once lets the rows carry only the time.
+ *
+ * `local` is threaded rather than assumed for the reason `day()` explains: the
+ * server runs UTC, and grouping by local time during SSR would build a different
+ * number of groups than the client, which is a structural hydration mismatch.
+ *
+ * A row whose timestamp will not parse is impossible — `created_at` is `NOT NULL`
+ * — but it gets its own group rather than being dropped if it ever happens. The
+ * log is append-only, and quietly losing a row from it would be the worst
+ * available outcome. */
+function groupByDay(events: EventRow[], local: boolean): DayGroup[] {
+  const groups: DayGroup[] = [];
+  for (const event of events) {
+    let key = day(event.created_at, local);
+    if (!key) {
+      key = '—';
+    }
+    const open = groups.at(-1);
+    if (open && open.day === key) {
+      open.rows.push(event);
+      continue;
+    }
+    groups.push({ day: key, rows: [event] });
+  }
+
+  return groups;
+}
+
+// whatClass marks the verb column when the event it names destroyed something.
+function whatClass(eventType: string): string {
+  if (DESTRUCTIVE.has(eventType)) {
+    return 'log__what log__what--void';
+  }
+
+  return 'log__what';
+}
+
 function Activity() {
   const { slug } = Route.useParams();
   const navigate = useNavigate({ from: '/w/$slug/activity' });
@@ -144,6 +207,10 @@ function Activity() {
 
   const events = (log?.events ?? []) as unknown as EventRow[];
   const eventTypes = types as Array<{ eventType: string; count: number }>;
+  /* Grouped by UTC day for the server render and the first client render, then
+     regrouped in the reader's own timezone — see `day()`. */
+  const mounted = useMounted();
+  const groups = groupByDay(events, mounted);
 
   return (
     <AppShell title="Activity" accession="Custody line" {...viewer}>
@@ -180,44 +247,48 @@ function Activity() {
           </p>
         )}
 
-        {events.length > 0 && (
-          <ul className="log__list">
-            {events.map((event) => {
-              const detail = detailOf(event);
-              return (
-                <li className="log__row" key={event.id}>
-                  <Stamp at={event.created_at} withTime className="log__at register" />
-                  <span className="log__what">
-                    {phrase(event.event_type)}
-                    {detail && <span className="log__detail"> {detail}</span>}
-                  </span>
-                  {/* Omitted rather than emptied: a blank grid cell would add a
-                      dead line once the columns stack on narrow screens. */}
-                  {event.source_id && (
-                    <span className="log__subject">
-                      {event.source_title ? (
-                        <Link
-                          to="/w/$slug/sources/$sourceId"
-                          params={{ slug, sourceId: event.source_id }}
-                          search={{}}
-                        >
-                          {event.source_title}
-                        </Link>
-                      ) : (
-                        <span className="register">{accessionOf(event.source_id)}</span>
+        {groups.map((group) => (
+          <div className="log__group" key={group.day}>
+            <span className="label log__day">{group.day}</span>
+            <ul className="log__list">
+              {group.rows.map((event) => {
+                const detail = detailOf(event);
+                return (
+                  <li className="log__row" key={event.id}>
+                    {/* Time only. The day is stated once, in the head above. */}
+                    <Stamp at={event.created_at} precision="time" className="log__at register" />
+                    <span className={whatClass(event.event_type)}>
+                      {phrase(event.event_type)}
+                      {detail && <span className="log__detail"> {detail}</span>}
+                    </span>
+                    {/* Omitted rather than emptied: a blank grid cell would add a
+                        dead line once the columns stack on narrow screens. */}
+                    {event.source_id && (
+                      <span className="log__subject">
+                        {event.source_title ? (
+                          <Link
+                            to="/w/$slug/sources/$sourceId"
+                            params={{ slug, sourceId: event.source_id }}
+                            search={{}}
+                          >
+                            {event.source_title}
+                          </Link>
+                        ) : (
+                          <span className="register">{accessionOf(event.source_id)}</span>
+                        )}
+                      </span>
+                    )}
+                    <span className="log__actor">
+                      {event.actor_admin ?? event.actor_agent ?? (
+                        <span className="log__unattributed">unattributed</span>
                       )}
                     </span>
-                  )}
-                  <span className="log__actor">
-                    {event.actor_admin ?? event.actor_agent ?? (
-                      <span className="log__unattributed">unattributed</span>
-                    )}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
 
         {log?.hasMore && (
           <p className="empty">

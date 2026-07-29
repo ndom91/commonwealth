@@ -152,7 +152,7 @@ function PersonRow({ person }: { person: Person }) {
         {person.isYou && ' — you'}
       </span>
       <span className="stub__meta register">
-        {person.email} · since <Stamp at={person.createdAt} withTime />
+        {person.email} · since <Stamp at={person.createdAt} precision="datetime" />
       </span>
       <span className="stub__action">
         <label className="field field--inline stub__role">
@@ -251,7 +251,7 @@ function Invitations({ invitations }: { invitations: Invitation[] }) {
             <span className="stub__meta register">
               {invitation.email} · invited by {invitation.invitedBy} ·{' '}
               {invitation.expired ? 'expired ' : 'expires '}
-              <Stamp at={invitation.expiresAt} withTime />
+              <Stamp at={invitation.expiresAt} precision="datetime" />
             </span>
             <span className="stub__action">
               {invitation.expired && <span className="label">Expired</span>}

@@ -63,6 +63,13 @@ const localDateTime = new Intl.DateTimeFormat(undefined, {
   minute: '2-digit',
 });
 
+/* For a row that sits under a date head and so only needs to say when in the
+   day it happened. */
+const localTime = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 /* These routes are server-rendered — /sources alone ships 52 timestamps in its
    HTML — and the container runs UTC while the reader does not. Formatting in
    local time during SSR would produce markup the client disagrees with.
@@ -72,19 +79,68 @@ const localDateTime = new Intl.DateTimeFormat(undefined, {
  * construction; local formatting arrives on the second render. The cost is a
  * brief flicker on the timestamps where the two differ, which beats a
  * hydration mismatch or a layout shift from rendering nothing until mount. */
-function useMounted(): boolean {
+export function useMounted(): boolean {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   return mounted;
 }
 
+/* How much of an instant a stamp shows. `time` is for rows already grouped under
+   a date, where repeating the date on every one of them is the noise the grouping
+   exists to remove. */
+export type StampPrecision = 'date' | 'datetime' | 'time';
+
+/* The calendar day an instant falls in, formatted the way the activity log heads
+   it.
+ *
+ * Takes `local` for the same reason `Stamp` does, and it matters more here: the
+ * server runs UTC and the reader may not, so grouping by local day during SSR
+ * would put a different *number of groups* in the server markup than the client
+ * builds — a structural hydration mismatch rather than a swapped string. So both
+ * sides group by UTC first and regroup locally on the second render. */
+export function day(at: Date | string | null | undefined, local: boolean): string | null {
+  const iso = isoUtc(at);
+  if (!iso) {
+    return null;
+  }
+  if (!local) {
+    return iso.slice(0, 10);
+  }
+
+  return localDate.format(new Date(iso));
+}
+
+// stampText renders an instant at the requested precision, in UTC until the
+// component has mounted and in the reader's own timezone after.
+function stampText(iso: string, precision: StampPrecision, local: boolean): string {
+  if (!local) {
+    if (precision === 'time') {
+      return iso.slice(11, 16);
+    }
+    if (precision === 'datetime') {
+      return `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
+    }
+
+    return iso.slice(0, 10);
+  }
+  const at = new Date(iso);
+  if (precision === 'time') {
+    return localTime.format(at);
+  }
+  if (precision === 'datetime') {
+    return localDateTime.format(at);
+  }
+
+  return localDate.format(at);
+}
+
 export function Stamp({
   at,
-  withTime = false,
+  precision = 'date',
   className,
 }: {
   at: Date | string | null | undefined;
-  withTime?: boolean;
+  precision?: StampPrecision;
   /* For the few places where the timestamp is also a layout element — the
      custody log's first grid column, for instance. This renders the only
      `<time>` in those rows; wrapping it in another one would nest `<time>`
@@ -98,13 +154,7 @@ export function Stamp({
      verified — so it reads as a dash with nothing to hover. */
   if (!iso) return <>—</>;
 
-  const text = mounted
-    ? withTime
-      ? localDateTime.format(new Date(iso))
-      : localDate.format(new Date(iso))
-    : withTime
-      ? `${iso.slice(0, 10)} ${iso.slice(11, 16)}`
-      : iso.slice(0, 10);
+  const text = stampText(iso, precision, mounted);
 
   return (
     <Tooltip.Root>
