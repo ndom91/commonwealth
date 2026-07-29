@@ -38,8 +38,10 @@ test('search explanations expose only ranking signals', () => {
     freshnessBoost: 0.02,
     finalScore: 0.79,
   });
+  /* "keyword overlap", not "exact keyword match": the lexical arm matches any
+     term of the query, so one shared stemmed word gets a row here. */
   assert.equal(
     result.explanation,
-    'semantic match; exact keyword match; canonical source; recently updated'
+    'semantic match; keyword overlap; canonical source; recently updated'
   );
 });
