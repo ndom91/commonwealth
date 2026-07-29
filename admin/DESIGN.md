@@ -66,6 +66,18 @@ typography:
     fontWeight: 400
     lineHeight: 1.45
     letterSpacing: "normal"
+  register-value:
+    fontFamily: "ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace"
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: 1.45
+    letterSpacing: "normal"
+  plate:
+    fontFamily: "ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace"
+    fontSize: "26px"
+    fontWeight: 600
+    lineHeight: 1
+    letterSpacing: "0.12em"
   label:
     fontFamily: "ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace"
     fontSize: "11px"
@@ -338,8 +350,15 @@ would have typed into a fixed field.
   68ch.
 - **Register** (400, 12.5px mono): identifiers, key prefixes, timestamps,
   counts, accession numbers.
+- **Register value** (400, 15px mono): a register figure that *is* the content of
+  its pane rather than a field inside a row of prose. Used only in the bench's
+  standing, where at 12.5px the figures read quieter than the sentence
+  introducing them. Not a hero metric — still smaller than any heading.
 - **Label** (600, 11px mono, 0.11em, uppercase): field labels, column heads,
   drawer labels, chip text.
+- **Plate** (600, 26px mono, 0.12em, uppercase): the product name on manila at the
+  threshold, and nowhere else. Register face at Display size because the wordmark
+  on a filing label is stamped, not set.
 
 ### Named Rules
 **The Field-Label Rule.** Tracked uppercase is a records-form field label, not
@@ -407,12 +426,13 @@ Borders are 1px hairlines, the masthead underline included. A doubled-weight
 rule reads at this density as two stacked hairlines rather than as emphasis, so
 hierarchy comes from ground and spacing and never from thickening a rule. Two
 boundaries meeting must resolve to one line: where a closing rule and an
-opening rule coincide, the lower element drops its own. The single structural
-exception is the sign-in form's opening rule, which stands on a bare page with
-no register grammar around it to set its scale. 2px otherwise means focus — the
-field underline and the focus ring. Colored left-borders are not part of this
-language; selection is expressed by ground shift and by the accession number
-changing to tag stock.
+opening rule coincide, the lower element drops its own. **There is no structural
+exception.** The sign-in form used to hold one — a 2px opening rule, on the
+argument that it stood on a bare page with no register grammar around it to set
+its scale. The threshold has register grammar now, so the argument expired and the
+rule went with it. 2px means focus and nothing else: the field underline and the
+focus ring. Colored left-borders are not part of this language; selection is
+expressed by ground shift and by the accession number changing to tag stock.
 
 ## Components
 
@@ -588,15 +608,65 @@ recorded a person read `unattributed` in dormant italic. They
 are shown rather than hidden or backfilled — the log is append-only, and a
 gap in the record is itself part of the record.
 
+### The bench's standing
+What the bench holds while nothing is selected. `IN CUSTODY` over a
+`{colors.rule-strong}` rule, then one sentence of consequence, then ruled rows of
+tracked label and Register value: canonical, never vouched for, changed since
+vouched, withdrawn, passages indexed, last vouched for, last retrieved.
+
+It exists because the resting state of the surface where the recurring job
+happens was 48% of the viewport holding a twelve-word instruction to click
+something. It is not a dashboard, and the distinction is load-bearing: no tiles,
+no figure set large enough to be a hero, no chart, no sparkline, and no
+reassurance invented to fill the space. A custody form's rows.
+
+**No count here may be one the rail already carries.** The register's own size is
+stated once, in the navigation that owns it, and the review queue's total is
+stated on its drawer — so the standing splits that total into its two populations
+instead, which is the thing the rail cannot say.
+
+The consequence sentence is present only when something is genuinely owed a
+human, and it uses the review queue's own two descriptions because they are the
+same two populations. When nothing is owed it says so in `{colors.ink-secondary}`
+and stops.
+
 ### Containers
 There are no cards. Regions are declared by a ground shift plus a hairline
 rule, with a tracked label at the top-left of the region.
+
+A ground shift stops reading as a region and starts reading as a box the moment
+all four of its edges are visible at once — so a region either fills its
+container or runs off an edge of the viewport. Nothing floats.
 
 ### Inputs / Fields
 Underline fields, not boxes: transparent ground, a 1px `{colors.rule-strong}`
 bottom rule, tracked label above. Focus thickens the underline to 2px in
 `{colors.ink}`. Error adds an oxide underline and an oxide message naming the
 problem and the recovery. Selects carry a drawn chevron in hairline stroke.
+
+### The threshold (sign-in)
+The one surface where nothing is being operated, and the only place most people
+meet this world — an invited teammate arrives from a link with no idea what is
+behind it. So it states the world by *being the shape of the product*: cabinet
+ground on the left, bench ground on the right, one hairline between them, both
+full height, at the same width where the cabinet and the bench split. Signing in
+walks into a room the reader has already been looking at.
+
+Left is the corpus half: `INTAKE` at the region's top-left, the Plate on manila,
+one sentence of orientation, then two ruled label-and-body rows for the two
+recurring jobs the product is built around — credentialing and curating. Right is
+the form, capped at 360px and centred in its own half so it does not hug the
+dividing rule.
+
+**Nothing here describes this instance.** Counts, names and corpus size are not
+knowable before authentication and are nobody's business until then, so the
+threshold speaks only about what the product is. No illustration, no gradient, no
+claim the product cannot keep.
+
+Expression is freer here than anywhere else in Operate, and the licence is
+specific: this is a threshold, not a register, so the Plate is allowed Display
+size where every other register value is capped at 15px. It buys exactly one
+thing — manila at a size that reads as applied material rather than as a caption.
 
 ### Navigation
 The **plate** at the head of the rail names the corpus you are in and is how

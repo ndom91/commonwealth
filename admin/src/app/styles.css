@@ -1610,38 +1610,169 @@ select {
   border-left: 1px solid var(--rule-hair);
 }
 
-/* ── Intake (sign-in) ────────────────────────────────────────────────────── */
+/* ── The bench's standing ────────────────────────────────────────────────────
+ *
+ * What the bench holds while nothing is selected — a ruled statement of the
+ * corpus, in the same label-and-register grammar the source bench uses for
+ * provenance. Deliberately not a dashboard: no tiles, no figure set large enough
+ * to be a hero, no chart. The rows are a custody form's rows.
+ *
+ * Measure is capped so the consequence sentence reads as prose in a pane that is
+ * nearly half the viewport, rather than running the full 784px. */
 
-.intake {
-  min-height: 100vh;
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: var(--s-loose);
-  max-width: 420px;
-  margin: 0 auto;
-  padding: var(--s-gutter) var(--s-loose);
+/* No left rule, unlike the one-sentence empty state this replaced. The tracked
+   label and the strong rule under it already declare the region, and the ruled
+   rows already carry its structure; a third device saying the same thing reads as
+   a blockquote bar. */
+.standing {
+  max-width: 62ch;
 }
 
+.standing > .label {
+  display: block;
+  padding-bottom: var(--s-tight);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+/* The one line here a reader must not skim: what is being served to agents that
+   no human stands behind. Body size and full ink, matching the review queue's
+   own note, because the two describe the same two populations. */
+.standing__owed {
+  margin: var(--s-base) 0 var(--s-section);
+  color: var(--ink);
+}
+
+/* Nothing owed is a real state and says so, quietly. */
+.standing__owed--clear {
+  color: var(--ink-2);
+}
+
+.standing__rows {
+  margin: 0;
+}
+
+.standing__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-loose);
+  padding: var(--s-snug) 0;
+  border-bottom: 1px solid var(--rule-hair);
+}
+
+.standing__row dt,
+.standing__row dd {
+  margin: 0;
+}
+
+/* The register face one rung up. Every other register value in the product sits
+   inside a row of body text and matches it; these *are* the content of the pane,
+   and at 12.5px they read quieter than the sentence introducing them, which is
+   the inversion the amplitude pass exists to remove. Not a hero metric: 15px is
+   a form's value size, and still smaller than any heading here. */
+.standing__row dd {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.standing__hint {
+  margin: var(--s-section) 0 0;
+  color: var(--ink-3);
+}
+
+/* ── Intake (sign-in) ────────────────────────────────────────────────────── */
+
+/* The threshold. The one surface where nothing is being operated, and the only
+ * place an invited teammate meets this world before they are inside it — so it
+ * states the world rather than asking for two strings in a 420px column floating
+ * in near-black.
+ *
+ * It states it by *being* the shape of the product: cabinet ground on the left,
+ * bench ground on the right, one hairline between them, both full height. The
+ * same two grounds and the same split the app itself uses, so signing in walks
+ * into a room the reader has already been looking at. No panel and no card —
+ * nothing here floats, because a region declared by a ground shift stops reading
+ * as a region and starts reading as a box the moment all four of its edges are
+ * visible at once. */
+
+.intake {
+  min-height: 100dvh;
+  display: grid;
+}
+
+.intake__world,
+.intake__form {
+  display: grid;
+  align-content: center;
+  gap: var(--s-base);
+  min-width: 0;
+  padding: var(--s-gutter);
+}
+
+.intake__world {
+  position: relative;
+  justify-items: start;
+  background: var(--slate-cabinet);
+}
+
+.intake__form {
+  gap: var(--s-loose);
+  background: var(--slate-bench);
+}
+
+/* The tracked label at the top-left of the region, as every region here carries.
+   Absolutely placed so it stays at the top-left of the column while the content
+   it names sits vertically centred. */
+.intake__eyebrow {
+  position: absolute;
+  top: var(--s-gutter);
+  left: var(--s-gutter);
+}
+
+/* Manila at a size that reads as applied material rather than as a caption — the
+   accession label on the folder, and the anchor of the column. Still die-cut
+   stock: 2px corners, no capsule, no shadow, and the same 1px edge every other
+   manila surface in the product now carries. */
 .intake__plate {
-  padding: 9px 11px;
+  padding: 14px 18px;
   background: var(--tag);
   border: 1px solid var(--tag-edge);
   border-radius: 2px;
   color: var(--tag-ink);
   font-family: var(--font-register);
-  font-size: 11px;
+  font-size: 26px;
   font-weight: 600;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.12em;
+  line-height: 1;
   text-transform: uppercase;
 }
 
-.intake__form {
-  width: 100%;
+.intake__world .prose {
+  margin: 0;
+  max-width: 56ch;
+}
+
+/* What is behind the door, in the two moments PRODUCT.md is actually built
+   around. Ruled rows in the register's own label-and-body grammar, so a reader
+   who has never seen this product meets its vocabulary before its password
+   field. */
+.intake__doors {
   display: grid;
-  gap: var(--s-loose);
-  padding-top: var(--s-loose);
-  border-top: 2px solid var(--rule-hair);
+  width: 100%;
+  max-width: 58ch;
+  margin: var(--s-tight) 0 0;
+}
+
+.intake__door {
+  display: grid;
+  gap: var(--s-hair);
+  padding: var(--s-snug) 0;
+  border-top: 1px solid var(--rule-hair);
+}
+
+.intake__door dd {
+  margin: 0;
+  color: var(--ink-2);
 }
 
 .intake h1 {
@@ -1652,13 +1783,56 @@ select {
   letter-spacing: -0.02em;
 }
 
+/* The form column is the one place here with a measure to hold: an underline field
+   spanning 670px is unpleasant to fill in, and the eye loses its left edge. One
+   capped track, centred in the column, so the form sits in the middle of its own
+   half rather than hugging the rule that divides them. */
+.intake__form {
+  grid-template-columns: minmax(0, 360px);
+  justify-content: center;
+}
+
 .intake__foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-snug) var(--s-base);
-  width: 100%;
+  display: grid;
+  gap: var(--s-snug);
   padding-top: var(--s-tight);
+}
+
+@media (min-width: 861px) {
+  .intake {
+    /* The cabinet's own width is fixed; this split is not, because the left column
+       here holds prose rather than a drawer index. Wider on the left so the manila
+       plate and the two doors keep their measure, and because the form on the
+       right is capped anyway. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .intake__form {
+    border-left: 1px solid var(--rule-hair);
+  }
+}
+
+/* Stacked, the form comes first: somebody returning to sign in should not scroll
+   past orientation they read once. The world keeps its ground below, so the two
+   halves stay legible as two rather than merging into one long column. */
+@media (max-width: 860px) {
+  .intake {
+    grid-template-rows: auto auto;
+  }
+
+  .intake__world {
+    order: 2;
+    padding: var(--s-section) var(--s-loose);
+    border-top: 1px solid var(--rule-hair);
+  }
+
+  .intake__form {
+    padding: var(--s-gutter) var(--s-loose) var(--s-section);
+  }
+
+  .intake__eyebrow {
+    position: static;
+  }
 }
 
 /* ── Adaptation ──────────────────────────────────────────────────────────── */

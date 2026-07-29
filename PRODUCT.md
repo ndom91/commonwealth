@@ -178,6 +178,17 @@ closed by whoever notices them next:
   system still decides. This puts a browser floor on the product — `light-dark()`,
   so every engine from 2024 — which is a deliberate trade for a palette that cannot
   drift out of agreement with itself.
+- **The bench states the corpus's custody standing at rest, and says nothing about
+  it before you are signed in.** The default state of `/w/:slug/sources` — the
+  surface where the recurring job happens — used to be a twelve-word instruction
+  to click something, in half the viewport. It now reports what the register does
+  not: the two populations owed a human kept apart, canonical and withdrawn counts,
+  indexed passages, when the corpus was last vouched for, and when an agent last
+  retrieved from it. That last figure is the first thing the admin surface says
+  about *agent* behaviour rather than human curation, and a corpus nobody retrieves
+  from is a different problem from one nobody curates. The threshold deliberately
+  carries none of it: instance facts are not knowable before authentication and are
+  nobody's business until then, so sign-in speaks only about what the product is.
 
 Remaining known gaps, in rough order of how much they cost:
 

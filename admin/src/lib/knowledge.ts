@@ -205,6 +205,77 @@ export const getNavCounts = createServerFn({ method: 'GET' })
     };
   });
 
+/* The state of the corpus, for the bench to stand on while nothing is selected.
+ *
+ * Deliberately *not* the register's own size. The rail states that a few inches
+ * away, and a head repeating a count the navigation already carries is a row of
+ * chrome between the reader and the rows. These are the facts the rail cannot
+ * tell you: how much of the corpus no human stands behind, how much is sealed,
+ * when anyone last vouched for anything, how much text agents are actually being
+ * served, and when one of them last asked.
+ *
+ * Unverified and stale are counted as two populations rather than one, and split
+ * on the same predicate the review queue and the rail count use — they are
+ * different failures. Nobody has looked, versus somebody looked and then the text
+ * moved underneath them. */
+export const getRegisterSummary = createServerFn({ method: 'GET' })
+  .validator(validateScope)
+  .handler(async ({ data }) => {
+    const { workspaceId } = await requireMember('read', data.workspace);
+    const [row] = await client<
+      {
+        unverified: string;
+        stale: string;
+        canonical: string;
+        withdrawn: string;
+        chunks: string;
+        last_verified: string | null;
+        last_retrieved: string | null;
+      }[]
+    >`
+      SELECT
+        (SELECT count(*)
+         FROM sources
+         WHERE workspace_id = ${workspaceId}
+           AND status = 'active' AND authority = 'unverified') AS unverified,
+        (SELECT count(*)
+         FROM sources
+         JOIN source_revisions AS revision ON revision.id = sources.current_revision_id
+         WHERE sources.workspace_id = ${workspaceId}
+           AND sources.status = 'active'
+           AND sources.authority <> 'unverified'
+           AND (${IS_STALE})) AS stale,
+        (SELECT count(*)
+         FROM sources
+         WHERE workspace_id = ${workspaceId}
+           AND status = 'active' AND authority = 'canonical') AS canonical,
+        (SELECT count(*)
+         FROM sources
+         WHERE workspace_id = ${workspaceId} AND status = 'deleted') AS withdrawn,
+        (SELECT count(*)
+         FROM chunks
+         JOIN source_revisions AS revision ON revision.id = chunks.source_revision_id
+         JOIN sources ON sources.current_revision_id = revision.id
+         WHERE sources.workspace_id = ${workspaceId}
+           AND sources.status = 'active') AS chunks,
+        (SELECT max(last_verified_at)
+         FROM sources
+         WHERE workspace_id = ${workspaceId} AND status = 'active') AS last_verified,
+        (SELECT max(created_at)
+         FROM events
+         WHERE workspace_id = ${workspaceId} AND event_type = 'search') AS last_retrieved
+    `;
+    return {
+      unverified: Number(row?.unverified ?? 0),
+      stale: Number(row?.stale ?? 0),
+      canonical: Number(row?.canonical ?? 0),
+      withdrawn: Number(row?.withdrawn ?? 0),
+      chunks: Number(row?.chunks ?? 0),
+      lastVerified: row?.last_verified ?? null,
+      lastRetrieved: row?.last_retrieved ?? null,
+    };
+  });
+
 function validateSourceId(value: unknown): Scoped<{ sourceId: string }> {
   const sourceId = (value as { sourceId?: string })?.sourceId?.trim();
   if (!sourceId) throw new Error('Invalid source');
