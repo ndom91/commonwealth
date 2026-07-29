@@ -104,7 +104,13 @@ const actor: Actor = {
 if (!process.argv.includes('--no-seed')) {
   /* Hard delete rather than the product's soft delete: this workspace holds no
      history worth keeping, and a soft-deleted source would keep its chunks and
-     its content hash, so the next reseed would collide on both. */
+     its content hash, so the next reseed would collide on both.
+   *
+   * Events first. `events.source_id` has no cascade — deliberately, because the
+   * log is append-only and outlives what it describes — so dropping a source
+   * out from under its own history is refused. That is right everywhere except
+   * here, where the history is nothing but previous benchmark runs. */
+  await sql`DELETE FROM events WHERE workspace_id = ${workspace.id}`;
   await sql`DELETE FROM sources WHERE workspace_id = ${workspace.id}`;
 
   const files = (await readdir(CORPUS)).filter((name) => name.endsWith('.md')).sort();

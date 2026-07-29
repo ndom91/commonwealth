@@ -87,6 +87,71 @@ test('long sections split under the cap and overlap by whole blocks', () => {
   assert.ok(chunks[1]?.content.startsWith(tail), 'second chunk carries the first chunk’s tail');
 });
 
+/* Markdown does not require blank lines between list items, so a tight list is
+   one block — and PRODUCT.md's capabilities section was a single 640-word chunk
+   averaging a dozen subjects, which the benchmark could not retrieve from. */
+test('an oversized list is cut between its items', () => {
+  const body = Array.from({ length: 30 }, (_, index) => `- item ${index} ${'word '.repeat(30)}`)
+    .join('\n')
+    .trimEnd();
+  const chunks = chunkMarkdown(`## Big\n\n${body}`);
+
+  assert.ok(chunks.length > 1);
+  for (const chunk of chunks) {
+    assert.match(chunk.content, /^ {0,3}[-*+]\s/, 'every chunk starts at an item boundary');
+    assert.ok(chunk.tokenCount <= 500);
+  }
+});
+
+test('a list that fits is left exactly as written', () => {
+  const list = '- one\n- two\n- three';
+  const chunks = chunkMarkdown(`## L\n\n${list}\n`);
+
+  assert.equal(chunks.length, 1);
+  /* Byte-identical, not merely equivalent: splitting every list and letting the
+     packer reassemble would turn a tight list into a loose one, and `excerpt`
+     would stop matching the document. */
+  assert.equal(chunks[0]?.content, list);
+});
+
+test('an item longer than the cap is kept whole rather than cut', () => {
+  const chunks = chunkMarkdown(`## L\n\n- ${'word '.repeat(600)}\n- short\n`);
+
+  assert.ok((chunks[0]?.tokenCount ?? 0) > 500);
+  assert.match(chunks[0]?.content ?? '', /^- word/);
+});
+
+test('nested items and continuation lines travel with their parent', () => {
+  const body = Array.from(
+    { length: 20 },
+    (_, index) =>
+      `- item ${index} ${'word '.repeat(25)}\n  - nested ${index}\n  continuation ${index}`
+  ).join('\n');
+  const chunks = chunkMarkdown(`## Deep\n\n${body}`);
+
+  assert.ok(chunks.length > 1);
+  for (const chunk of chunks) {
+    assert.doesNotMatch(chunk.content, /^ +- nested/, 'a cut never lands before a nested item');
+    assert.doesNotMatch(chunk.content, /^ +continuation/, 'nor before a continuation line');
+  }
+});
+
+test('leading YAML front matter is not indexed as prose', () => {
+  const chunks = chunkMarkdown('---\nname: Thing\ncolor: "#fff"\n---\n\n# Real\n\nBody text.\n');
+
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0]?.heading, 'Real');
+  assert.equal(chunks[0]?.content, 'Body text.');
+});
+
+test('a thematic break inside the document is not mistaken for front matter', () => {
+  const chunks = chunkMarkdown('# A\n\nbefore\n\n---\n\nafter\n');
+
+  const combined = chunks.map((chunk) => chunk.content).join('\n');
+  assert.match(combined, /before/);
+  assert.match(combined, /after/);
+});
+
 /* Budget yields to correctness: half a code sample helps nobody. */
 test('a single block over the cap is emitted whole', () => {
   const chunks = chunkMarkdown(`## Huge\n\n\`\`\`\n${'line\n'.repeat(700)}\`\`\`\n`);

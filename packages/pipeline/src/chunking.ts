@@ -114,6 +114,53 @@ function parseSections(markdown: string): Section[] {
   return sections;
 }
 
+/* A list item begins at the left margin, or within three spaces of it. Deeper
+   indentation is a nested item and belongs to its parent. */
+const LIST_ITEM = /^ {0,3}([-*+]|\d+[.)])\s/;
+
+/* Cut an oversized list between its items.
+ *
+ * Markdown does not require blank lines between list items, so a tightly
+ * written list is a single block. PRODUCT.md's "Capabilities and Constraints"
+ * was one 640-word chunk covering a dozen unrelated subjects, and its vector was
+ * the average of all of them — the benchmark could not retrieve two separate
+ * facts stated plainly inside it.
+ *
+ * Only oversized blocks are touched, and only lists. Splitting every list at
+ * parse time and letting `pack` reassemble would be simpler, but `pack` joins
+ * with a blank line, so a tight list would come back loose and `excerpt` would
+ * no longer match the document. A list that fits stays byte-identical.
+ *
+ * Continuation lines and nested items travel with the item they belong to, so a
+ * cut never lands inside one. */
+function splitList(block: string): string[] {
+  const lines = block.split('\n');
+  if (!lines.some((line) => LIST_ITEM.test(line))) return [block];
+
+  const items: string[][] = [];
+  for (const line of lines) {
+    if (LIST_ITEM.test(line) || items.length === 0) items.push([line]);
+    else items[items.length - 1]?.push(line);
+  }
+
+  const runs: string[] = [];
+  let run: string[] = [];
+  let words = 0;
+  for (const item of items) {
+    const text = item.join('\n');
+    const itemWords = countWords(text);
+    if (words > 0 && words + itemWords > MAX_CHUNK_WORDS) {
+      runs.push(run.join('\n'));
+      run = [];
+      words = 0;
+    }
+    run.push(text);
+    words += itemWords;
+  }
+  if (run.length > 0) runs.push(run.join('\n'));
+  return runs;
+}
+
 function pack(section: Section): Chunk[] {
   const chunks: Chunk[] = [];
   const heading = section.path.at(-1) ?? null;
@@ -126,7 +173,13 @@ function pack(section: Section): Chunk[] {
     chunks.push({ content, heading, headingPath: section.path, tokenCount: countWords(content) });
   };
 
-  for (const block of section.blocks) {
+  /* Oversized lists are divided before packing, so the packer sees ordinary
+     blocks and its overlap rule applies to them like any other. */
+  const blocks = section.blocks.flatMap((block) =>
+    countWords(block) > MAX_CHUNK_WORDS ? splitList(block) : [block]
+  );
+
+  for (const block of blocks) {
     const blockWords = countWords(block);
 
     if (words > 0 && words + blockWords > MAX_CHUNK_WORDS) {
@@ -158,8 +211,18 @@ function pack(section: Section): Chunk[] {
   return chunks;
 }
 
+/* Front matter is metadata about the document, not part of it. DESIGN.md opens
+   with a YAML block of colour tokens and a description, which indexed as prose
+   and came back as a search result reading `--- name: Commonwealth — Admin
+   description: …`.
+ *
+ * Anchored to the very start and requiring a closing fence, so a `---`
+ * thematic rule inside the document is never mistaken for it. Non-greedy, so
+ * the first close wins rather than the last. */
+const FRONT_MATTER = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(\r?\n|$)/;
+
 export function chunkMarkdown(markdown: string): Chunk[] {
-  return parseSections(markdown).flatMap(pack);
+  return parseSections(markdown.replace(FRONT_MATTER, '')).flatMap(pack);
 }
 
 /* What actually gets embedded, which is not what gets stored.
