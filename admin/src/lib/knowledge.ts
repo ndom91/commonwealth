@@ -378,9 +378,9 @@ export const restoreSource = createServerFn({ method: 'POST' })
     try {
       await client.begin(async (transaction) => {
         const [source] = await transaction<
-          { workspace_id: string; status: string; markdown_content: string; chunks: string }[]
+          { workspace_id: string; status: string; expected: number | null; chunks: string }[]
         >`
-          SELECT sources.workspace_id, sources.status, revision.markdown_content,
+          SELECT sources.workspace_id, sources.status, revision.expected_chunks AS expected,
                  (SELECT count(*) FROM chunks
                   WHERE chunks.source_revision_id = sources.current_revision_id) AS chunks
           FROM sources
@@ -391,9 +391,16 @@ export const restoreSource = createServerFn({ method: 'POST' })
         if (source.status === 'active') return;
         /* Counted rather than merely "has any chunks": a source withdrawn
            half-way through indexing has some, and serving half a document is
-           the failure this guard exists to prevent. */
+           the failure this guard exists to prevent.
+         *
+         * Against the count the revision recorded, not one recomputed from its
+         * markdown. Recomputing compares today's chunker against yesterday's
+         * chunks, so any change to chunking marked every healthy source
+         * `failed` until a reindex ran. A null means the revision predates the
+         * column and its backfill somehow; refusing is the safe direction,
+         * since Retry rebuilds it and sets the number. */
         restored =
-          Number(source.chunks) === chunkMarkdown(source.markdown_content).length
+          source.expected !== null && Number(source.chunks) === Number(source.expected)
             ? 'active'
             : 'failed';
         await transaction`
@@ -687,10 +694,10 @@ export const reviseSource = createServerFn({ method: 'POST' })
         const [revision] = await transaction<{ id: string }[]>`
           INSERT INTO source_revisions (
             source_id, revision_number, title, content_hash, markdown_content,
-            supersedes_revision_id, created_by, created_by_admin_id
+            supersedes_revision_id, created_by, created_by_admin_id, expected_chunks
           ) VALUES (
             ${data.sourceId}, ${revisionNumber}, ${data.title}, ${contentHash}, ${data.markdown},
-            ${source.current_revision_id}, NULL, ${administrator}
+            ${source.current_revision_id}, NULL, ${administrator}, ${chunks.length}
           ) RETURNING id
         `;
         if (!revision) throw new Error('Unable to record the revision');
@@ -834,11 +841,11 @@ async function writeNewSource(
           INSERT INTO source_revisions (
             id, source_id, revision_number, title, content_hash, markdown_content,
             original_filename, mime_type, storage_path,
-            supersedes_revision_id, created_by, created_by_admin_id
+            supersedes_revision_id, created_by, created_by_admin_id, expected_chunks
           ) VALUES (
             ${revisionId}, ${sourceId}, 1, ${input.title}, ${contentHash}, ${input.markdown},
             ${input.originalFilename ?? null}, ${input.mimeType ?? null}, ${input.storagePath ?? null},
-            NULL, NULL, ${administrator}
+            NULL, NULL, ${administrator}, ${chunks.length}
           )
         `;
 
@@ -965,19 +972,25 @@ async function indexSource(run: {
 /* What the browser polls while a source is indexing.
  *
  * `done` counts chunk rows, which is the same thing retrieval will read, so the
- * bar cannot claim progress that is not actually in the table. `total` is
- * recomputed with `chunkMarkdown` rather than stored: it is the deterministic
- * function that produced those rows in the first place, so a column would only
- * be a second copy of an answer already available, with the usual risk of the
- * two disagreeing. */
+ * bar cannot claim progress that is not actually in the table.
+ *
+ * `total` used to be recomputed with `chunkMarkdown` on the argument that it is
+ * the deterministic function which produced those rows, so a column would be a
+ * second copy that could only disagree. The word doing the work there is
+ * *deterministic*, and it is only true for a fixed chunker. Rewriting the
+ * chunker made every recomputed total disagree with the rows already in the
+ * table at once — progress read wrong, and `restoreSource` marked healthy
+ * sources `failed`. What the revision recorded when it was written is not a
+ * duplicate of what the current code would produce; across a chunker change it
+ * is the only record of what was actually built. */
 export const getIndexingProgress = createServerFn({ method: 'GET' })
   .validator(validateSourceId)
   .handler(async ({ data }) => {
     const { workspaceId } = await requireMember('read', data.workspace);
     const [source] = await client<
-      { status: string; current_revision_id: string; markdown_content: string; done: string }[]
+      { status: string; current_revision_id: string; expected: number | null; done: string }[]
     >`
-      SELECT sources.status, sources.current_revision_id, revision.markdown_content,
+      SELECT sources.status, sources.current_revision_id, revision.expected_chunks AS expected,
              (SELECT count(*) FROM chunks
               WHERE chunks.source_revision_id = sources.current_revision_id) AS done
       FROM sources
@@ -1000,7 +1013,10 @@ export const getIndexingProgress = createServerFn({ method: 'GET' })
     return {
       status: source.status,
       done: Number(source.done),
-      total: chunkMarkdown(source.markdown_content).length,
+      /* Null only for a revision written before the column existed whose
+         backfill did not reach it. Reporting the rows already present beats
+         inventing a denominator that would render as a shrinking fraction. */
+      total: source.expected === null ? Number(source.done) : Number(source.expected),
       message,
     };
   });
@@ -1043,12 +1059,22 @@ export const retryIndexing = createServerFn({ method: 'POST' })
        or has since finished. The page reloads and shows whatever is true now. */
     if (!claimed) return { sourceId: data.sourceId, restarted: false };
 
+    /* Re-chunking with today's code, so today's count is what this revision
+       should be judged against. Without this the retry would rebuild the chunks
+       and leave the old expectation next to them, which is the disagreement the
+       column exists to prevent. */
+    const chunks = chunkMarkdown(claimed.markdown_content);
+    await client`
+      UPDATE source_revisions SET expected_chunks = ${chunks.length}
+      WHERE id = ${claimed.current_revision_id}
+    `;
+
     void indexSource({
       sourceId: data.sourceId,
       revisionId: claimed.current_revision_id,
       workspaceId: claimed.workspace_id,
       administrator,
-      chunks: chunkMarkdown(claimed.markdown_content),
+      chunks,
     });
 
     return { sourceId: data.sourceId, restarted: true };

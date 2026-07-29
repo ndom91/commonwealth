@@ -108,6 +108,13 @@ for (const source of sources) {
     const vectors = await embeddings().embed(chunks.map(embeddingInput));
 
     await client.begin(async (transaction) => {
+      /* The revision's recorded expectation moves with its chunks. Rebuilding
+         one without the other is exactly the disagreement `expected_chunks`
+         exists to prevent. */
+      await transaction`
+        UPDATE source_revisions SET expected_chunks = ${chunks.length}
+        WHERE id = ${source.revision_id}
+      `;
       await transaction`DELETE FROM chunks WHERE source_revision_id = ${source.revision_id}`;
       for (const [ordinal, chunk] of chunks.entries()) {
         const vector = vectors[ordinal];

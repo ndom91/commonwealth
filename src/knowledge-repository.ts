@@ -401,11 +401,11 @@ export class KnowledgeRepository {
     const [created] = await transaction<{ id: string }[]>`
       INSERT INTO source_revisions (
         id, source_id, revision_number, title, content_hash, markdown_content, original_filename, mime_type,
-        storage_path, supersedes_revision_id, created_by
+        storage_path, supersedes_revision_id, created_by, expected_chunks
       ) VALUES (
         ${revisionId}, ${sourceId}, ${revisionNumber}, ${revision.title}, ${revision.contentHash}, ${revision.markdown},
         ${revision.originalFilename ?? null}, ${revision.mimeType ?? null}, ${revision.storagePath ?? null},
-        ${supersedesRevisionId}, ${actor.id}
+        ${supersedesRevisionId}, ${actor.id}, ${revision.chunks.length}
       ) RETURNING id
     `;
     if (!created) throw new Error('Unable to create source revision');
