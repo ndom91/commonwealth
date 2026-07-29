@@ -33,8 +33,10 @@ Authorization: Bearer <your key>
 ```
 
 The default embedding model is a small local baseline. `qwen3-embedding:0.6b`
-is Apache-2.0 licensed and approximately 639 MB. Treat it as a baseline: use
-the evaluation corpus described in `PLAN.md` before changing the default.
+is Apache-2.0 licensed and approximately 639 MB. Treat it as a baseline: run
+`pnpm bench` before and after changing it, which scores retrieval against a
+frozen corpus and reads `EMBEDDING_MODEL` from the environment so the two runs
+are comparable. `PLAN.md` records what that measures and what it still does not.
 
 ## Local development
 

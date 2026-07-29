@@ -125,7 +125,9 @@ The MCP tool list, the role names and the source lifecycle are all readable from
   in one index. Changing `EMBEDDING_MODEL` or the vector dimension requires
   reindexing every chunk, and `index_configuration` refuses a silent change.
   `qwen3-embedding:0.6b` is explicitly a replaceable baseline, not a choice the
-  product is built around.
+  product is built around — and `pnpm bench` takes `EMBEDDING_MODEL` from the
+  environment precisely so replacing it is a measured decision rather than a
+  swap.
 - **`active` is an invariant, not a default.** It is the only status any MCP read
   returns, so it has to mean *every chunk of the current revision is in the
   table*. Admin-created sources pass through `indexing`, and land `failed` if
@@ -192,8 +194,18 @@ closed by whoever notices them next:
 
 Remaining known gaps, in rough order of how much they cost:
 
-- **No retrieval quality work has happened at all.** The largest one, and the one
-  that gates calling any embedding model a default. See below.
+- **Retrieval is measured, but only against itself.** `pnpm bench` scores
+  Recall@5, MRR, indexing throughput and query latency on a frozen corpus, and a
+  first tuning wave used it — chunking on block boundaries, the heading in both
+  halves of the index, the query side marked for asymmetric models, the lexical
+  arm matching any term instead of every one, and finally rank fusion across the
+  two arms. What it cannot say is whether a *different* model would do better:
+  the harness reads `EMBEDDING_MODEL` from the environment and has only ever been
+  pointed at one. Until a second model has been through it, `qwen3-embedding:0.6b`
+  is a baseline that has been tuned around, not a choice that has been justified.
+- **The operational half of the model gate is untouched.** RAM, image size and
+  CPU cold-start, per `PLAN.md`. These decide whether the default is usable on a
+  small self-hosted box, which is the deployment this product assumes.
 - Nothing else outstanding at this size. Rate limiting closed the last of the
   unthrottled routes; the admin's session reads were the last obvious waste.
 
@@ -220,10 +232,15 @@ Remaining known gaps, in rough order of how much they cost:
 
 **Deliberately absent — do not fabricate:**
 
-- **No retrieval benchmarks.** `PLAN.md` requires measuring Recall@5, MRR,
-  indexing throughput, query latency, RAM, image size and CPU cold-start on a
-  representative corpus *before* any model is called a release default. No such
-  numbers exist. **Never publish a quality or speed figure.**
+- **Retrieval numbers exist, and none of them may be published.** `pnpm bench`
+  produces Recall@5, MRR, chunks/sec and p50/p95 latency, and they are real
+  measurements — but of 32 hand-written questions against five of this repo's own
+  documents, on whatever machine happened to run it, with one model. They exist to
+  tell one commit from the next, which is the only claim they can carry. They are
+  not a characterisation of the product, they say nothing about a real team's
+  corpus, and a figure lifted out of a commit message and into a README becomes a
+  claim the evidence does not support. **Never publish a quality or speed
+  figure.** RAM, image size and CPU cold-start are not measured at all.
 - No users, teams, adopters, testimonials, case studies, press, or stars.
 - No pricing, hosted offering, support commitment, or SLA. Self-hosted only.
 - No security audit or compliance certification.
