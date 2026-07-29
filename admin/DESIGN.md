@@ -2,24 +2,46 @@
 name: Commonwealth — Admin
 description: An evidence-custody bench for knowledge an AI agent is allowed to trust.
 colors:
-  slate-ground: "#0E1214"
-  slate-cabinet: "#12171A"
-  slate-bench: "#171D20"
-  slate-raised: "#1D2429"
-  rule-hair: "#262F34"
-  rule-strong: "#36424A"
+  slate-ground: "#0B0E10"
+  slate-cabinet: "#12181B"
+  slate-bench: "#1C2429"
+  slate-raised: "#283238"
+  rule-hair: "#5B707C"
+  rule-strong: "#748E9F"
   ink: "#E6EAE9"
   ink-secondary: "#A2ADB1"
-  ink-meta: "#8A969B"
+  ink-meta: "#8E9BA0"
   ink-dormant: "#5A666C"
   tag-stock: "#E3DAC6"
   tag-stock-edge: "#CFC3A9"
   tag-ink: "#1A1815"
   tag-ink-secondary: "#4A453C"
   mark: "#E3DAC6"
-  seal-mark: "#E86B38"
+  seal-mark: "#F6713B"
+  seal-fill: "#9A3414"
+colors-light:
+  slate-ground: "#E8E9E6"
+  slate-cabinet: "#D8DBD6"
+  slate-bench: "#F4F5F2"
+  slate-raised: "#CFD3CD"
+  rule-hair: "#797B78"
+  rule-strong: "#5C5F5B"
+  ink: "#14181A"
+  ink-secondary: "#444D51"
+  ink-meta: "#525B5F"
+  ink-dormant: "#7C8489"
+  tag-stock: "#B9A882"
+  tag-stock-edge: "#8F8161"
+  mark: "#7A2E14"
+  seal-mark: "#A23410"
   seal-fill: "#9A3414"
 typography:
+  hero:
+    fontFamily: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+    fontSize: "38px"
+    fontWeight: 600
+    lineHeight: 1.12
+    letterSpacing: "-0.025em"
   display:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
     fontSize: "26px"
@@ -201,9 +223,46 @@ sealed or voided.
   is what makes the theme a swap rather than a rewrite.
 
 ### Named Rules
+**The Amplitude Rule.** This system carries *all* structure on hairline rules and
+tonal ground shifts, so those two mechanisms have to be audible or the world does
+not arrive. Every structural value is therefore measured against a floor, not
+chosen by eye:
+
+| what | floor | why |
+|---|---|---|
+| `rule-hair` against any ground it sits on | **3:1** | it is the only thing giving the page a shape |
+| `rule-strong` under an input | **4.5:1** | fields are transparent with no box, so the rule *is* the affordance — WCAG 1.4.11 |
+| `slate-raised` against `slate-bench` | perceptible | selection is the one interaction index-and-bench is built around |
+| any ink that carries language, on any ground including a selected row | **4.5:1** | `.label` alone appears 76 times |
+
+The first shipped values missed all four: rules at 1.38:1, input underlines at
+1.82:1, a selected row at 1.084:1, nothing structural above 1.65:1. The doctrine
+read as a flat dark field with text on it — which is what a generic dark admin
+panel looks like, however well argued the system behind it. Amplitude is not
+decoration; it is whether the argument reaches the eye.
+
+**The Applied-Edge Rule.** Every manila surface carries a 1px `tag-stock-edge`,
+in both themes. Tag stock is *applied to* the bench rather than part of it, and
+an edge is what says so. On the dark ground the fill alone carried that at
+13.9:1; on a light ground manila is 1.92:1 and needs the die-cut line to read as
+a label at all. It is applied to both themes so the palette stays a symmetrical
+swap rather than growing a light-only exception.
+
 **The Reserved Seal Rule.** Oxide appears only where something is sealed,
 voided, or about to be destroyed. If a screen shows oxide in more than two
-places, one of them is decoration and must be removed.
+places, one of them is decoration and must be removed. The source bench broke
+this by stating a source's authority as a chip twice — beside the title and again
+in the authority row — which put three oxide elements on a canonical source. The
+second chip is gone; the bench head states the seal, and the control set marks
+the option already in force.
+
+**The Silent Default Rule.** A register marks only what departs from the
+ordinary. `approved` + `active` is the common case and takes no chip, because a
+mark every row carries has stopped carrying information: a healthy workspace
+showed ten identical `APPROVED` outlines out of thirteen rows, out-shouting the
+one `CANONICAL` a reader needed to find. Sealed, unverified, withdrawn, stale and
+failed still mark themselves, and the absence of a mark is legible precisely
+because everything else is not. Authority is still stated in full on the bench.
 
 **The Issued-Material Rule.** Manila is not a highlight color. A surface may
 only be tag stock if it represents something issued, applied, or handed over —
@@ -224,6 +283,39 @@ literal `#` and backticks. The block carries a caption saying so, because a
 reader who does not know it is unrendered will read the syntax as a mistake.
 Rendering it later needs a sanitiser and a deliberate decision, not a default.
 
+## Themes
+
+Both schemes ship. Dark is the bench as designed and is what the product is named
+for; light is the same bench under daylight, and is a full peer rather than a
+courtesy.
+
+**One declaration per colour.** Every token is
+`light-dark(light, dark)` in a single `:root` block, resolved by the used
+`color-scheme`. The palette previously existed in three hand-synced copies — dark
+in `:root`, light in a `prefers-color-scheme` block, light again under
+`[data-theme="light"]` — which is how the light theme came to have a manila that
+had stopped being a material without anyone noticing. This costs a browser floor:
+`light-dark()` needs Chrome 123, Safari 17.5, or Firefox 120, so every engine from
+2024 onward.
+
+**Three states, two of them pinned.** No `data-theme` attribute means the
+operating system decides, which is `color-scheme: light dark` doing its job.
+`[data-theme="light"]` and `[data-theme="dark"]` pin a scheme. The rail's toggle
+writes the pin.
+
+**The pin arrives before the paint.** A server-set, `httpOnly` cookie is read
+during SSR and put on `<html>`, so a pinned scheme is already correct in the first
+frame. The alternative — `localStorage` and a blocking inline script — renders the
+wrong scheme and corrects itself visibly, and would be the only thing in the
+product needing a script-src exception. Nothing on the client needs to read the
+cookie, because the scheme in force is on the document already.
+
+**Light is not dark with the values flipped.** Two things genuinely differ. Manila
+darkens to `#B9A882`, because at the original value it was 1.23:1 against a light
+ground and read as a faintly beige rectangle rather than a physical label. And the
+mark darkens to oxide-brown while tag stock does not, which is the reason `mark`
+was ever a separate token from `tag-stock`.
+
 ## Typography
 
 **UI Font:** system stack (`ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto`)
@@ -236,10 +328,12 @@ identifier, a hash, a timestamp, a count, or a key — the things a custody form
 would have typed into a fixed field.
 
 ### Hierarchy
+- **Hero** (600, 38px, 1.12, -0.025em): the name of the object on the bench. One
+  per screen at most, and only when a specific thing is open.
 - **Display** (600, 26px, 1.15, -0.02em): the page title in the masthead. One
   per screen.
-- **Title** (600, 15px, 1.3): object names — an identity, a source, a section
-  heading inside the detail pane.
+- **Title** (600, 15px, 1.3): object names in a register row, and section
+  headings inside the detail pane.
 - **Body** (400, 14px, 1.55): prose, descriptions, help text. Measure capped at
   68ch.
 - **Register** (400, 12.5px mono): identifiers, key prefixes, timestamps,
@@ -254,6 +348,18 @@ above a page section as decoration.
 
 **The Register Rule.** If a value could be typed into a fixed-width box on a
 paper form, it is set in the register font. If it is language, it is not.
+
+**The Object Outranks Its Route.** Where a bench and a masthead are on screen
+together, the largest type names the *thing*, not the section it lives in. The
+bench title was 22px against a 26px masthead, so on a source bench the word
+"Sources" was larger than the name of the source — the most generic word on the
+page was the biggest thing on it, and with nothing above 26px anywhere the eye had
+no focal point at all. The masthead keeps Display, because on a register-only
+page like Activity the route name *is* the subject.
+
+That 22px was also off this ramp, invented because there was no step between 15
+and 26. A missing rung gets filled by whoever needs it next; the ramp now runs
+11 / 12.5 / 13 / 14 / 15 / 26 / 38.
 
 ## Layout
 
@@ -523,9 +629,20 @@ for Sources, a dashed seal for the review queue, an issued tag for Identities, a
 it: these are the holders who sign for others rather than the ones issued to),
 a **cabinet front** for Settings (the case and its drawer pulls: Settings
 configures the thing that holds the drawers rather than indexing one), and a
-custody line for Activity. Six marks, no borrowed icon set. The one Lucide glyph
-in the chrome sits by the signed-in name, where the vocabulary is deliberately
-not the drawer one.
+custody line for Activity. Six marks, no borrowed icon set. The Lucide glyphs in
+the chrome sit by the signed-in name — Account, and the scheme toggle — where the
+vocabulary is deliberately not the drawer one.
+
+The **scheme toggle** is a sun or a moon naming the bench it would bring, beside
+Account for the same reason Account is there: both are preferences of the person,
+not sections of the corpus. It is two states rather than three, because a two-glyph
+control cannot legibly express a third, and "follow the operating system" is
+reachable by clearing the cookie rather than by a position on the button. Which
+scheme is in force can only be answered by the browser when nothing is pinned, so
+the glyph resolves in an effect; a reader on a light OS who has never pinned
+anything sees the shipped default's glyph for one frame. Deciding it in CSS would
+fix the icon and not the accessible name, and a control that misnames itself is
+worse than one whose icon settles.
 
 Identities and People are tabs of Settings and nothing else. They were briefly
 both — drawers in an Access group *and* tabs — and two ways into one page reads
@@ -561,6 +678,13 @@ exponential ease-out settling the tag onto the bench; everything else is a
 120ms state report. Dismissing it removes the tag entirely, leaving only the
 stub the database keeps.
 
+The motion is a descent, not a fade: the tag travels 18px, settles from 98.5%,
+and its shadow contracts from wide-and-soft to tight as it meets the surface —
+the same physics the One Shadow Rule already licenses for this element, animated
+rather than static. It was a 6px translate, which is to say it was technically an
+animation and nobody would ever have seen it. A product with exactly one dramatic
+moment can afford that moment to land.
+
 Because the clipboard API is absent on insecure origins and the default
 deployment is plain HTTP, the copy control reports only a resolved write. When
 the clipboard is unavailable it says so, selects the secret, and keeps the tag
@@ -578,8 +702,8 @@ is invisible on manila.
   action (`REVOKE`, `WITHDRAW`), never softened to "remove" or "clear".
 - **Do** show authority, holder, and time on the object itself; provenance
   never hides behind a disclosure.
-- **Do** define every color as a token pair so the light theme is a token
-  swap, not a rewrite.
+- **Do** define every color as a single `light-dark(light, dark)` declaration, so
+  a change of palette is one edit and the two themes cannot drift apart.
 - **Do** distinguish reversible suspension from destruction: an outlined oxide
   chip for disabled, a struck one for voided.
 - **Do** let a control's size follow where it sits — head controls at the

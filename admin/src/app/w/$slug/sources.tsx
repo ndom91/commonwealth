@@ -115,6 +115,67 @@ export type SourceRow = {
   excerpt?: string;
 };
 
+/* What a register row shows in its seal column — and nothing at all when the row
+ * is in the ordinary state.
+ *
+ * `approved` and `active` used to render a chip like every other state, which
+ * meant a healthy workspace showed a column of identical `APPROVED` outlines: on
+ * a register of thirteen sources, ten of them the same word. A mark that never
+ * varies has stopped carrying information and become texture, and it was
+ * out-shouting the one `CANONICAL` that a reader actually needs to find. Raising
+ * the rule contrast made that louder, not quieter.
+ *
+ * So the column now marks only what departs from the ordinary: sealed, not yet
+ * vouched for, withdrawn, stale, or failed to index. Approved-and-active is the
+ * silent default, and its absence is legible because everything else is not.
+ * A row's authority is still stated in full on its bench.
+ *
+ * Guard clauses rather than the nested ternary chain this replaces — the branches
+ * are a priority order, and a reader should be able to see which one wins. */
+function RegisterMark({ source }: { source: SourceRow }) {
+  if (source.status === 'deleted') {
+    return (
+      <span className="entry__role">
+        <SealChip state="void">Withdrawn</SealChip>
+      </span>
+    );
+  }
+  /* Not a chip: being embedded is work in progress, not a seal state. The bench
+     draws the same distinction. */
+  if (source.status === 'indexing') {
+    return (
+      <span className="entry__role">
+        <span className="label">Indexing</span>
+      </span>
+    );
+  }
+  if (source.status === 'failed') {
+    return (
+      <span className="entry__role">
+        <SealChip state="suspended">Index failed</SealChip>
+      </span>
+    );
+  }
+  /* Stale and withdrawn override the authority chip: someone scanning the
+     register needs the reason a row cannot be trusted before its rank. */
+  if (source.is_stale) {
+    return (
+      <span className="entry__role">
+        <SealChip state="suspended">Stale</SealChip>
+      </span>
+    );
+  }
+  if (source.authority !== 'approved') {
+    return (
+      <span className="entry__role">
+        <SealChip state={authoritySeal(source.authority)}>{source.authority}</SealChip>
+      </span>
+    );
+  }
+
+  return null;
+}
+
 function Sources() {
   const { slug } = Route.useParams();
   const navigate = useNavigate({ from: '/w/$slug/sources' });
@@ -294,23 +355,7 @@ function Sources() {
                   {source.excerpt && (
                     <span className="entry__excerpt">{highlight(source.excerpt)}</span>
                   )}
-                  <span className="entry__role">
-                    {source.status === 'deleted' ? (
-                      <SealChip state="void">Withdrawn</SealChip>
-                    ) : source.status === 'indexing' ? (
-                      /* Not a chip: being embedded is work in progress, not a
-                         seal state. See the bench for the same distinction. */
-                      <span className="label">Indexing</span>
-                    ) : source.status === 'failed' ? (
-                      <SealChip state="suspended">Index failed</SealChip>
-                    ) : source.is_stale ? (
-                      <SealChip state="suspended">Stale</SealChip>
-                    ) : (
-                      <SealChip state={authoritySeal(source.authority)}>
-                        {source.authority}
-                      </SealChip>
-                    )}
-                  </span>
+                  <RegisterMark source={source} />
                 </Link>
               </li>
             ))}

@@ -92,7 +92,11 @@ function QueueGroup({ label, note, rows }: { label: string; note: string; rows: 
           {label} · {rows.length}
         </span>
       </div>
-      <p className="line__caption queue__note">{note}</p>
+      {/* Not `.line__caption`. This sentence is the reason the queue exists —
+          "Agents are being served text nobody has checked" — and it was set in
+          the quietest style the product has, 12.5px in the most muted ink. A
+          consequence should be legible at the weight of its consequence. */}
+      <p className="queue__note">{note}</p>
       <ul className="index__list">
         {rows.map((row) => (
           <li key={row.id}>

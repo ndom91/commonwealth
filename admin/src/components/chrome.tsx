@@ -1,9 +1,11 @@
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Link, useRouter } from '@tanstack/react-router';
-import { type LucideIcon, UserRoundCog } from 'lucide-react';
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import { type LucideIcon, Moon, Sun, UserRoundCog } from 'lucide-react';
+import { type ComponentPropsWithoutRef, type ReactNode, useEffect, useState } from 'react';
 import { authClient } from '../lib/auth-client.js';
 import { can, type Role, type WorkspaceRef } from '../lib/roles.js';
+import { pinTheme } from '../lib/session.js';
+import { DEFAULT_THEME, other, parseTheme, type Theme } from '../lib/theme.js';
 
 /* Application chrome for the Custody Bench. Every workbench screen mounts
    inside AppShell and reuses the index-and-bench split: a ruled register of
@@ -228,6 +230,76 @@ function WorkspacePlate({
   );
 }
 
+/* The scheme toggle, beside the signed-in name.
+ *
+ * It sits with Account rather than in a drawer for the same reason Account does:
+ * it is a preference of the person, not a section of the corpus. Both are
+ * icon-only under the Icon Button rule, and both keep their word in `aria-label`
+ * and on hover.
+ *
+ * Two states, not three. The stylesheet supports a third — no pin at all, meaning
+ * "follow the operating system" — but a two-glyph control cannot legibly express
+ * three positions, and a reader who wants the OS back can clear the cookie. Once
+ * the toggle is touched, the choice is explicit and stays that way.
+ *
+ * The glyph names the destination: a sun while the dark bench is in force, because
+ * pressing it brings the light one.
+ *
+ * Which scheme is in force can only be answered by the browser when nothing is
+ * pinned, so it is resolved in an effect rather than guessed during render. For a
+ * reader on a light-mode OS who has never pinned anything, that leaves the glyph
+ * showing the shipped default for a single frame before it corrects. The
+ * alternative — deciding the glyph in CSS — cannot also fix the label, and a
+ * control whose accessible name is wrong is worse than one whose icon settles. */
+function ThemeToggle() {
+  const [showing, setShowing] = useState<Theme>(DEFAULT_THEME);
+  const [kept, setKept] = useState(true);
+
+  useEffect(() => {
+    const pinned = parseTheme(document.documentElement.dataset.theme);
+    if (pinned) {
+      setShowing(pinned);
+      return;
+    }
+    if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+      setShowing('light');
+    }
+  }, []);
+
+  const flip = async () => {
+    const next = other(showing);
+    /* The bench changes at once — this is a preference, and waiting on a round
+       trip to redraw it would be the slower lie. Persisting follows, and the
+       label says so if it does not land: the scheme is right for now and would
+       come back wrong on reload, which is worth one clause rather than silence. */
+    document.documentElement.dataset.theme = next;
+    setShowing(next);
+    try {
+      await pinTheme({ data: { theme: next } });
+      setKept(true);
+    } catch {
+      setKept(false);
+    }
+  };
+
+  if (showing === 'dark') {
+    return <IconButton label={toggleLabel('light', kept)} icon={Sun} onClick={flip} />;
+  }
+
+  return <IconButton label={toggleLabel('dark', kept)} icon={Moon} onClick={flip} />;
+}
+
+// toggleLabel names the scheme the control moves to, and whether the last move
+// was actually kept.
+function toggleLabel(destination: Theme, kept: boolean): string {
+  const move = `Switch to the ${destination} bench`;
+  if (kept) {
+    return move;
+  }
+
+  return `${move} — the last change could not be saved`;
+}
+
 export function AppShell({
   title,
   accession,
@@ -358,6 +430,7 @@ export function AppShell({
                   <UserRoundCog size={15} strokeWidth={1.75} aria-hidden="true" />
                 </Link>
               </Hint>
+              <ThemeToggle />
             </div>
           )}
           <button type="button" className="btn btn--quiet" onClick={signOut}>

@@ -65,6 +65,16 @@ type Progress = { status: string; done: number; total: number; message: string |
 
 const AUTHORITIES: Authority[] = ['unverified', 'approved', 'canonical'];
 
+// indexedFraction returns how much of a source is embedded, 0 to 1, and 0 while
+// the total is not yet known.
+function indexedFraction(progress: Progress | undefined): number {
+  if (!progress?.total) {
+    return 0;
+  }
+
+  return progress.done / progress.total;
+}
+
 function SourceBench() {
   const { slug } = Route.useParams();
   const { sourceId } = Route.useParams();
@@ -231,11 +241,13 @@ function SourceBench() {
             aria-valuemax={progress?.total ?? 0}
             aria-valuenow={progress?.done ?? 0}
           >
+            {/* Scaled rather than resized. The measurement is still the bar's
+                length, but a transform composites where an animated width forces
+                layout on every frame of a bar that ticks for as long as indexing
+                runs. */}
             <span
               className="indexing__fill"
-              style={{
-                width: progress?.total ? `${(progress.done / progress.total) * 100}%` : '0%',
-              }}
+              style={{ transform: `scaleX(${indexedFraction(progress)})` }}
             />
           </div>
           <p className="bench__consequence" aria-live="polite">
@@ -289,10 +301,15 @@ function SourceBench() {
               ' · never verified by a human'
             )}
           </span>
-          <div className="authority-current">
-            <span className="label">Current authority</span>
-            <SealChip state={authoritySeal(detail.authority)}>{detail.authority}</SealChip>
-          </div>
+          {/* No second authority chip here.
+           *
+           * The bench head states the seal beside the title, and the control set
+           * below marks the option already in force — so this block was the same
+           * fact a third time, and on a canonical source it put a third oxide
+           * element on one screen. DESIGN.md's Reserved Seal Rule says that when
+           * oxide appears in more than two places one of them is decoration; this
+           * was the one. It only read as necessary while `btn--current` expressed
+           * itself through a 1.084:1 ground shift nobody could see. */}
         </div>
         <div className="authority-set">
           <fieldset className="authority-control">

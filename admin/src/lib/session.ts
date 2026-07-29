@@ -1,7 +1,8 @@
 import { createServerFn } from '@tanstack/react-start';
-import { getRequest } from '@tanstack/react-start/server';
+import { getCookie, getRequest, setCookie } from '@tanstack/react-start/server';
 import { auth } from './auth.js';
 import { readMembership, readWorkspaces, validateWorkspace } from './authorize.js';
+import { parseTheme, THEME_COOKIE, THEME_MAX_AGE } from './theme.js';
 
 /* Server functions only. Routes import from here, and this module reaches the
    database through `authorize.ts`, so nothing may be exported whose body the
@@ -48,3 +49,35 @@ export const getWorkspaceViewer = createServerFn({ method: 'GET' })
       workspaces,
     };
   });
+
+/* Pin a colour scheme for this reader, or read the one they pinned.
+ *
+ * The cookie is written by the server rather than the browser, which lets it be
+ * `httpOnly` — nothing on the client needs to read it, because the scheme in force
+ * is already on `<html data-theme>`, put there during SSR. It also keeps the
+ * product free of a `document.cookie` write, which the linter rejects and whose
+ * modern replacement is still missing in one engine.
+ *
+ * `undefined` is the answer for a reader who has never touched the toggle, and it
+ * has to survive as `undefined` — the stylesheet's `color-scheme: light dark` then
+ * defers to the operating system, which is a different outcome from dark. */
+export const pinTheme = createServerFn({ method: 'POST' })
+  .validator((value: unknown) => {
+    const theme = parseTheme((value as { theme?: string })?.theme);
+    /* At the framework boundary, so throwing is the contract. A scheme this does
+       not recognise is a caller error, not a preference to store. */
+    if (!theme) throw new Error('Unknown colour scheme');
+    return { theme };
+  })
+  .handler(async ({ data }) => {
+    setCookie(THEME_COOKIE, data.theme, {
+      path: '/',
+      maxAge: THEME_MAX_AGE,
+      sameSite: 'lax',
+      httpOnly: true,
+    });
+  });
+
+export const readTheme = createServerFn({ method: 'GET' }).handler(async () => {
+  return parseTheme(getCookie(THEME_COOKIE));
+});

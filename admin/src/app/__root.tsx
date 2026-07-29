@@ -1,19 +1,41 @@
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
+import { readTheme } from '../lib/session.js';
+import type { Theme } from '../lib/theme.js';
 import appCss from './styles.css?url';
 
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { name: 'theme-color', content: '#0e1214' },
-      { title: 'Custody bench — Commonwealth' },
-    ],
-    links: [{ rel: 'stylesheet', href: appCss }],
-  }),
-  component: () => (
-    <html lang="en">
+/* The ground of each scheme. The browser paints its own chrome — the address bar
+   on mobile, the window surround on some desktops — with this, so a stale value
+   frames a light page in near-black. */
+const GROUND: Record<Theme, string> = {
+  dark: '#0b0e10',
+  light: '#f4f5f2',
+};
+
+/* `theme-color` for a reader who has pinned a scheme, and for one who has not.
+ *
+ * Pinned, there is exactly one right answer and the media queries would get it
+ * wrong — a reader on a light OS who pinned dark would be framed in white. Unpinned,
+ * the two media variants are right, and let the browser follow the OS with us. */
+function themeColor(theme: Theme | undefined) {
+  if (theme) {
+    return [{ name: 'theme-color', content: GROUND[theme] }];
+  }
+
+  return [
+    { name: 'theme-color', content: GROUND.light, media: '(prefers-color-scheme: light)' },
+    { name: 'theme-color', content: GROUND.dark, media: '(prefers-color-scheme: dark)' },
+  ];
+}
+
+function RootDocument() {
+  const theme = Route.useLoaderData();
+  return (
+    /* `data-theme` is absent unless the reader pinned a scheme, and absent is
+       what makes the stylesheet defer to the operating system. Set here during
+       SSR rather than by a script after paint, so a pinned scheme is already
+       correct in the first frame and there is nothing to flash. */
+    <html lang="en" data-theme={theme}>
       <head>
         <HeadContent />
       </head>
@@ -28,6 +50,20 @@ export const Route = createRootRoute({
         <Scripts />
       </body>
     </html>
-  ),
+  );
+}
+
+export const Route = createRootRoute({
+  loader: () => readTheme(),
+  head: ({ loaderData }) => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      ...themeColor(loaderData),
+      { title: 'Custody bench — Commonwealth' },
+    ],
+    links: [{ rel: 'stylesheet', href: appCss }],
+  }),
+  component: RootDocument,
   notFoundComponent: () => <main>Page not found</main>,
 });

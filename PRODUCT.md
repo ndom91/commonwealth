@@ -168,6 +168,16 @@ closed by whoever notices them next:
   while a new one indexes — the state would have to move onto the revision. Notes
   are typed by hand and rarely large, so the wait is not felt. Revisit when a
   revision is big enough to notice.
+- **Both colour schemes ship, and the reader picks.** Light was tokenised long
+  before it was honest: it had auto-activated on `prefers-color-scheme` for anyone
+  whose OS asked for it while the design system still described it as unshipped,
+  and in it manila sat at 1.23:1 against the ground, so the material that means
+  *issued* had quietly stopped being a material. It is now a full peer with its own
+  measured values, and a sun/moon toggle in the rail footer pins a choice through
+  an `httpOnly` cookie the server reads during SSR. Absent a pin the operating
+  system still decides. This puts a browser floor on the product — `light-dark()`,
+  so every engine from 2024 — which is a deliberate trade for a palette that cannot
+  drift out of agreement with itself.
 
 Remaining known gaps, in rough order of how much they cost:
 

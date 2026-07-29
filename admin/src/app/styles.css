@@ -17,33 +17,75 @@
    as index-and-bench rather than the dealt radar sweep.
    ────────────────────────────────────────────────────────────────────────── */
 
+/* Every colour is one declaration carrying both themes, `light-dark(light, dark)`,
+   resolved by the used `color-scheme`. It replaces three hand-synced copies of
+   the palette — dark here, light in a `prefers-color-scheme` block, light again
+   under `[data-theme="light"]` — which is why the amplitude pass below could be
+   applied once rather than three times and kept in agreement by hand.
+
+   `color-scheme: light dark` is what makes the OS preference the default; the
+   two attribute rules below pin a scheme when the rail's toggle has been used.
+   This needs `light-dark()` — Chrome 123, Safari 17.5, Firefox 120, so every
+   engine since 2024. The floor is recorded in DESIGN.md.
+
+   AMPLITUDE. The values below are measured, not chosen by eye. The doctrine
+   carries all structure on hairline rules and tonal ground shifts, and every one
+   of them used to ship at the bottom of its range: rules at 1.38:1, a *selected*
+   register row at 1.084:1 against an unselected one, input underlines at 1.82:1
+   against a 3:1 requirement. Nothing structural exceeded 1.65:1, so the world
+   never reached the eye and the surface read as text on a flat field.
+
+   Held: the slate hue, the two materials, the reserved accent, the text ramp's
+   own steps. Changed: how loudly each one speaks. */
 :root {
-  color-scheme: dark;
+  color-scheme: light dark;
 
-  --slate-ground: #0e1214;
-  --slate-cabinet: #12171a;
-  --slate-bench: #171d20;
-  --slate-raised: #1d2429;
-  --rule-hair: #262f34;
-  --rule-strong: #36424a;
+  --slate-ground: light-dark(#e8e9e6, #0b0e10);
+  --slate-cabinet: light-dark(#d8dbd6, #12181b);
+  --slate-bench: light-dark(#f4f5f2, #1c2429);
+  /* Row hover and the selected row. 1.084:1 on the bench before, 1.202:1 now —
+     selection is the one interaction index-and-bench is built around, and it was
+     invisible. */
+  --slate-raised: light-dark(#cfd3cd, #283238);
+  /* Structural separation, and the reason the page has a shape at all: 3.04:1 on
+     the bench, 3.74:1 on the ground. Still a 1px hairline, now a visible one. */
+  --rule-hair: light-dark(#797b78, #5b707c);
+  /* The resting underline of every input. Fields are transparent with no box, so
+     this rule is the only thing saying a field is there — 4.58:1 on the bench
+     against WCAG 1.4.11's 3:1 floor, where it used to sit at 1.65:1. */
+  --rule-strong: light-dark(#5c5f5b, #748e9f);
 
-  --ink: #e6eae9;
-  --ink-2: #a2adb1;
-  --ink-3: #8a969b;
-  --ink-dormant: #5a666c;
+  --ink: light-dark(#14181a, #e6eae9);
+  --ink-2: light-dark(#444d51, #a2adb1);
+  /* Lifted a single step from #8a969b so `.label` — the most-used style in the
+     product — clears AA on a selected row too, not only on the bench. */
+  --ink-3: light-dark(#525b5f, #8e9ba0);
+  /* Genuinely disabled affordances only, and never information a reader must
+     take in, which is why it is the one ink below AA on purpose. */
+  --ink-dormant: light-dark(#7c8489, #5a666c);
 
-  --tag: #e3dac6;
-  --tag-edge: #cfc3a9;
-  --tag-hover: #f1eada;
+  /* Manila is 13.9:1 against the dark ground and reads as a lit object. On a
+     light ground the old #dcd2bb was 1.23:1 — tag stock stopped being a material
+     and became a faintly beige rectangle, taking the plate, every primary button
+     and the credential tag with it. Darkened to 1.92:1 and given a real edge. */
+  --tag: light-dark(#b9a882, #e3dac6);
+  --tag-edge: light-dark(#8f8161, #cfc3a9);
+  --tag-hover: light-dark(#c9b994, #f1eada);
+  /* Unchanged across themes: 12.75:1 on dark manila, 7.58:1 on light. */
   --tag-ink: #1a1815;
   --tag-ink-2: #4a453c;
 
   /* Tag stock used as ink rather than as ground — active drawer rules, the
      selected accession, credential prefixes. Kept separate from --tag so the
-     light theme can darken the mark without darkening the tag surface. */
-  --mark: #e3dac6;
+     light theme can darken the mark without darkening the tag surface, which is
+     now visible in the one declaration rather than argued for in a comment. */
+  --mark: light-dark(#7a2e14, #e3dac6);
 
-  --seal: #e86b38;
+  /* Oxide, 4% brighter than the old #e86b38. An 11px `VOID` chip sits on a
+     selected row, and the old value gave 4.11:1 there. The alternative was
+     darkening the selected ground back down, which would have cost the selection
+     amplitude this pass exists to buy. */
+  --seal: light-dark(#a23410, #f6713b);
   --seal-fill: #9a3414;
 
   --scrollbar-thumb: var(--ink-3);
@@ -83,54 +125,20 @@
   --issued-lift: 0 10px 28px -6px rgba(0, 0, 0, 0.55), 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    color-scheme: light;
+/* Pinning a scheme, which is all the rail's toggle does. Every token above
+   already carries both values, so there is nothing to restate here — the two
+   rules that used to hold a second and third copy of the light palette are one
+   line each now.
 
-    --slate-ground: #e8e9e6;
-    --slate-cabinet: #dfe1dd;
-    --slate-bench: #f2f3f0;
-    --slate-raised: #dcded9;
-    --rule-hair: #c6cac4;
-    --rule-strong: #a8ada6;
-
-    --ink: #14181a;
-    --ink-2: #444d51;
-    --ink-3: #555e62;
-    --ink-dormant: #7c8489;
-
-    --tag: #dcd2bb;
-    --tag-edge: #b9ad91;
-    --tag-hover: #e7dfcc;
-
-    --mark: #7a2e14;
-    --seal: #96300f;
-    --seal-fill: #9a3414;
-  }
-}
-
+   Set by the server from a cookie before the document is sent, so a pinned theme
+   is correct in the first paint and there is no flash. Absent the attribute the
+   `color-scheme: light dark` above defers to the operating system. */
 [data-theme="light"] {
   color-scheme: light;
+}
 
-  --slate-ground: #e8e9e6;
-  --slate-cabinet: #dfe1dd;
-  --slate-bench: #f2f3f0;
-  --slate-raised: #dcded9;
-  --rule-hair: #c6cac4;
-  --rule-strong: #a8ada6;
-
-  --ink: #14181a;
-  --ink-2: #444d51;
-  --ink-3: #555e62;
-  --ink-dormant: #7c8489;
-
-  --tag: #dcd2bb;
-  --tag-edge: #b9ad91;
-  --tag-hover: #e7dfcc;
-
-  --mark: #7a2e14;
-  --seal: #96300f;
-  --seal-fill: #9a3414;
+[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 *,
@@ -158,7 +166,9 @@ body {
 
   :where(html, .cabinet, .index, .detail, .source-body, .queue, .log)::-webkit-scrollbar-thumb {
     border: 2px solid var(--scrollbar-track);
-    border-radius: 8px;
+    /* 2px, like every other applied chip. It was the one rounded object in a
+       product whose shapes are square by doctrine. */
+    border-radius: 2px;
     background: var(--scrollbar-thumb);
   }
 
@@ -310,11 +320,18 @@ select {
   letter-spacing: 0.04em;
 }
 
+/* THE APPLIED-EDGE RULE. Every manila surface carries a 1px `--tag-edge`, in
+   both themes. Tag stock is applied to the bench rather than part of it, and an
+   edge is what says so — on the dark ground the fill alone carried that at
+   13.9:1, but on a light ground manila is 1.92:1 and needs the die-cut line to
+   read as a label at all. Applying it to both themes keeps the palette a
+   symmetrical swap instead of adding a light-only exception. */
 .cabinet__plate {
   display: block;
   margin: var(--s-loose) var(--s-base) var(--s-section);
   padding: 9px 11px;
   background: var(--tag);
+  border: 1px solid var(--tag-edge);
   border-radius: 2px;
   color: var(--tag-ink);
   text-decoration: none;
@@ -333,7 +350,7 @@ select {
   display: block;
   margin-top: 3px;
   font-family: var(--font-register);
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: 0.04em;
   color: var(--tag-ink-2);
 }
@@ -393,7 +410,7 @@ select {
 .drawer__count {
   margin-left: auto;
   font-family: var(--font-register);
-  font-size: 12px;
+  font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }
@@ -409,7 +426,7 @@ select {
 }
 
 .drawer--dormant .drawer__count {
-  font-size: 9.5px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.11em;
   padding: 1px 5px;
@@ -541,7 +558,7 @@ select {
 .tabs__count {
   margin-left: var(--s-tight);
   color: var(--ink-dormant);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .tabs__link[aria-current="page"] .tabs__count {
@@ -728,19 +745,13 @@ select {
   border-radius: 2px;
   background: var(--slate-ground);
   font-family: var(--font-register);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--ink-2);
 }
 
 .authority-set {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-tight);
-}
-
-.authority-current {
-  display: flex;
   align-items: center;
   gap: var(--s-tight);
 }
@@ -775,8 +786,14 @@ select {
   margin-top: var(--s-gutter);
 }
 
+/* The consequence line under a queue group head. Body size and full ink, capped
+   to a readable measure — it states what is true for agents right now, which is
+   the one thing on this page a reader must not skim past. */
 .queue__note {
-  margin-bottom: var(--s-snug);
+  max-width: 68ch;
+  margin-top: 0;
+  margin-bottom: var(--s-base);
+  color: var(--ink);
 }
 
 .queue .entry {
@@ -849,7 +866,7 @@ select {
 .entry__accession {
   grid-column: 1;
   font-family: var(--font-register);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
@@ -967,9 +984,12 @@ select {
     border-color 120ms ease-out;
 }
 
+/* The applied edge, at no layout cost: `.btn` already reserves a 1px transparent
+   border so every variant is the same height. */
 .btn--primary {
   padding-inline: 18px;
   background: var(--tag);
+  border-color: var(--tag-edge);
   color: var(--tag-ink);
 }
 
@@ -1128,6 +1148,7 @@ select {
   overflow: visible;
   clip-path: none;
   background: var(--tag);
+  border: 1px solid var(--tag-edge);
   border-radius: 2px;
   color: var(--tag-ink);
   font-family: var(--font-register);
@@ -1160,6 +1181,7 @@ select {
   margin: var(--s-base) 0 var(--s-loose);
   padding: var(--s-base) 18px;
   background: var(--tag);
+  border: 1px solid var(--tag-edge);
   border-radius: 2px;
   color: var(--tag-ink);
   box-shadow: var(--issued-lift);
@@ -1237,10 +1259,27 @@ select {
   color: var(--tag);
 }
 
+/* The one authored motion in the product, and the only moment it has: a secret
+   that is readable exactly once, arriving on manila stock.
+ *
+ * It was a 6px translate and a fade — technically an animation, and nobody would
+ * ever notice it. A product this deliberately still can afford its single moment
+ * to actually land, so the tag now descends far enough to read as descending, and
+ * its shadow contracts as it meets the surface: wide and soft while the tag is
+ * above the bench, tight once it is on it. That is the same physics the One
+ * Shadow Rule already licenses for this element, animated rather than static — no
+ * second shadow is introduced.
+ *
+ * The 320ms exponential ease-out is unchanged; DESIGN.md pins it, and the point
+ * was never that the moment was too fast. `prefers-reduced-motion` collapses the
+ * duration globally, which lands the tag on its resting state instantly. */
 @keyframes issue {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(-18px) scale(0.985);
+    box-shadow:
+      0 26px 54px -10px rgba(0, 0, 0, 0.6),
+      0 2px 0 rgba(0, 0, 0, 0);
   }
 }
 
@@ -1254,11 +1293,24 @@ select {
   border-bottom: 1px solid var(--rule-hair);
 }
 
+/* The object is the hero of its own bench.
+ *
+ * This was 22px against a 26px masthead, so on a source bench the two were on
+ * screen together and the larger of them named the *route* — "Sources" — while
+ * the thing you had navigated to read was smaller. The most generic word on the
+ * page was the biggest, at a 1.18x step, and with nothing above 26px anywhere in
+ * the product the eye had no focal point to land on.
+ *
+ * 22px was also off the documented ramp, which had no step between 15 and 26 and
+ * so got one invented for it. 38px is a real rung and it inverts the inversion
+ * without touching the masthead — on Activity and the review queue the route
+ * name *is* the subject and should stay the hero there. */
 .bench__head h2 {
   margin: var(--s-hair) 0 0;
-  font-size: 22px;
+  font-size: 38px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
 }
 
 .bench__section {
@@ -1315,12 +1367,14 @@ select {
 
 .indexing__fill {
   display: block;
+  width: 100%;
   height: 100%;
   background: var(--ink-2);
-  /* Width is the measurement itself, so this is the one property that moves.
-     The global reduced-motion rule collapses the duration, leaving the bar
-     accurate and instant rather than absent. */
-  transition: width 240ms linear;
+  /* Scaled from the left, so the bar grows the way a measurement does. The
+     global reduced-motion rule collapses the duration, leaving the bar accurate
+     and instant rather than absent. */
+  transform-origin: left center;
+  transition: transform 240ms linear;
 }
 
 .indexing .bench__consequence {
@@ -1360,7 +1414,7 @@ select {
   border: 1px solid var(--rule-strong);
   color: var(--ink);
   font-family: var(--font-register);
-  font-size: 12px;
+  font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   line-height: 1.4;
   box-shadow: var(--issued-lift);
@@ -1572,6 +1626,7 @@ select {
 .intake__plate {
   padding: 9px 11px;
   background: var(--tag);
+  border: 1px solid var(--tag-edge);
   border-radius: 2px;
   color: var(--tag-ink);
   font-family: var(--font-register);
@@ -1773,7 +1828,7 @@ select {
   grid-column: 1;
   margin-top: 3px;
   font-family: var(--font-register);
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.55;
   color: var(--ink-2);
 }
@@ -1816,7 +1871,7 @@ select {
 }
 
 .log__at {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
