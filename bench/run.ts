@@ -183,6 +183,7 @@ let recallAt5 = 0;
 let reciprocalRankTotal = 0;
 const latencies: number[] = [];
 const misses: string[] = [];
+const ranks: Array<{ rank: number; question: string }> = [];
 
 for (const item of questions) {
   const startedAt = Date.now();
@@ -195,6 +196,7 @@ for (const item of questions) {
   latencies.push(Date.now() - startedAt);
 
   const rank = results.findIndex((result) => hits(result, item.relevant)) + 1;
+  ranks.push({ rank, question: item.question });
   if (rank > 0 && rank <= 5) recallAt5++;
   if (rank > 0) reciprocalRankTotal += 1 / rank;
   else misses.push(item.question);
@@ -220,6 +222,19 @@ console.log(`  query hint  ${config.EMBEDDING_QUERY_INSTRUCTION ? 'on' : 'off'}`
 if (misses.length > 0) {
   console.log(`\n  not found in the top ${LIMIT}:`);
   for (const miss of misses) console.log(`    · ${miss}`);
+}
+
+/* Per-question ranks, for judging a change to *ranking* rather than to what is
+   indexed. With 26 questions one question is 3.8 points of Recall@5, so a
+   re-ranking that helps six and hurts five averages to nothing and reads as "no
+   effect". Diffing two of these tables shows what actually moved. */
+if (process.argv.includes('--ranks')) {
+  console.log('\n  rank per question:');
+  for (const entry of ranks) {
+    console.log(
+      `    ${entry.rank === 0 ? '  —' : String(entry.rank).padStart(3)}  ${entry.question}`
+    );
+  }
 }
 
 await knowledge.close();
