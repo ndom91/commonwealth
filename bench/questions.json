@@ -1,5 +1,6 @@
 {
   "note": "Hand-written gold set for bench/run.ts. Each `relevant` entry names a corpus document and an `anchor` — a distinctive phrase that must appear in the retrieved chunk's excerpt. Anchors deliberately avoid chunk ids and headings: both move when chunking changes, and the point of this set is to survive that. Questions are phrased the way a teammate would ask, not by restating the sentence they should match.",
+  "styles": "`style` defaults to \"sentence\". The \"keyword\" ones at the end are what an agent sends when it already knows the term, and they exist because a lexical arm with OR semantics trades precision for recall: short queries are the case that could get worse without any aggregate showing it. Scored separately for that reason.",
   "questions": [
     {
       "question": "why does the rate limiter count in memory instead of using Postgres?",
@@ -117,6 +118,37 @@
         { "doc": "PLAN.md", "anchor": "Do not mix embeddings" },
         { "doc": "PRODUCT.md", "anchor": "must never be mixed" }
       ]
+    },
+
+    {
+      "question": "scrypt",
+      "style": "keyword",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "25ms each" }]
+    },
+    {
+      "question": "pgvector",
+      "style": "keyword",
+      "relevant": [{ "doc": "README.md", "anchor": "PostgreSQL with pgvector" }]
+    },
+    {
+      "question": "MarkItDown",
+      "style": "keyword",
+      "relevant": [{ "doc": "README.md", "anchor": "MarkItDown for document-to-Markdown" }]
+    },
+    {
+      "question": "TRUST_FORWARDED_FOR",
+      "style": "keyword",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "differs per service" }]
+    },
+    {
+      "question": "_journal.json",
+      "style": "keyword",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "needs a matching entry for every new file" }]
+    },
+    {
+      "question": "vector(1024)",
+      "style": "keyword",
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "for the entire table" }]
     }
   ]
 }

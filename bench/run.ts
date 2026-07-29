@@ -24,7 +24,8 @@ import type { Actor } from '../src/domain.js';
 import { KnowledgeRepository } from '../src/knowledge-repository.js';
 
 type Relevant = { doc: string; anchor: string };
-type Question = { question: string; relevant: Relevant[] };
+type Style = 'sentence' | 'keyword';
+type Question = { question: string; style?: Style; relevant: Relevant[] };
 type SearchResult = { title?: string; excerpt?: string };
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -179,11 +180,9 @@ if (impossible.length > 0) {
   process.exit(1);
 }
 
-let recallAt5 = 0;
-let reciprocalRankTotal = 0;
 const latencies: number[] = [];
 const misses: string[] = [];
-const ranks: Array<{ rank: number; question: string }> = [];
+const ranks: Array<{ rank: number; question: string; style: Style }> = [];
 
 for (const item of questions) {
   const startedAt = Date.now();
@@ -196,10 +195,8 @@ for (const item of questions) {
   latencies.push(Date.now() - startedAt);
 
   const rank = results.findIndex((result) => hits(result, item.relevant)) + 1;
-  ranks.push({ rank, question: item.question });
-  if (rank > 0 && rank <= 5) recallAt5++;
-  if (rank > 0) reciprocalRankTotal += 1 / rank;
-  else misses.push(item.question);
+  ranks.push({ rank, question: item.question, style: item.style ?? 'sentence' });
+  if (rank === 0) misses.push(item.question);
 }
 
 const percentile = (values: number[], fraction: number): number => {
@@ -207,12 +204,40 @@ const percentile = (values: number[], fraction: number): number => {
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))] ?? 0;
 };
 
-const total = questions.length;
-console.log(`${total} questions against ${WORKSPACE}, top ${LIMIT}\n`);
-console.log(`  Recall@5    ${((recallAt5 / total) * 100).toFixed(1)}%  (${recallAt5}/${total})`);
-console.log(`  MRR         ${(reciprocalRankTotal / total).toFixed(3)}`);
+/* Scored per style as well as overall. Sentence and keyword queries are the two
+   sides of the precision/recall trade a lexical arm makes, so a change that
+   lifts one and sinks the other has to be visible as that rather than averaging
+   into "no effect". */
+const score = (subset: typeof ranks) => {
+  const found = subset.filter((entry) => entry.rank > 0);
+  return {
+    n: subset.length,
+    recallAt5: subset.filter((entry) => entry.rank > 0 && entry.rank <= 5).length,
+    mrr: found.reduce((sum, entry) => sum + 1 / entry.rank, 0) / (subset.length || 1),
+  };
+};
+
+const line = (label: string, subset: typeof ranks) => {
+  if (subset.length === 0) return;
+  const { n, recallAt5, mrr } = score(subset);
+  console.log(
+    `  ${label.padEnd(10)} Recall@5 ${((recallAt5 / n) * 100).toFixed(1).padStart(5)}%  (${recallAt5}/${n})` +
+      `    MRR ${mrr.toFixed(3)}`
+  );
+};
+
+console.log(`${ranks.length} questions against ${WORKSPACE}, top ${LIMIT}\n`);
+line('overall', ranks);
+line(
+  'sentence',
+  ranks.filter((entry) => entry.style === 'sentence')
+);
+line(
+  'keyword',
+  ranks.filter((entry) => entry.style === 'keyword')
+);
 console.log(
-  `  latency     p50 ${percentile(latencies, 0.5)}ms   p95 ${percentile(latencies, 0.95)}ms`
+  `\n  latency     p50 ${percentile(latencies, 0.5)}ms   p95 ${percentile(latencies, 0.95)}ms`
 );
 console.log(`  model       ${config.EMBEDDING_MODEL}`);
 console.log(`  query hint  ${config.EMBEDDING_QUERY_INSTRUCTION ? 'on' : 'off'}`);
@@ -225,14 +250,16 @@ if (misses.length > 0) {
 }
 
 /* Per-question ranks, for judging a change to *ranking* rather than to what is
-   indexed. With 26 questions one question is 3.8 points of Recall@5, so a
+   indexed. At this corpus size one question is several points of Recall@5, so a
    re-ranking that helps six and hurts five averages to nothing and reads as "no
-   effect". Diffing two of these tables shows what actually moved. */
+   effect". Diffing two of these tables shows what actually moved — it is what
+   established that the first RRF attempt was a true no-op rather than a wash. */
 if (process.argv.includes('--ranks')) {
   console.log('\n  rank per question:');
   for (const entry of ranks) {
     console.log(
-      `    ${entry.rank === 0 ? '  —' : String(entry.rank).padStart(3)}  ${entry.question}`
+      `    ${entry.rank === 0 ? '  —' : String(entry.rank).padStart(3)}  ` +
+        `${entry.style === 'keyword' ? '[kw] ' : '     '}${entry.question}`
     );
   }
 }
