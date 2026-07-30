@@ -449,10 +449,6 @@ select {
   gap: var(--s-snug);
 }
 
-.cabinet__identity > .icon-btn {
-  margin-left: auto;
-}
-
 /* Current-page marking matches the drawer links: a ground shift and stronger
    ink, never a colored border. */
 .cabinet__identity > .icon-btn[aria-current="page"] {
@@ -461,7 +457,14 @@ select {
   color: var(--ink);
 }
 
+/* The free space in the row goes to the name, so the controls sit flush against
+   the rail's right edge — aligned with the sign-out control below them. The auto
+   margin used to be on the buttons, and `margin-left: auto` on *each* of them
+   made them share the slack rather than cluster: the pair drifted inward and
+   apart, and a third would have spread them further. One declaration here keeps
+   working however many controls end up in the row. */
 .cabinet__holder {
+  margin-right: auto;
   overflow: hidden;
 }
 
