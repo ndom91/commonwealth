@@ -5,7 +5,15 @@
     "moduleResolution": "NodeNext",
     "jsx": "react-jsx",
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // See the root tsconfig: TypeScript 7 no longer includes installed
+    // `@types/*` ambiently. Only `node` is named — the server halves of this app
+    // import `node:crypto` and read `process.env`. React's types are not listed
+    // because nothing here depends on them ambiently: they arrive through
+    // `import type` and, for JSX, through `react/jsx-runtime` under
+    // `jsx: react-jsx`, both of which are module resolution rather than ambient
+    // inclusion.
+    "types": ["node"]
   },
   "include": ["src", "scripts", "vite.config.ts", "drizzle.config.ts"]
 }

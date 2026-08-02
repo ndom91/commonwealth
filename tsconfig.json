@@ -6,7 +6,14 @@
     "strict": true,
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    // TypeScript 7 defaults `types` to an empty array. Before it, any installed
+    // `@types/*` package was pulled into every program just by being on disk,
+    // which is why this line was not needed and also why a stray transitive
+    // `@types` package could change what compiled. Naming the one we depend on
+    // is the migration; without it every `node:` specifier and every `process`
+    // and `Buffer` reads as an undeclared name.
+    "types": ["node"]
   },
   // The shared pipeline is checked from here rather than carrying its own
   // tsconfig and devDependencies: it has no runtime deps, and checking it under
