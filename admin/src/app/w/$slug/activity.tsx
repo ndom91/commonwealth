@@ -48,10 +48,16 @@ type EventRow = {
  * Rule's two-place limit is about oxide spent on decoration, not about a log of
  * destructions declining to mark them.
  *
- * `identity_disabled` is absent on purpose. Disabling a holder is reversible
- * suspension, and the seal vocabulary is careful to keep that distinct from a
- * void. `source_index_failed` is absent too: a failure is not a destruction, and
- * its own message already rides in the detail column. */
+ * `identity_disabled` is absent from the list on purpose, but not
+ * unconditionally. Disabling a holder by hand is reversible suspension, and the
+ * seal vocabulary is careful to keep that distinct from a void. The same event
+ * filed by `removePerson` is not reversible — it accompanies voided credentials
+ * and the owner losing the workspace — so it carries `reason: 'offboarded'` and
+ * is marked. A log that phrased the two identically would be describing a
+ * suspension somebody could undo.
+ *
+ * `source_index_failed` is absent too: a failure is not a destruction, and its
+ * own message already rides in the detail column. */
 const DESTRUCTIVE = new Set([
   'api_key_revoked',
   'member_invitation_revoked',
@@ -129,6 +135,11 @@ function detailOf(event: EventRow): string | null {
   if (event.event_type === 'api_key_created' || event.event_type === 'api_key_revoked') {
     return text('label');
   }
+  /* Why this holder went out of service. Without it the log shows a disable
+     nobody in the workspace performed, next to voids nobody ordered. */
+  if (isOffboardingDisable(event)) {
+    return 'owner removed from the workspace';
+  }
   /* Who, and at what. A role change is the one event here where the old value
      matters as much as the new one — "reviewer → reader" is a withdrawal of
      trust, and reading it as just "reader" loses that. */
@@ -190,12 +201,18 @@ function groupByDay(events: EventRow[], local: boolean): DayGroup[] {
 }
 
 // whatClass marks the verb column when the event it names destroyed something.
-function whatClass(eventType: string): string {
-  if (DESTRUCTIVE.has(eventType)) {
+function whatClass(event: EventRow): string {
+  if (DESTRUCTIVE.has(event.event_type) || isOffboardingDisable(event)) {
     return 'log__what log__what--void';
   }
 
   return 'log__what';
+}
+
+/* A holder disabled because its owner left, rather than by an administrator
+   reaching for the button. Only the first is irreversible. */
+function isOffboardingDisable(event: EventRow): boolean {
+  return event.event_type === 'identity_disabled' && event.metadata.reason === 'offboarded';
 }
 
 function Activity() {
@@ -257,7 +274,7 @@ function Activity() {
                   <li className="log__row" key={event.id}>
                     {/* Time only. The day is stated once, in the head above. */}
                     <Stamp at={event.created_at} precision="time" className="log__at register" />
-                    <span className={whatClass(event.event_type)}>
+                    <span className={whatClass(event)}>
                       {phrase(event.event_type)}
                       {detail && <span className="log__detail"> {detail}</span>}
                     </span>

@@ -85,6 +85,13 @@
       "when": 1784914839313,
       "tag": "0011_revision_expected_chunks",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784914839314,
+      "tag": "0012_identity_owner",
+      "breakpoints": true
     }
   ]
 }

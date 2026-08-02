@@ -34,6 +34,18 @@ export function can(role: Role, permission: Permission): boolean {
   return permissions[role].includes(permission);
 }
 
+/* Whether someone holding `granter` may mint a holder at `candidate` — nobody
+   may issue a credential that can do more than they can.
+ *
+ * Stated as a subset of permissions rather than a position in `ROLES`. The four
+ * names happen to be listed in increasing power and an index comparison would
+ * work today, but that array is also what the role `<select>` iterates, so
+ * reordering it for the sake of a form would silently turn this check into the
+ * wrong one. A subset check cannot be broken by rearranging a list. */
+export function canGrant(granter: Role, candidate: Role): boolean {
+  return permissions[candidate].every((permission) => can(granter, permission));
+}
+
 /* A workspace as the chrome needs to know it: enough to name it on the plate,
  * link to it from the switcher, and cut the rail to what you may do in it.
  *

@@ -1,0 +1,27 @@
+-- Whose agent this is.
+--
+-- Identities have never recorded an owner. `description` is an administrator's
+-- note on what a holder is *for*; the only record of *whose* it is has been
+-- whatever somebody typed into that prose. Three questions had no answer:
+-- which holders are mine, what does this engineer hold, and what becomes of
+-- their credentials when they leave. `managed_api_key.created_by_admin_id`
+-- does not answer them — it records who *minted* a key, and two administrators
+-- issuing keys to one holder write two different values for the same identity.
+--
+-- Nullable, and staying that way. An unowned holder is legitimate: the
+-- bootstrap identity is one, a shared CI runner is another, and
+-- `management.ts` notes the register can show a holder "that is nobody's
+-- colleague".
+--
+-- `ON DELETE SET NULL` because a holder outlives the person who holds it.
+-- Losing the account must never take the identity's history with it — every
+-- source it submitted still points at it through `sources.created_by`.
+-- Offboarding is handled deliberately in `removePerson`, which voids the
+-- credentials and disables the holder while leaving the row, and its
+-- provenance, intact.
+--
+-- Admin chain only, and necessarily: this references better-auth's "user"
+-- table, which the test chain has no concept of, and nothing in `src/` reads
+-- the column. See AGENTS.md, "Two migration chains, on purpose".
+ALTER TABLE "users" ADD COLUMN "owner_admin_id" text
+  REFERENCES "user"("id") ON DELETE SET NULL;

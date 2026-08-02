@@ -268,7 +268,8 @@ function HolderBench() {
       <div className="bench__head">
         <div>
           <span className="label">
-            Holder · {accessionOf(identity.id)} · registered <Stamp at={identity.created_at} />
+            Holder · {accessionOf(identity.id)} · registered <Stamp at={identity.created_at} /> ·{' '}
+            {identity.owner ? `held by ${identity.owner}` : 'unowned'}
           </span>
           <h2>{identity.name}</h2>
         </div>

@@ -42,7 +42,7 @@ function Workspace() {
     <AppShell
       title="Workspace"
       accession="Settings"
-      tabs={<SettingsTabs slug={slug} counts={viewer.counts} />}
+      tabs={<SettingsTabs slug={slug} counts={viewer.counts} role={viewer.role} />}
       {...viewer}
     >
       <section className="detail" aria-label="This workspace">

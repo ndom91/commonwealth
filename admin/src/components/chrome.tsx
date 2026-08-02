@@ -159,6 +159,16 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
       label: 'Workspace',
       items: [{ mark: 'settings', label: 'Settings', to: '/w/$slug/settings/workspace' }],
     });
+  } else if (can(role, 'write')) {
+    /* A writer has one thing to do in Settings — mint and void credentials for
+       their own agents — so the rail names that rather than a section whose
+       other two tabs would refuse them. The count is deliberately absent: it
+       counts every holder in the workspace, and this link leads to a register
+       showing only theirs. */
+    groups.push({
+      label: 'Workspace',
+      items: [{ mark: 'settings', label: 'Your identities', to: '/w/$slug/settings/identities' }],
+    });
   }
   groups.push({
     label: 'Custody',
@@ -508,8 +518,28 @@ export function AppShell({
  *
  * `activeOptions.exact` is off for Identities on purpose: a selected holder
  * lives at `settings/identities/$id`, and the tab has to stay lit while you are
- * reading one. */
-export function SettingsTabs({ slug, counts }: { slug: string; counts: NavCounts | undefined }) {
+ * reading one.
+ *
+ * Workspace and People are administrators' pages and are omitted for everyone
+ * else, on the same reasoning as the rail: a tab that answers "Administrator
+ * access is required" is telling you about a job that is not yours. A writer
+ * reaching Identities to mint their own credential sees one tab, which is a
+ * bar with nothing to choose — so the bar is dropped entirely rather than
+ * rendered with a single lit item.
+ *
+ * The identity count goes with it. It counts every holder in the workspace, and
+ * a non-administrator's register shows only their own; a number that disagrees
+ * with the list beneath it is worse than no number. */
+export function SettingsTabs({
+  slug,
+  counts,
+  role,
+}: {
+  slug: string;
+  counts: NavCounts | undefined;
+  role: Role;
+}) {
+  if (!can(role, 'admin')) return null;
   return (
     <nav className="tabs" aria-label="Settings sections">
       <Link

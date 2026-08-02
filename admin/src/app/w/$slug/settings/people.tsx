@@ -63,7 +63,7 @@ function People() {
     <AppShell
       title="People"
       accession="Settings"
-      tabs={<SettingsTabs slug={slug} counts={viewer.counts} />}
+      tabs={<SettingsTabs slug={slug} counts={viewer.counts} role={viewer.role} />}
       {...viewer}
       /* In the masthead, where Identities keeps *Issue identity*. The head that
          used to hold it also held the headcount, which the tab now states — and
@@ -218,6 +218,23 @@ function PersonRow({ person }: { person: Person }) {
             ))}
         </span>
       </span>
+      {/* What removal costs beyond the membership, stated before it is paid.
+          Their agents stop working the moment this is confirmed, and a shared
+          bot that happened to be minted under their name goes with them — so
+          the number is here rather than in a message afterwards. Silent when
+          they hold nothing, which is the common case. */}
+      {confirming && person.holders > 0 && (
+        <p className="bench__consequence">
+          Also retires {person.holders} holder{person.holders === 1 ? '' : 's'} they own
+          {person.liveCredentials > 0 && (
+            <>
+              , voiding {person.liveCredentials} live credential
+              {person.liveCredentials === 1 ? '' : 's'} at <code className="register">/mcp</code>
+            </>
+          )}
+          . Voiding cannot be undone; re-issue anything shared under a holder that is nobody's.
+        </p>
+      )}
       {error && (
         <p className="notice" role="alert">
           {error}

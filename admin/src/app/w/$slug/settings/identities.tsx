@@ -4,9 +4,9 @@ import { AppShell, accessionOf, SealChip, SettingsTabs } from '../../../../compo
 import { CredentialTag, type Identity, type Issued } from '../../../../components/identity.js';
 import { readFailure, writeFailure } from '../../../../lib/failure.js';
 import { createIdentity, listIdentities } from '../../../../lib/management.js';
-import { ROLES, type Role } from '../../../../lib/roles.js';
+import { can, canGrant, ROLES, type Role } from '../../../../lib/roles.js';
 
-export type IdentitySearch = { after?: string };
+export type IdentitySearch = { after?: string; mine?: boolean };
 
 /* The cursor is one search param rather than two, so a link carries a single
    opaque token instead of exposing a timestamp and a uuid the reader is
@@ -34,6 +34,9 @@ export const Route = createFileRoute('/w/$slug/settings/identities')({
   validateSearch: (search: Record<string, unknown>): IdentitySearch => ({
     after:
       typeof search.after === 'string' && search.after.includes('|') ? search.after : undefined,
+    /* Absent rather than `false` when off, so the unfiltered register is the
+       bare URL and a link to it carries no state a reader has to interpret. */
+    mine: search.mine === true || search.mine === 'true' ? true : undefined,
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps, params }) => {
@@ -41,7 +44,9 @@ export const Route = createFileRoute('/w/$slug/settings/identities')({
        failure in full, and two alarms for one fault would be noise. */
     const cursor = parseCursor(deps.after);
     try {
-      const page = await listIdentities({ data: { workspace: params.slug, cursor } });
+      const page = await listIdentities({
+        data: { workspace: params.slug, cursor, mine: deps.mine === true },
+      });
       return { page, failure: undefined };
     } catch {
       return { page: undefined, failure: readFailure('The register') };
@@ -56,7 +61,16 @@ function IdentitiesLayout() {
   const navigate = useNavigate();
   const viewer = Route.useRouteContext();
   const { page, failure } = Route.useLoaderData();
-  const { after } = Route.useSearch();
+  const { after, mine } = Route.useSearch();
+
+  /* An administrator sees the whole workspace and may narrow to their own;
+     everyone else is already narrowed by the server and is not offered a
+     control that could only ever be a no-op. */
+  const administers = can(viewer.role, 'admin');
+  /* Nobody may issue a credential that outranks them, so the roles that cannot
+     be granted are not offered. The server refuses them regardless — this only
+     keeps the form from proposing a choice it would reject. */
+  const grantable = ROLES.filter((value) => canGrant(viewer.role, value));
 
   /* Loader data crosses a serialisation boundary, so the router hands it back
      widened. Re-stated here rather than at every use site. */
@@ -74,6 +88,7 @@ function IdentitiesLayout() {
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('writer');
   const [keyLabel, setKeyLabel] = useState('');
+  const [unowned, setUnowned] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -82,11 +97,14 @@ function IdentitiesLayout() {
     setPending(true);
     setError(undefined);
     try {
-      const result = await createIdentity({ data: { workspace: slug, name, role, keyLabel } });
+      const result = await createIdentity({
+        data: { workspace: slug, name, role, keyLabel, unowned: administers && unowned },
+      });
       setIssued(result);
       setIssuing(false);
       setName('');
       setKeyLabel('');
+      setUnowned(false);
       await router.invalidate();
       await navigate({
         to: '/w/$slug/settings/identities/$identityId',
@@ -109,7 +127,7 @@ function IdentitiesLayout() {
     <AppShell
       title="Identities"
       accession="Settings"
-      tabs={<SettingsTabs slug={slug} counts={viewer.counts} />}
+      tabs={<SettingsTabs slug={slug} counts={viewer.counts} role={viewer.role} />}
       {...viewer}
       actions={
         <button
@@ -124,6 +142,30 @@ function IdentitiesLayout() {
     >
       <div className="panes">
         <section className="index" aria-label="Identity register">
+          {administers && (
+            <div className="filters filters--flush">
+              <label className="filters__field filters__field--row">
+                <span className="label">Holders</span>
+                <select
+                  value={mine ? 'mine' : 'all'}
+                  onChange={(event) =>
+                    void navigate({
+                      to: '/w/$slug/settings/identities',
+                      params: { slug },
+                      /* The cursor is dropped rather than carried: it points
+                         into the unfiltered ordering, and a page token from one
+                         list applied to another lands somewhere arbitrary. */
+                      search: event.target.value === 'mine' ? { mine: true } : {},
+                    })
+                  }
+                >
+                  <option value="all">Everyone's</option>
+                  <option value="mine">Yours</option>
+                </select>
+              </label>
+            </div>
+          )}
+
           {identities.length > 0 && (
             <div className="index__cols">
               <span className="label">Holder</span>
@@ -146,9 +188,14 @@ function IdentitiesLayout() {
             </div>
           )}
 
+          {/* Two different facts, and saying the first when the second is true
+              would tell an administrator filtering to their own that the
+              workspace is empty. A non-administrator's register is always
+              filtered, so they always get the second. */}
           {!failure && identities.length === 0 && (
             <p className="empty index__note">
-              No identities yet. Issue one to give an agent a credential it can present at{' '}
+              {administers && !mine ? 'No identities yet.' : 'You hold no identities yet.'} Issue
+              one to give an agent a credential it can present at{' '}
               <code className="register">/mcp</code>.
             </p>
           )}
@@ -167,7 +214,8 @@ function IdentitiesLayout() {
                   >
                     <span className="entry__name">{identity.name}</span>
                     <span className="entry__accession">
-                      {accessionOf(identity.id)} · {live} live · {identity.keys.length} total
+                      {accessionOf(identity.id)} · {live} live · {identity.keys.length} total ·{' '}
+                      {identity.owner ?? 'unowned'}
                     </span>
                     <span className="entry__role">
                       {identity.disabled_at ? (
@@ -238,13 +286,42 @@ function IdentitiesLayout() {
                 <label className="field">
                   <span className="label">Role</span>
                   <select value={role} onChange={(event) => setRole(event.target.value as Role)}>
-                    {ROLES.map((value) => (
+                    {grantable.map((value) => (
                       <option key={value} value={value}>
                         {value}
                       </option>
                     ))}
                   </select>
                 </label>
+
+                {!administers && (
+                  <p className="amend__consequence">
+                    A credential cannot do more than you can, so the list stops at{' '}
+                    <span className="role">{viewer.role}</span>. This holder will be yours, and is
+                    retired if you leave this workspace.
+                  </p>
+                )}
+
+                {administers && (
+                  <label className="field">
+                    <span className="label">Owner</span>
+                    <select
+                      value={unowned ? 'nobody' : 'you'}
+                      onChange={(event) => setUnowned(event.target.value === 'nobody')}
+                    >
+                      <option value="you">You</option>
+                      <option value="nobody">Nobody — shared</option>
+                    </select>
+                  </label>
+                )}
+
+                {administers && (
+                  <p className="amend__consequence">
+                    {unowned
+                      ? 'A shared holder survives anyone leaving the workspace. Nothing retires it automatically; voiding it is a deliberate act.'
+                      : 'Yours. Removing you from this workspace voids its credentials and disables it.'}
+                  </p>
+                )}
 
                 <label className={`field${error ? ' field--error' : ''}`}>
                   <span className="label">Credential label</span>
