@@ -1,8 +1,8 @@
 /* ── The Custody Bench ──────────────────────────────────────────────────────
    THESIS: An admin surface for knowledge an agent is allowed to trust, staged
-   as an evidence bench rather than a dashboard. It refuses the near-black
-   developer-tool card grid and the cream editorial page in equal measure.
-   OWN-WORLD: Dark slate ground; manila tag stock as the only light material;
+   as an evidence bench rather than a dashboard. It refuses the card grid and
+   the cream editorial page in equal measure.
+   OWN-WORLD: Neutral near-black ground; manila tag stock as the only light material;
    one oxide seal held in reserve for sealing, voiding and destruction.
    Hairline rules and ground shifts instead of cards. Square corners. Tracked
    mono field labels. No webfonts — the type stack resolves with no network.
@@ -28,46 +28,99 @@
    This needs `light-dark()` — Chrome 123, Safari 17.5, Firefox 120, so every
    engine since 2024. The floor is recorded in DESIGN.md.
 
-   AMPLITUDE. The values below are measured, not chosen by eye. The doctrine
-   carries all structure on hairline rules and tonal ground shifts, and every one
-   of them used to ship at the bottom of its range: rules at 1.38:1, a *selected*
-   register row at 1.084:1 against an unselected one, input underlines at 1.82:1
-   against a 3:1 requirement. Nothing structural exceeded 1.65:1, so the world
-   never reached the eye and the surface read as text on a flat field.
+   QUIET STRUCTURE. The values below are measured, not chosen by eye, and they
+   are the second answer this file has given to the same question: how does a
+   surface built entirely from hairlines and ground shifts acquire a shape?
 
-   Held: the slate hue, the two materials, the reserved accent, the text ramp's
-   own steps. Changed: how loudly each one speaks. */
+   The first answer was amplitude — push every rule until it is audible. Rules
+   went to 3.74:1 on the ground, which worked, and cost the page a permanent
+   grid of blue-teal lines: the loudest thing on a surface whose subject is
+   quiet records. The second answer is the one a well-set page has always used:
+   let *space* separate, and let the rules fall back to a whisper. Structural
+   hairlines now sit at 1.38:1 and the gutter is 64px, and those two numbers are
+   a single decision. Reinstating the tight gutter without restoring the rules
+   would land exactly where this file started — text on a flat field.
+
+   One rule does not get to be quiet. An input here is transparent with no box,
+   so its underline is not decoration but the entire affordance, and WCAG 1.4.11
+   puts a 3:1 floor under it. `--rule-strong` is the least loud grey that clears
+   that floor, and it is deliberately a different token from `--rule-hair` for
+   this reason alone.
+
+   Held: the two materials, the reserved accent, the text ramp's own steps, the
+   square corners, the register grammar. Changed: the hue cast is gone, and
+   separation moved from line weight to space. */
 :root {
   color-scheme: light dark;
 
-  --slate-ground: light-dark(#e8e9e6, #0b0e10);
-  --slate-cabinet: light-dark(#d8dbd6, #12181b);
-  --slate-bench: light-dark(#f4f5f2, #1c2429);
-  /* Row hover and the selected row. 1.084:1 on the bench before, 1.202:1 now —
-     selection is the one interaction index-and-bench is built around, and it was
-     invisible. */
-  --slate-raised: light-dark(#cfd3cd, #283238);
-  /* Structural separation, and the reason the page has a shape at all: 3.04:1 on
-     the bench, 3.74:1 on the ground. Still a 1px hairline, now a visible one. */
-  --rule-hair: light-dark(#797b78, #5b707c);
-  /* The resting underline of every input. Fields are transparent with no box, so
-     this rule is the only thing saying a field is there — 4.58:1 on the bench
-     against WCAG 1.4.11's 3:1 floor, where it used to sit at 1.65:1. */
-  --rule-strong: light-dark(#5c5f5b, #748e9f);
+  /* The grounds are neutral greys, not slate. The hue is what made the surface
+     read as a themed panel rather than as a working ground: the old rules
+     carried 33-43 points of channel spread and put a blue-teal grid over every
+     page. Chroma is now zero and the ramp is compressed — the whole spread from
+     ground to bench is 1.09:1, so the panes are told apart by their rules and
+     their gutters rather than by three separate shades of dark. */
+  --slate-ground: light-dark(#ffffff, #0a0a0a);
+  --slate-cabinet: light-dark(#fafafa, #0f0f0f);
+  --slate-bench: light-dark(#ffffff, #151515);
+  /* The current state: a selected register row, the active drawer, the authority
+     already in force, an icon button whose page you are on. 1.42:1 against the
+     index ground in the dark scheme and 1.27:1 in the light — lifted rather than
+     lowered with the rest, because with the dividers at a whisper selection is
+     carrying more of the work than it used to, not less.
 
-  --ink: light-dark(#14181a, #e6eae9);
-  --ink-2: light-dark(#444d51, #a2adb1);
-  /* Lifted a single step from #8a969b so `.label` — the most-used style in the
-     product — clears AA on a selected row too, not only on the bench. */
-  --ink-3: light-dark(#525b5f, #8e9ba0);
+     This used to be `--slate-bench`, which was doing two jobs: the detail pane's
+     ground *and* the selected row's. The jobs came apart when the grounds were
+     compressed — a selected row was 1.08:1 in the dark and, once the light
+     scheme went white, exactly 1.00:1. Invisible, with only the accession's
+     colour change left to say which row was open. The pane keeps `--slate-bench`
+     and stays flat; the row gets a token that can be as loud as it needs to be.
+
+     `--slate-raised` is also the ground of a tag chip and a tooltip, which want
+     the same weight, so they were left on it. */
+  --slate-raised: light-dark(#e4e4e4, #282828);
+  /* Row hover, and only row hover — 1.15:1 dark, 1.10:1 light. It has to sit
+     *under* the current state or the two read the same: at the old value a
+     hovered row was heavier than a selected one, so running the mouse down the
+     register lit rows more brightly than the one actually open. Small targets —
+     buttons, icon buttons — keep the heavier `--slate-raised` on hover, because
+     a control the size of a word needs a definite answer. */
+  --row-hover: light-dark(#f4f4f4, #1b1b1b);
+  /* Structural separation at 1.38:1 on the ground. A hairline that states a
+     boundary and then stops talking; the gutters do the separating. */
+  --rule-hair: light-dark(#dbdbdb, #2a2a2a);
+  /* The resting underline of every input, and the one rule held above the
+     floor: fields are transparent with no box, so this is not a boundary drawn
+     around an affordance, it *is* the affordance. 3.09:1 on the dark bench and
+     3.06:1 on the light rail — the quietest grey on either side that still
+     clears WCAG 1.4.11. It does not follow --rule-hair down.
+
+     Each side is measured against its *worst* ground, and they are not the same
+     surface: in the dark that is the bench, the lightest ground, and in the
+     light it is the rail at #fafafa rather than the white bench, because a dark
+     line loses contrast against the darker of two pale grounds. Measuring the
+     light side on white alone passes at 3.19:1 and hides a 2.94:1 rail. */
+  --rule-strong: light-dark(#909090, #646464);
+
+  --ink: light-dark(#0f0f0f, #ededed);
+  --ink-2: light-dark(#555555, #a6a6a6);
+  /* `.label` is the most-used style in the product, and the register's accession
+     is set in this ink too — the selected row is exactly where a reader looks,
+     so it has to clear AA there and not only on the bench. That row got heavier
+     in this pass, so this and `--slate-raised` were solved as a pair: 4.68:1
+     dark, 4.51:1 light. `--ink-2` darkened with it on the light side to keep a
+     visible step between the two, which is the only reason to have both. */
+  --ink-3: light-dark(#666666, #919191);
   /* Genuinely disabled affordances only, and never information a reader must
      take in, which is why it is the one ink below AA on purpose. */
-  --ink-dormant: light-dark(#7c8489, #5a666c);
+  --ink-dormant: light-dark(#a0a0a0, #5c5c5c);
 
-  /* Manila is 13.9:1 against the dark ground and reads as a lit object. On a
-     light ground the old #dcd2bb was 1.23:1 — tag stock stopped being a material
-     and became a faintly beige rectangle, taking the plate, every primary button
-     and the credential tag with it. Darkened to 1.92:1 and given a real edge. */
+  /* Unchanged by the neutral pass, and the reason it survives it: manila is the
+     one warm thing left, so with the slate cast gone it is now the only hue on
+     the surface rather than the warmest of several. 13.1:1 against the dark
+     bench, reading as a lit object. On a light ground the old #dcd2bb was 1.23:1
+     — tag stock stopped being a material and became a faintly beige rectangle,
+     taking the plate, every primary button and the credential tag with it.
+     Darkened, and now 2.34:1 on the white bench with a real edge under it. */
   --tag: light-dark(#b9a882, #e3dac6);
   --tag-edge: light-dark(#8f8161, #cfc3a9);
   --tag-hover: light-dark(#c9b994, #f1eada);
@@ -81,10 +134,10 @@
      now visible in the one declaration rather than argued for in a comment. */
   --mark: light-dark(#7a2e14, #e3dac6);
 
-  /* Oxide, 4% brighter than the old #e86b38. An 11px `VOID` chip sits on a
-     selected row, and the old value gave 4.11:1 there. The alternative was
-     darkening the selected ground back down, which would have cost the selection
-     amplitude this pass exists to buy. */
+  /* Oxide, 4% brighter than the old #e86b38, because an 11px `VOID` chip sits on
+     a selected row and the old value gave 4.11:1 there. Held through the neutral
+     pass at 5.43:1 on the selected ground and 6.39:1 on the bench — the accent
+     is spent so rarely that when it is spent it should not also be dim. */
   --seal: light-dark(#a23410, #f6713b);
   --seal-fill: #9a3414;
 
@@ -102,7 +155,23 @@
   --s-base: 16px;
   --s-loose: 24px;
   --s-section: 32px;
-  --s-gutter: 40px;
+  /* The gutter is load-bearing now, not generous. It was 40px when the rules
+     were loud enough to carry the structure on their own; at 1.38:1 they are
+     not, and this is what replaces them. Every main-column edge runs on it. */
+  --s-gutter: 64px;
+  /* The register's own inset, which is tighter than the gutter because 64px
+     inside a 420px column would spend a third of it on air. Every edge in the
+     index pane runs on this — rows, filter bar, search, column head — and so
+     does the masthead's left edge on a split page, so the column has one edge
+     rather than five.
+
+     It is a variable rather than a repeated `--s-section` so the narrow
+     breakpoint can retune it in one place. Overriding five padding rules from
+     inside a media query does not work reliably here: media queries add no
+     specificity, `.seek` is declared *after* the breakpoint in this file, and it
+     silently kept the wide value. A custom property is resolved at use, so
+     source order stops mattering. */
+  --index-inset: var(--s-section);
 
   --rail: 236px;
   /* Sized to the register entry, not chosen by eye. An accession line reads
@@ -254,9 +323,14 @@ select {
    be clicked shut is not in anybody's way. A menu that floated over the rail
    would need both, and that is the trade this element declines.
 
-   The marker is removed and replaced by nothing at all — the plate is already
-   the only tag-stock object in the rail, and a disclosure triangle on manila
-   reads as a form widget stuck to a label. */
+   The native marker is removed: a disclosure triangle on manila reads as a form
+   widget stuck to a label. For a long time it was replaced by nothing at all, on
+   the argument that the plate is already the only tag-stock object in the rail
+   and so obviously the thing you press. It is not — a reader had to stumble onto
+   the switcher to learn it existed, which is a poor way to find out you are
+   looking at the wrong corpus. What replaces it is a group mark and a hover
+   label, neither of which is a triangle: the mark names *workspaces* rather than
+   announcing a menu, and it does not rotate on open. */
 .cabinet__switch {
   position: relative;
 }
@@ -310,7 +384,7 @@ select {
 }
 
 .cabinet__workspace:hover {
-  box-shadow: inset 0 0 0 100px var(--slate-raised);
+  box-shadow: inset 0 0 0 100px var(--row-hover);
   color: var(--ink);
 }
 
@@ -326,8 +400,16 @@ select {
    13.9:1, but on a light ground manila is 1.92:1 and needs the die-cut line to
    read as a label at all. Applying it to both themes keeps the palette a
    symmetrical swap instead of adding a light-only exception. */
+/* Two stacked lines with room for a mark on the right. A grid rather than a
+   flex row with a wrapper, so the name and the corpus keep their own rows and
+   the mark can centre against the pair — and so the plain, unswitchable plate
+   needs no markup change to lose it. The second column collapses to nothing
+   when there is no mark, which is exactly that case. */
 .cabinet__plate {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--s-tight);
   margin: var(--s-loose) var(--s-base) var(--s-section);
   padding: 9px 11px;
   background: var(--tag);
@@ -337,8 +419,24 @@ select {
   text-decoration: none;
 }
 
+/* Quiet by default: it marks an affordance rather than competing with the name
+   of the corpus, so it rests at the same weight as the line beneath it and
+   comes up to full ink when the plate is hovered or open. */
+.cabinet__plate-mark {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--tag-ink-2);
+  transition: color 120ms ease-out;
+}
+
+.cabinet__switch summary:hover .cabinet__plate-mark,
+.cabinet__switch[open] .cabinet__plate-mark {
+  color: var(--tag-ink);
+}
+
 .cabinet__plate span {
   display: block;
+  grid-column: 1;
   font-family: var(--font-register);
   font-size: 11px;
   font-weight: 600;
@@ -348,6 +446,7 @@ select {
 
 .cabinet__plate small {
   display: block;
+  grid-column: 1;
   margin-top: 3px;
   font-family: var(--font-register);
   font-size: 11px;
@@ -387,12 +486,12 @@ select {
 }
 
 .drawer:hover {
-  background: var(--slate-raised);
+  background: var(--row-hover);
   color: var(--ink);
 }
 
 .drawer[aria-current="page"] {
-  background: var(--slate-bench);
+  background: var(--slate-raised);
   border-left-color: var(--mark);
   color: var(--ink);
   font-weight: 600;
@@ -534,6 +633,30 @@ select {
   padding-bottom: var(--s-snug);
 }
 
+/* On a split page the register is the leftmost column, and the title above it
+   starts where the register starts. The gutter and the register's inset are
+   different measures for good reason — 64px inside a 420px column would spend a
+   third of it on air — but a page title hanging 32px right of the column it
+   names reads as a slip rather than as a band, and the reader scans that left
+   edge straight down: title, search label, filter label, first row.
+
+   Only the left edge moves. The masthead's actions sit above the bench, which
+   keeps the gutter, so the right edge still agrees with what is under it.
+   Single-column pages — Activity, the Workspace tab — keep the gutter on both
+   sides, because there the thing below the masthead is gutter-inset too.
+
+   **A tabbed section is exempt, even where it splits.** Identities is the only
+   Settings tab with a register beside a bench, so pulling its title left aligned
+   that one page and made the whole column jump 32px as you moved along a row of
+   three tabs. Tabs are a set: the frame has to hold still while you change what
+   is inside it, and that outranks aligning a title with the column beneath it.
+   The cost is that the Identities register sits inset under a gutter-inset
+   title — the smaller of the two errors, and a static one rather than one that
+   only appears in motion. */
+.masthead:has(+ .panes) {
+  padding-left: var(--index-inset);
+}
+
 .tabs {
   display: flex;
   gap: var(--s-loose);
@@ -575,9 +698,13 @@ select {
   text-shadow: none;
 }
 
+/* 32px, up from 26. The ramp's steps did not change; the page title moved one
+   rung up it, because with the gutter at 64px a 26px title stopped holding the
+   top of the page. Still below the 38px bench hero — The Object Outranks Its
+   Route survives, with less room in it than before. */
 .masthead h1 {
   margin: 6px 0 0;
-  font-size: 26px;
+  font-size: 32px;
   font-weight: 600;
   line-height: 1.15;
   letter-spacing: -0.02em;
@@ -629,14 +756,15 @@ select {
 
 .filters {
   display: grid;
-  /* 78px, not 88: the register pane leaves 276px inside its gutter, and three
-     tracks plus two gaps must fit or the row breaks to two and reads ragged.
-     A vertical scrollbar takes enough off the pane to cross that line, so the
-     bar was collapsing only once the register was long enough to scroll. The
-     widest label, AUTHORITY, measures ~70px at label typography. */
+  /* 78px, not 88: three tracks plus two gaps must fit or the row breaks to two
+     and reads ragged. The 420px pane at the current 32px inset leaves 356px, so
+     each track gets 110px — clear, and clear again once a vertical scrollbar
+     takes its cut, which is what used to collapse the bar only on registers
+     long enough to scroll. The widest label, AUTHORITY, measures ~70px at label
+     typography. Re-check this if the inset opens further. */
   grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
   gap: var(--s-snug);
-  padding: var(--s-snug) var(--s-loose) var(--s-base);
+  padding: var(--s-snug) var(--index-inset) var(--s-base);
   border-bottom: 1px solid var(--rule-hair);
 }
 
@@ -810,7 +938,7 @@ select {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--s-snug);
-  padding: var(--s-snug) var(--s-loose) var(--s-tight);
+  padding: var(--s-snug) var(--index-inset) var(--s-tight);
 }
 
 .index__list {
@@ -824,7 +952,10 @@ select {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 2px var(--s-snug);
   width: 100%;
-  padding: var(--s-snug) var(--s-loose);
+  /* Opened with the gutter and for the same reason: the divider between two
+     rows is a whisper now, so the space between their text is what separates
+     them. Inline padding tracks the index pane's other edges. */
+  padding: var(--s-base) var(--index-inset);
   border: 0;
   border-top: 1px solid var(--rule-hair);
   background: none;
@@ -850,11 +981,11 @@ select {
 }
 
 .entry:hover {
-  background: var(--slate-raised);
+  background: var(--row-hover);
 }
 
 .entry[aria-current="page"] {
-  background: var(--slate-bench);
+  background: var(--slate-raised);
 }
 
 .entry__name {
@@ -898,7 +1029,7 @@ select {
    that entry rows can rule edge to edge. Block padding keeps a note from
    reading as part of the ruled control directly above it. */
 .index__note {
-  padding: var(--s-base) var(--s-loose);
+  padding: var(--s-base) var(--index-inset);
 }
 
 /* Only for a note that stacks separate blocks — a failure message above a
@@ -977,6 +1108,14 @@ select {
   text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
+  /* This class is worn by both `<button>` and `<a>` — *New source*, *Issue
+     identity* and the invite's *Sign in* are links, because they go somewhere.
+     A `<button>` has no underline to begin with, so the omission was invisible
+     on the majority of controls and showed up on exactly the ones that navigate:
+     a primary button with an underlined label sitting beside identical buttons
+     without one. A control that looks like a button is a button, however it is
+     implemented. */
+  text-decoration: none;
   /* One block padding for every variant: two controls sitting side by side
      must never differ in height. Variants change colour and horizontal
      padding only. */
@@ -1420,7 +1559,17 @@ select {
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   line-height: 1.4;
-  box-shadow: var(--issued-lift);
+  /* No shadow. It wore `--issued-lift`, whose second component is a hard
+     unblurred `0 2px 0` — that is the credential tag's card-stock edge, and on
+     a 24px-tall tooltip it stopped reading as thickness and started reading as
+     a bottom border four times the weight of the other three sides.
+
+     Removing it rather than softening it, because the One Shadow Rule says
+     exactly one element in this product casts a shadow and that element is the
+     credential tag at the instant of issue. A tooltip wearing the same lift was
+     a second one, and the doctrine's own words for that are "anything else that
+     appears lifted is a bug". Separation here is what it is everywhere else: a
+     ground shift and a rule, on all four sides equally. */
   user-select: text;
   z-index: 40;
 }
@@ -1840,6 +1989,19 @@ select {
 
 /* ── Adaptation ──────────────────────────────────────────────────────────── */
 
+/* Between the stacking breakpoint and a comfortably wide screen the bench is the
+   narrowest thing on the page: the rail and a 420px register take 656px before
+   it starts, so at ~1100px two 64px gutters leave the bench barely 300px and its
+   title wraps mid-word. The gutter steps back to the register's own inset here.
+   The case for 64px is that space substitutes for rule contrast — at this width
+   there is no space to substitute with, and taking it from the one pane that is
+   already short is the wrong trade. */
+@media (max-width: 1300px) {
+  :root {
+    --s-gutter: var(--s-section);
+  }
+}
+
 @media (max-width: 1080px) {
   .panes {
     grid-template-columns: minmax(0, 1fr);
@@ -1856,6 +2018,15 @@ select {
 
   .masthead {
     padding: var(--s-loose) var(--s-loose) var(--s-base);
+  }
+
+  /* Stacked, the register is no longer a narrow column beside a wide one, so it
+     stops keeping its own tighter measure: the whole main column shares the
+     gutter. Retuning the variable also settles the masthead's split-page rule,
+     which reads the same token — otherwise its `:has()` specificity would
+     outrank the plain `.masthead` reset above and hold the title off the rest. */
+  :root {
+    --index-inset: var(--s-loose);
   }
 }
 
@@ -1959,7 +2130,7 @@ select {
   display: flex;
   align-items: flex-end;
   gap: var(--s-snug);
-  padding: var(--s-snug) var(--s-loose);
+  padding: var(--s-snug) var(--index-inset);
   border-bottom: 1px solid var(--rule-hair);
 }
 
@@ -2148,11 +2319,26 @@ select {
   height: 30px;
   flex: none;
   padding: 0;
-  border: 1px solid var(--rule-hair);
+  /* `--rule-strong`, not `--rule-hair`: this control has no fill and no label,
+     so its border is the only thing saying a button is there — the same
+     argument the input underline makes, and the same WCAG 1.4.11 floor. It sat
+     on the hairline while the hairline was loud; when that dropped to 1.38:1
+     for structure, this came with it and shouldn't have. Structural rules are
+     decoration and may be quiet. A control's boundary is not. */
+  border: 1px solid var(--rule-strong);
   border-radius: 0;
   background: none;
-  color: var(--ink-2);
+  /* A step quieter than body ink. The glyph is a graphic rather than language,
+     and with the frame around it no longer shouting there is nothing for it to
+     shout over — at `--ink-2` on a white rail it read as the heaviest object in
+     the corner of the page, next to hairlines a fifth its weight. Still 5.7:1
+     light and 6.1:1 dark, well clear of the 3:1 a meaningful graphic needs. */
+  color: var(--ink-3);
   cursor: pointer;
+  /* Same reason as `.btn`: the rail's Account control is a `<Link>`. It carries
+     a glyph rather than a word, so an underline here draws a stray rule under
+     the icon. */
+  text-decoration: none;
   transition:
     background 120ms ease-out,
     color 120ms ease-out,
@@ -2172,7 +2358,7 @@ select {
 
 .icon-btn:disabled:hover {
   background: none;
-  border-color: var(--rule-hair);
+  border-color: var(--rule-strong);
   color: var(--ink-dormant);
 }
 

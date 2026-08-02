@@ -8,8 +8,8 @@ import appCss from './styles.css?url';
    on mobile, the window surround on some desktops — with this, so a stale value
    frames a light page in near-black. */
 const GROUND: Record<Theme, string> = {
-  dark: '#0b0e10',
-  light: '#f4f5f2',
+  dark: '#0a0a0a',
+  light: '#ffffff',
 };
 
 /* `theme-color` for a reader who has pinned a scheme, and for one who has not.

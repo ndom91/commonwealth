@@ -2,16 +2,17 @@
 name: Commonwealth — Admin
 description: An evidence-custody bench for knowledge an AI agent is allowed to trust.
 colors:
-  slate-ground: "#0B0E10"
-  slate-cabinet: "#12181B"
-  slate-bench: "#1C2429"
-  slate-raised: "#283238"
-  rule-hair: "#5B707C"
-  rule-strong: "#748E9F"
-  ink: "#E6EAE9"
-  ink-secondary: "#A2ADB1"
-  ink-meta: "#8E9BA0"
-  ink-dormant: "#5A666C"
+  slate-ground: "#0A0A0A"
+  slate-cabinet: "#0F0F0F"
+  slate-bench: "#151515"
+  slate-raised: "#282828"
+  row-hover: "#1B1B1B"
+  rule-hair: "#2A2A2A"
+  rule-strong: "#646464"
+  ink: "#EDEDED"
+  ink-secondary: "#A6A6A6"
+  ink-meta: "#919191"
+  ink-dormant: "#5C5C5C"
   tag-stock: "#E3DAC6"
   tag-stock-edge: "#CFC3A9"
   tag-ink: "#1A1815"
@@ -20,16 +21,17 @@ colors:
   seal-mark: "#F6713B"
   seal-fill: "#9A3414"
 colors-light:
-  slate-ground: "#E8E9E6"
-  slate-cabinet: "#D8DBD6"
-  slate-bench: "#F4F5F2"
-  slate-raised: "#CFD3CD"
-  rule-hair: "#797B78"
-  rule-strong: "#5C5F5B"
-  ink: "#14181A"
-  ink-secondary: "#444D51"
-  ink-meta: "#525B5F"
-  ink-dormant: "#7C8489"
+  slate-ground: "#FFFFFF"
+  slate-cabinet: "#FAFAFA"
+  slate-bench: "#FFFFFF"
+  slate-raised: "#E4E4E4"
+  row-hover: "#F4F4F4"
+  rule-hair: "#DBDBDB"
+  rule-strong: "#909090"
+  ink: "#0F0F0F"
+  ink-secondary: "#555555"
+  ink-meta: "#666666"
+  ink-dormant: "#A0A0A0"
   tag-stock: "#B9A882"
   tag-stock-edge: "#8F8161"
   mark: "#7A2E14"
@@ -44,7 +46,7 @@ typography:
     letterSpacing: "-0.025em"
   display:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
-    fontSize: "26px"
+    fontSize: "32px"
     fontWeight: 600
     lineHeight: 1.15
     letterSpacing: "-0.02em"
@@ -94,7 +96,7 @@ spacing:
   base: "16px"
   loose: "24px"
   section: "32px"
-  gutter: "40px"
+  gutter: "64px"
 components:
   button-primary:
     backgroundColor: "{colors.tag-stock}"
@@ -168,7 +170,7 @@ components:
 **Creative North Star: "The Custody Bench"**
 
 This is not a dashboard. It is the bench in an evidence room, seen under task
-lighting: a dark slate working surface where the only bright objects are small
+lighting: a neutral near-black working surface where the only bright objects are small
 pieces of tag stock carrying accession numbers, seal states, and
 initial-and-date blocks. Everything the product does is a custody operation.
 An identity is a badge issued to a named holder. An API key is a sealed
@@ -190,7 +192,7 @@ grammar is built for long tabular reading rather than for a landing
 impression.
 
 **Key Characteristics:**
-- Dark slate ground; manila tag stock as the only light material
+- Neutral near-black ground; manila tag stock as the only light material
 - One accent — oxide seal — spent only on sealing, voiding, and destruction
 - Zero radius on structure; 2px only on applied chips and tags
 - Hairline rules and ground shifts instead of cards
@@ -198,7 +200,7 @@ impression.
 
 ## Colors
 
-A near-monochrome slate field interrupted by two materials that mean something:
+A neutral greyscale field interrupted by two materials that mean something:
 manila tag stock for anything issued or applied, and oxide seal for anything
 sealed or voided.
 
@@ -216,11 +218,23 @@ sealed or voided.
 
 ### Neutral
 - **Slate Ground** (`{colors.slate-ground}`): the page field.
-- **Slate Cabinet** (`{colors.slate-cabinet}`): the navigation rail, recessed
-  slightly below the ground so the rail reads as the drawer face.
+- **Slate Cabinet** (`{colors.slate-cabinet}`): the navigation rail, set a hair
+  off the ground so the rail reads as the drawer face. In the dark scheme that
+  means a shade lighter; in the light scheme, a shade darker — white is a
+  ceiling, so the offset flips rather than the metaphor.
 - **Slate Bench** (`{colors.slate-bench}`): raised working surfaces — the
   detail pane and any inspected object.
-- **Slate Raised** (`{colors.slate-raised}`): row hover and the selected row.
+- **Slate Raised** (`{colors.slate-raised}`): **the current state** — a selected
+  register row, the active drawer, the authority already in force, the tag chip
+  and the tooltip. It used to be the *hover* value while selection borrowed
+  `slate-bench`, which put hover above selection in weight and, once the grounds
+  were compressed, left a selected row at 1.08:1 in the dark and 1.00:1 in the
+  light. The pane's ground and the selected row's ground are two jobs, and they
+  came apart under a flat palette.
+- **Row Hover** (`{colors.row-hover}`): row and drawer hover, and nothing else.
+  It sits deliberately *under* Slate Raised so a hovered row never outweighs the
+  open one. Small targets — buttons, icon buttons — keep Slate Raised on hover,
+  because a control the size of a word needs a definite answer.
 - **Hairline / Strong Rule** (`{colors.rule-hair}` / `{colors.rule-strong}`):
   all structural separation, and the resting state of input underlines.
 - **Ink / Secondary / Meta / Dormant** (`{colors.ink}`,
@@ -235,28 +249,48 @@ sealed or voided.
   is what makes the theme a swap rather than a rewrite.
 
 ### Named Rules
-**The Amplitude Rule.** This system carries *all* structure on hairline rules and
-tonal ground shifts, so those two mechanisms have to be audible or the world does
-not arrive. Every structural value is therefore measured against a floor, not
-chosen by eye:
+**The Quiet Structure Rule.** *Supersedes the Amplitude Rule, which stood from the
+first correction until this one. The history is kept because the failure it fixed
+is real and easy to walk back into.*
+
+This system carries *all* structure on hairline rules and tonal ground shifts, so
+the page acquires its shape from those two mechanisms and nothing else. There are
+two ways to make that work, and this system has now shipped both.
+
+The first was **amplitude**: push every rule until it is audible. It was a
+correction to values that had shipped at the bottom of their range — rules at
+1.38:1, input underlines at 1.82:1, a selected row at 1.084:1, nothing structural
+above 1.65:1 — which read as a flat dark field with text on it. Amplitude fixed
+that and cost something for it: rules at 3.74:1 in a blue-teal slate put a
+permanent grid of lines over every page, and on a surface whose subject is quiet
+records the loudest object was the ruling.
+
+The second, in force now, is **space**. Structural hairlines fall back to 1.38:1
+— the value the first version shipped and the correction rejected — and the
+gutter goes to 64px to carry what they no longer carry. This is not a
+reversal, because **the two halves are one decision**. A 1.38:1 rule inside a
+40px gutter is the original failure. A 1.38:1 rule inside a 64px gutter is a
+well-set page. Anyone tightening the gutter must put the amplitude back.
+
+Floors that survive, and are still measured rather than chosen by eye:
 
 | what | floor | why |
 |---|---|---|
-| `rule-hair` against any ground it sits on | **3:1** | it is the only thing giving the page a shape |
-| `rule-strong` under an input | **4.5:1** | fields are transparent with no box, so the rule *is* the affordance — WCAG 1.4.11 |
-| `slate-raised` against `slate-bench` | perceptible | selection is the one interaction index-and-bench is built around |
+| `rule-strong` under an input | **3:1** | fields are transparent with no box, so the rule *is* the affordance — WCAG 1.4.11. This is the one rule that does not get to be quiet, and the reason it is a separate token from `rule-hair`. Relaxed from a self-imposed 4.5:1 to the actual requirement; `#646464` / `#939393` are the quietest greys clearing it. |
 | any ink that carries language, on any ground including a selected row | **4.5:1** | `.label` alone appears 76 times |
+| `slate-raised` against the ground it sits on | perceptible, and **above `row-hover`** | selection is the one interaction index-and-bench is built around, and it now carries more than it used to because the divider crossing a selected row has gone faint. 1.34:1 dark / 1.27:1 light, with hover held at 1.15:1 / 1.10:1 beneath it. Solved jointly with `ink-meta`, which has to clear AA *on* it. |
+| `rule-hair` against any ground | **none** | it is decoration once space is doing the separating, and WCAG asks nothing of it |
 
-The first shipped values missed all four: rules at 1.38:1, input underlines at
-1.82:1, a selected row at 1.084:1, nothing structural above 1.65:1. The doctrine
-read as a flat dark field with text on it — which is what a generic dark admin
-panel looks like, however well argued the system behind it. Amplitude is not
-decoration; it is whether the argument reaches the eye.
+**The hue is gone.** The grounds and rules are neutral greys, not slate. The old
+rules carried 33–43 points of channel spread, which is what made the surface read
+as a themed panel rather than as a working ground. Manila and oxide keep their
+warmth and are now the only hues on the page, which is what the Two-Material Rule
+always wanted and the slate cast was quietly working against.
 
 **The Applied-Edge Rule.** Every manila surface carries a 1px `tag-stock-edge`,
 in both themes. Tag stock is *applied to* the bench rather than part of it, and
 an edge is what says so. On the dark ground the fill alone carried that at
-13.9:1; on a light ground manila is 1.92:1 and needs the die-cut line to read as
+13.1:1; on a light ground manila is 2.34:1 and needs the die-cut line to read as
 a label at all. It is applied to both themes so the palette stays a symmetrical
 swap rather than growing a light-only exception.
 
@@ -328,6 +362,14 @@ ground and read as a faintly beige rectangle rather than a physical label. And t
 mark darkens to oxide-brown while tag stock does not, which is the reason `mark`
 was ever a separate token from `tag-stock`.
 
+**Light went white.** It was a grey theme — a `#E8E9E6` ground with `#F4F5F2`
+benches — which is a different room from the dark bench rather than the same one
+under daylight. Ground and bench are now both `#FFFFFF`, the rail `#FAFAFA`, and
+the panes are told apart by their rules and their gutters exactly as they are in
+the dark. The one place the two schemes still differ in *structure* is that light
+has no tonal separation left to spend, which is fine: the dark side barely does
+either, at 1.09:1 from ground to bench.
+
 ## Typography
 
 **UI Font:** system stack (`ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto`)
@@ -342,8 +384,9 @@ would have typed into a fixed field.
 ### Hierarchy
 - **Hero** (600, 38px, 1.12, -0.025em): the name of the object on the bench. One
   per screen at most, and only when a specific thing is open.
-- **Display** (600, 26px, 1.15, -0.02em): the page title in the masthead. One
-  per screen.
+- **Display** (600, 32px, 1.15, -0.02em): the page title in the masthead. One
+  per screen. Moved up from 26px when the gutter went to 64px — at the wider
+  measure a 26px title no longer held the top of the page.
 - **Title** (600, 15px, 1.3): object names in a register row, and section
   headings inside the detail pane.
 - **Body** (400, 14px, 1.55): prose, descriptions, help text. Measure capped at
@@ -357,8 +400,11 @@ would have typed into a fixed field.
 - **Label** (600, 11px mono, 0.11em, uppercase): field labels, column heads,
   drawer labels, chip text.
 - **Plate** (600, 26px mono, 0.12em, uppercase): the product name on manila at the
-  threshold, and nowhere else. Register face at Display size because the wordmark
-  on a filing label is stamped, not set.
+  threshold, and nowhere else. Register face at a heading size because the wordmark
+  on a filing label is stamped, not set. It held 26px when Display moved to 32:
+  tracked mono grows about 19px per character per rung, and at 32px the plate
+  overruns a 320px viewport. It is the one rung that answers to a measure rather
+  than to the ramp.
 
 ### Named Rules
 **The Field-Label Rule.** Tracked uppercase is a records-form field label, not
@@ -376,14 +422,21 @@ page was the biggest thing on it, and with nothing above 26px anywhere the eye h
 no focal point at all. The masthead keeps Display, because on a register-only
 page like Activity the route name *is* the subject.
 
+The margin is thinner than it was. Display moved to 32px against Hero's 38px, so
+the rule holds on six points rather than sixteen — deliberate, because on Sources
+and Activity the masthead *is* the page's title and was reading as a caption at
+26px. **Hero moves first if Display moves again**, and it may not go below 38px
+while a bench and a masthead can share a screen.
+
 That 22px was also off this ramp, invented because there was no step between 15
 and 26. A missing rung gets filled by whoever needs it next; the ramp now runs
-11 / 12.5 / 13 / 14 / 15 / 26 / 38.
+11 / 12.5 / 13 / 14 / 15 / 26 / 32 / 38 — where 26 survives only as the
+threshold Plate, which answers to a viewport measure rather than to this ramp.
 
 ## Layout
 
 A fixed two-part shell: a 236px cabinet rail and a fluid main column. Inside
-main, a masthead strip sits above a split of a 340px index pane and a fluid
+main, a masthead strip sits above a split of a 420px index pane and a fluid
 detail pane. The index lists objects; the detail holds the selected one. This
 split is the durable pattern for every future workbench screen — sources,
 review queue, activity — not a one-off for identities.
@@ -392,24 +445,52 @@ Spacing runs on a 4px base (`{spacing.hair}` through `{spacing.gutter}`), with
 more space above a heading than below it. Rows are 1px-ruled rather than
 gapped, so long registers stay scannable.
 
+**The 64px gutter is structural, not generous.** Every main-column edge runs on
+`{spacing.gutter}`, and it is what separates the page now that the rules have
+gone quiet — see the Quiet Structure Rule. Tightening it without restoring rule
+contrast returns the surface to a flat field. Inside the index pane the
+equivalent inset is `{spacing.section}`: register rows, the filter bar, the
+search field and the column head all share it, so the column has one edge rather
+than four.
+
 Above 860px the shell is `100dvh` with `overflow: hidden`, and the cabinet,
 index and detail each scroll independently with the register's column head
 sticky. A filing cabinet does not slide away while you read one folder.
 
-Below 1080px the index and detail panes stack, index first. Below 860px the
+Below 1300px the gutter steps back to `{spacing.section}` while the panes stay
+side by side. The rail and the register take 656px before the bench begins, so
+at ~1100px two 64px gutters left it barely 300px and its title wrapped mid-word.
+The wide gutter exists to substitute for rule contrast; at this width there is
+no space to substitute with, and taking it from the shortest pane is the wrong
+trade.
+
+Below 1080px the index and detail panes stack, index first — and the register
+gives up its own tighter inset there, because stacked it is no longer a narrow
+column beside a wide one. Below 860px the
 cabinet rail collapses to a horizontal drawer strip above the masthead. The
 shell never becomes a hamburger: wayfinding stays visible because the surface
 is a filing system.
 
 ## Elevation & Depth
 
-Flat by doctrine. Depth is tonal — cabinet sits below ground, bench sits above
-it — and separation is always a hairline rule, never a shadow and never a box.
+Flat by doctrine, and flatter since the grounds were compressed: the whole
+distance from ground to bench is 1.09:1 in the dark scheme and nothing at all in
+the light one, where both are white. What tone remains only orders the surfaces —
+it does not separate them. **Separation is the gutter first and a hairline
+second**, never a shadow and never a box.
 
 ### Shadow Vocabulary
 - **Issued lift** (`box-shadow: 0 10px 28px -6px rgba(0,0,0,0.55), 0 2px 0 rgba(0,0,0,0.4)`):
   the single shadow in the system. It exists only under a freshly issued
   credential tag, for the one moment that credential is readable.
+
+  The second component is a hard, unblurred `0 2px 0` — the thickness of the card
+  stock where it meets the bench, not a glow. **It is sized to a credential tag
+  and does not survive being borrowed.** The tooltip wore this lift for a while,
+  and at 24px tall the card-stock edge stopped reading as thickness and started
+  reading as a bottom border four times the weight of the other three sides. That
+  it was borrowable at all was the bug; a tooltip casting the issue shadow was a
+  second shadow in a system that permits one.
 
 ### Named Rules
 **The One Shadow Rule.** Exactly one element in this product casts a shadow:
@@ -463,6 +544,15 @@ expressed by ground shift and by the accession number changing to tag stock.
   happening. Nor is it outlined in the mark, because in the light theme the mark
   is oxide-brown and an oxide-outlined control beside Withdraw would put two of
   them in one row and blunt the Reserved Seal Rule.
+
+**A button is a button however it is implemented.** Several of these are `<a>`
+rather than `<button>` because they navigate — *New source*, *Issue identity*,
+the invite's *Sign in*, the rail's *Account*. The class kills the anchor
+underline, so the two cannot be told apart by eye. The omission hid for a long
+time precisely because it was invisible on the majority of controls: a
+`<button>` has no underline to lose, so only the handful that navigate showed
+one, and a primary button with an underlined label sat beside identical buttons
+without one.
 
 **Actions are verbs; chips are states.** The authority controls read *Unverify*,
 *Approve*, *Mark canonical* — what a person would be doing — while the chip
@@ -520,6 +610,16 @@ is reserved with `text-shadow`, so the row does not shift as you move along it.
 Links, not an ARIA `tablist`: tabs are routes here. They are in history, Back
 moves between them, and one can be pasted to a colleague.
 
+**A tabbed section holds its frame still.** The masthead and tab row keep the
+gutter across every tab, including one that splits into a register and a bench.
+Identities is the only Settings tab that does, and letting it align its title to
+its register — which is what an untabbed split page like Sources does — moved the
+whole column 32px as the reader moved along a row of three tabs. Tabs are a set:
+what changes when you click one should be the content, not the frame around it.
+The register keeps its own tighter inset underneath, so on that page a
+gutter-inset title sits above an inset column. That is the smaller error, and a
+static one rather than one that only appears in motion.
+
 A tab whose page is a register carries that register's size, set in register face
 at the rail count's weight. This does not compete with the rail: a register's
 size is stated once, in the navigation that owns it, and for People and
@@ -544,8 +644,20 @@ somebody looked and then the text moved underneath them.
 
 ### Icon button
 A 30px square control for rows where a worded button would crowd out the field
-beside it. Hairline box, no fill, glyph in `{colors.ink-secondary}`; the `void`
-tone spends an oxide outline and never a fill, exactly as `btn--void` does.
+beside it. No fill, glyph in `{colors.ink-meta}`; the `void` tone spends an oxide
+outline and never a fill, exactly as `btn--void` does.
+
+**Its box is `{colors.rule-strong}`, not the hairline** — the one place besides
+the input underline where a rule is an affordance rather than decoration. With no
+fill and no word, the border is the entire statement that a control is there, so
+it answers to WCAG 1.4.11's 3:1 like a field does. It rode the hairline for as
+long as the hairline was loud, and followed it down to 1.38:1 when structure went
+quiet, which is the wrong direction for the only edge a reader has to find.
+
+The glyph then came down a step to `{colors.ink-meta}` to match: it is a graphic,
+not language, and with the frame no longer shouting there was nothing for it to
+shout over. At body-ink weight on a white rail it was the heaviest object in the
+corner of the page, beside hairlines a fifth of its weight.
 
 The label is never dropped — it moves to `aria-label` and `title`, so the
 control still names itself to a screen reader and on hover. Icon-only is
@@ -671,7 +783,30 @@ thing — manila at a size that reads as applied material rather than as a capti
 ### Navigation
 The **plate** at the head of the rail names the corpus you are in and is how
 you leave it: a `<details>` disclosure listing the other workspaces you belong
-to, or a plain plate when there is nowhere to go. It switches and nothing else —
+to, or a plain plate when there is nowhere to go.
+
+It carries a **group mark on its right edge and a *Switch workspace* label on
+hover**, and only in the disclosure form — a mark on the plain plate would
+promise a menu that opens onto a list of one. Both exist because the plate
+otherwise gave no sign it was pressable, and a reader had to stumble onto the
+switcher to learn it was there; on a surface where every count and every register
+below is scoped to the corpus named on that plate, discovering the switcher by
+accident is discovering too late that you were reading the wrong one. The mark is
+Lucide rather than a drawn drawer mark, for the reason Account and the scheme
+toggle are: the hand-drawn grammar belongs to the drawers, and the plate is
+chrome. It is not a disclosure triangle and does not rotate — it names
+*workspaces* rather than announcing a menu, which is what the Shapes doctrine
+objects to.
+
+The label **describes rather than names.** The plate's accessible name stays the
+workspace itself, and *Switch workspace* arrives as `aria-describedby` on top of
+it. This is the opposite treatment from `Hint`, which serves icon-only controls
+where the tooltip merely repeats the `aria-label` and is therefore hidden from
+the accessibility tree. Replacing the name with an `aria-label` here would break
+Label in Name (WCAG 2.5.3): someone driving the page by voice says the words they
+can see, and the words they can see are the workspace's.
+
+It switches and nothing else —
 creating a workspace lives in Settings, which has a drawer. A disclosure has no
 Escape and no outside-click; that is survivable here because the panel displaces
 nothing and covers nothing, and it is the trade a floating menu could not make.

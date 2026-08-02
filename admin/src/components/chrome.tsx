@@ -1,6 +1,6 @@
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Link, useRouter } from '@tanstack/react-router';
-import { type LucideIcon, Moon, Sun, UserRoundCog } from 'lucide-react';
+import { Group, type LucideIcon, Moon, Sun, UserRoundCog } from 'lucide-react';
 import { type ComponentPropsWithoutRef, type ReactNode, useEffect, useState } from 'react';
 import { authClient } from '../lib/auth-client.js';
 import { can, type Role, type WorkspaceRef } from '../lib/roles.js';
@@ -207,10 +207,45 @@ function WorkspacePlate({
   }
   return (
     <details className="cabinet__switch">
-      <summary className="cabinet__plate">
-        <span>{name}</span>
-        <small>Commonwealth</small>
-      </summary>
+      {/* A tooltip that *describes* rather than names, so unlike `Hint` its
+          content is not `aria-hidden`. The plate already carries a visible name
+          — the workspace — and a screen reader announces that; what it cannot
+          announce is that the name is also a control. Radix points the
+          trigger's `aria-describedby` here, which adds "Switch workspace" to
+          the name instead of replacing it. Overriding the name with an
+          `aria-label` would break Label in Name (WCAG 2.5.3) for anyone driving
+          this by voice: they say the words they can see.
+
+          `Tooltip.Root` renders no element of its own and the content is
+          portalled to the body, so `<summary>` stays the first child of
+          `<details>` and the native disclosure still works. */}
+      <Tooltip.Root>
+        <Tooltip.Trigger asChild>
+          <summary className="cabinet__plate">
+            <span>{name}</span>
+            <small>Commonwealth</small>
+            {/* The one thing on the plate that says it is a control. Doctrine
+                refuses a disclosure triangle here — that reads as a form widget
+                stuck to a label — but this is not one: it names *workspaces*
+                rather than announcing a menu, and it does not rotate on open.
+                Lucide rather than a drawn mark for the same reason Account and
+                the scheme toggle are: the rail's hand-drawn grammar belongs to
+                the drawers, and the plate is chrome. */}
+            <Group
+              className="cabinet__plate-mark"
+              size={15}
+              strokeWidth={1.75}
+              aria-hidden="true"
+            />
+          </summary>
+        </Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Content className="tip tip--label" sideOffset={6} collisionPadding={8}>
+            Switch workspace
+            <Tooltip.Arrow className="tip__arrow" width={9} height={4} />
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      </Tooltip.Root>
       <div className="cabinet__workspaces">
         <span className="label">Switch to</span>
         {others.map((entry) => (
