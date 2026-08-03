@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { AppShell } from '../../../components/chrome.js';
 import { authClient } from '../../../lib/auth-client.js';
 import { getSession } from '../../../lib/session.js';
+import { documentTitle } from '../../../lib/title.js';
 
 /* Your own account, and nothing else.
  *
@@ -16,6 +17,12 @@ import { getSession } from '../../../lib/session.js';
  * Reachable at every role: changing your own name and password is not a
  * privilege. */
 export const Route = createFileRoute('/w/$slug/account')({
+  /* Named for the workspace it was reached from even though the account itself
+     is instance-wide, because the rail and the URL both say that workspace and
+     a tab that disagreed with them would be the odd one out. */
+  head: ({ match }) => ({
+    meta: [{ title: documentTitle('Account', match.context.workspaceName) }],
+  }),
   /* Your own account, so nothing here is workspace-scoped — but it is reached
      from a workspace and the rail stays put, so it lives under the same layout.
      That layout has already established who you are; this only fetches the

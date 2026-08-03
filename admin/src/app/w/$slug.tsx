@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound, Outlet, redirect } from '@tanstack/react-router';
 import { getNavCounts } from '../../lib/knowledge.js';
 import { getSession, getWorkspaceViewer } from '../../lib/session.js';
+import { workspaceTitle } from '../../lib/title.js';
 
 /* The workspace layout: everything under `/w/:slug` is one corpus.
  *
@@ -40,6 +41,17 @@ export const Route = createFileRoute('/w/$slug')({
     const counts = await getNavCounts({ data: { workspace: params.slug } }).catch(() => undefined);
     return { ...viewer, counts };
   },
+  /* The tab names the corpus, for the same reason the plate does: with several
+     workspaces on one instance, two tabs that both read "Commonwealth" are two
+     tabs you have to click to tell apart.
+   *
+     Read from `match.context`, which is what `beforeLoad` above returned — so
+     the name is already resolved and this costs no extra read. A page under
+     here that sets its own title overrides this one; anything that does not
+     inherits it. */
+  head: ({ match }) => ({
+    meta: [{ title: workspaceTitle(match.context.workspaceName) }],
+  }),
   notFoundComponent: Unavailable,
   component: () => <Outlet />,
 });

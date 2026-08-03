@@ -4,6 +4,7 @@ import { AppShell, SettingsTabs } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
 import { readFailure, writeFailure } from '../../../../lib/failure.js';
 import { createWorkspace, getWorkspaceFacts, renameWorkspace } from '../../../../lib/management.js';
+import { documentTitle } from '../../../../lib/title.js';
 
 /* The workspace as an object: what it is called, what it is made of, and how to
  * start another one.
@@ -20,6 +21,14 @@ import { createWorkspace, getWorkspaceFacts, renameWorkspace } from '../../../..
  * means reindexing every chunk, which is an operator's job with the service
  * stopped, not a select on a settings page. */
 export const Route = createFileRoute('/w/$slug/settings/workspace')({
+  /* "Settings", not the "Workspace" the masthead shows. On the page that word
+     sits under an accession already reading Settings; in a tab strip there is no
+     accession, and "Workspace · Core Team" would name the corpus twice. Its two
+     sibling tabs name themselves — People, Identities — so this one takes the
+     section. */
+  head: ({ match }) => ({
+    meta: [{ title: documentTitle('Settings', match.context.workspaceName) }],
+  }),
   loader: async ({ params }) => {
     try {
       return {

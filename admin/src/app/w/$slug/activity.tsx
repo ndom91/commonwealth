@@ -3,6 +3,7 @@ import { AppShell, accessionOf } from '../../../components/chrome.js';
 import { day, Stamp, useMounted } from '../../../components/stamp.js';
 import { readFailure } from '../../../lib/failure.js';
 import { listEvents, listEventTypes } from '../../../lib/knowledge.js';
+import { documentTitle } from '../../../lib/title.js';
 
 type ActivityFilters = { type?: string };
 
@@ -26,6 +27,10 @@ export const Route = createFileRoute('/w/$slug/activity')({
       return { log: undefined, types, failure: readFailure('The log') };
     }
   },
+  /* After `validateSearch` — see the note in `sources.tsx`. */
+  head: ({ match }) => ({
+    meta: [{ title: documentTitle('Activity', match.context.workspaceName) }],
+  }),
   component: Activity,
 });
 

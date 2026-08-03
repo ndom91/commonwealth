@@ -216,9 +216,21 @@ Remaining known gaps, in rough order of how much they cost:
   common by the people who use it and administered by them rather than owned
   over them — which is the whole argument of a self-hosted, source-cited corpus
   that agents write to and a team vouches for.
-- The plate reads the **workspace name** over **Commonwealth**; the admin surface
-  is the **Custody bench**. The design system is documented in `admin/DESIGN.md`
-  and is binding.
+- **Nothing user-facing names the surface; it names where you are.** The plate
+  reads the **workspace name** over **Commonwealth**, and the browser tab reads
+  the page, the workspace, then the product — `Sources · Core Team —
+  Commonwealth`. Signed out there is no workspace to name and the tab is bare
+  **Commonwealth**, because no instance fact is anybody's business before
+  authentication.
+- **"Custody bench" is the design system's north star, not a name the product
+  says out loud.** Chain-of-custody evidence handling is where the whole visual
+  grammar comes from — an identity is a badge issued to a holder, a key is a
+  sealed credential, revoking is voiding, the event log is the custody line — and
+  `admin/DESIGN.md` documents it and is binding. It stopped being *shown* because
+  it was the same phrase on every page of every workspace: true, and telling the
+  reader nothing they could act on. The vocabulary it produced is still on the
+  surface where it labels one specific thing — "Custody line", "In custody" —
+  which is where it earns its keep.
 - Agent credentials mint as `cw_…`. Keys issued before the rename mint as
   `tkb_…` and keep working — a live secret cannot be rewritten — so both
   markings will appear in an older instance's register indefinitely.

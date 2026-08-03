@@ -5,6 +5,7 @@ import { CredentialTag, type Identity, type Issued } from '../../../../component
 import { readFailure, writeFailure } from '../../../../lib/failure.js';
 import { createIdentity, listIdentities } from '../../../../lib/management.js';
 import { can, canGrant, ROLES, type Role } from '../../../../lib/roles.js';
+import { documentTitle } from '../../../../lib/title.js';
 
 export type IdentitySearch = { after?: string; mine?: boolean };
 
@@ -52,6 +53,10 @@ export const Route = createFileRoute('/w/$slug/settings/identities')({
       return { page: undefined, failure: readFailure('The register') };
     }
   },
+  /* After `validateSearch` — see the note in `sources.tsx`. */
+  head: ({ match }) => ({
+    meta: [{ title: documentTitle('Identities', match.context.workspaceName) }],
+  }),
   component: IdentitiesLayout,
 });
 

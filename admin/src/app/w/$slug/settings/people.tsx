@@ -14,6 +14,7 @@ import {
   updatePersonRole,
 } from '../../../../lib/management.js';
 import { ROLE_SUMMARY, ROLES, type Role } from '../../../../lib/roles.js';
+import { documentTitle } from '../../../../lib/title.js';
 
 /* Who can open the cabinet, and how far.
  *
@@ -29,6 +30,9 @@ import { ROLE_SUMMARY, ROLES, type Role } from '../../../../lib/roles.js';
  * full, and a pending invitation is a live credential that has to be visible
  * next to them. */
 export const Route = createFileRoute('/w/$slug/settings/people')({
+  head: ({ match }) => ({
+    meta: [{ title: documentTitle('People', match.context.workspaceName) }],
+  }),
   loader: async ({ params }) => {
     try {
       const [people, invitations] = await Promise.all([

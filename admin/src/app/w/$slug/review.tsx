@@ -4,8 +4,12 @@ import { Stamp } from '../../../components/stamp.js';
 import { readFailure } from '../../../lib/failure.js';
 import { listReviewQueue } from '../../../lib/knowledge.js';
 import { requireRole } from '../../../lib/route-guards.js';
+import { documentTitle } from '../../../lib/title.js';
 
 export const Route = createFileRoute('/w/$slug/review')({
+  head: ({ match }) => ({
+    meta: [{ title: documentTitle('Review queue', match.context.workspaceName) }],
+  }),
   /* The `/w/$slug` layout has already resolved the workspace and confirmed
      membership; this only narrows by role. Approving what the corpus vouches
      for is a reviewer's job; a writer landing here would see a queue of buttons

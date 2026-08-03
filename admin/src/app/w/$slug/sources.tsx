@@ -10,6 +10,7 @@ import {
 import { Stamp } from '../../../components/stamp.js';
 import { readFailure } from '../../../lib/failure.js';
 import { listSources, listSubmitters, searchSources } from '../../../lib/knowledge.js';
+import { documentTitle } from '../../../lib/title.js';
 
 /* Filters live in the URL rather than component state: a filtered register is
    a thing people send each other, and the review queue hands off into it. */
@@ -93,6 +94,12 @@ export const Route = createFileRoute('/w/$slug/sources')({
       };
     }
   },
+  /* After `validateSearch`, not before it. These options are typed in
+     declaration order, and a `head` declared first leaves the search schema
+     unresolved for everything below it — `loaderDeps` then sees `{}`. */
+  head: ({ match }) => ({
+    meta: [{ title: documentTitle('Sources', match.context.workspaceName) }],
+  }),
   component: Sources,
 });
 
