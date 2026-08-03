@@ -142,8 +142,13 @@ function IdentitiesLayout() {
     >
       <div className="panes">
         <section className="index" aria-label="Identity register">
+          {/* Not `--flush`: that modifier is the log's, where the filter sits in
+              an already-padded pane and so drops the register's gutter. Here the
+              gutter is what puts this label in the same column as the HOLDER
+              heading and the rows beneath it, and its top padding is what keeps
+              it off the tab bar. */}
           {administers && (
-            <div className="filters filters--flush">
+            <div className="filters">
               <label className="filters__field filters__field--row">
                 <span className="label">Holders</span>
                 <select
