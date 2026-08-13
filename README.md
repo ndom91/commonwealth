@@ -3,14 +3,6 @@
 A self-hosted, source-cited knowledge base for MCP clients such as Claude Code,
 OpenCode, and Cursor.
 
-## Default stack
-
-- Node.js and the MCP TypeScript SDK
-- PostgreSQL with pgvector
-- Ollama with `qwen3-embedding:0.6b` for local embeddings
-- MarkItDown for document-to-Markdown conversion
-- Optional Caddy reverse proxy for HTTPS
-
 ## Quick start
 
 ```sh
@@ -54,4 +46,4 @@ Vite development server; both use port 3001.
 
 ## License
 
-GPL-3.0-only. See `LICENSE.md`.
+GPL-3.0
