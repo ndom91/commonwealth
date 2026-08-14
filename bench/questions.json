@@ -31,8 +31,8 @@
       "relevant": [{ "doc": "AGENTS.md", "anchor": "issues string ids" }]
     },
     {
-      "question": "why are the member and workspace ids passed into indexing as arguments?",
-      "relevant": [{ "doc": "AGENTS.md", "anchor": "the response has been sent" }]
+      "question": "what makes a Git commit searchable?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "only when every chunk from the same Git commit exists" }]
     },
     {
       "question": "which database does the integration suite insist on?",
@@ -53,12 +53,12 @@
       "relevant": [{ "doc": "AGENTS.md", "anchor": "node --import tsx" }]
     },
     {
-      "question": "why is the knowledge repository not in the shared package?",
-      "relevant": [{ "doc": "AGENTS.md", "anchor": "Each package keeps its own SQL" }]
+      "question": "why does the shared indexer take a workspace id and slug?",
+      "relevant": [{ "doc": "AGENTS.md", "anchor": "without inheriting either service's request or permission model" }]
     },
     {
       "question": "what counts as this product succeeding?",
-      "relevant": [{ "doc": "PRODUCT.md", "anchor": "which source it came from" }]
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "which concept and Git commit it came from" }]
     },
     {
       "question": "can one workspace use a different embedding model from another?",
@@ -76,18 +76,16 @@
       ]
     },
     {
-      "question": "what happens to a source when someone removes it?",
-      "relevant": [{ "doc": "PRODUCT.md", "anchor": "deletes are soft" }]
+      "question": "what happens when a concept is deprecated?",
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "prior commits remain in the workspace bundle" }]
     },
     {
       "question": "how do we stop an agent treating stored content as instructions?",
       "relevant": [{ "doc": "PRODUCT.md", "anchor": "quoted references, not instructions" }]
     },
     {
-      "question": "what does the status active guarantee?",
-      "relevant": [
-        { "doc": "PRODUCT.md", "anchor": "every chunk of the current revision is in the" }
-      ]
+      "question": "what does the indexed commit guarantee?",
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "only snapshot MCP and admin reads may use" }]
     },
     {
       "question": "how do I start the whole thing for the first time?",

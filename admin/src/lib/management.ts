@@ -96,7 +96,7 @@ export const listIdentities = createServerFn({ method: 'GET' })
         users.disabled_at, users.auto_approve, users.owner_admin_id,
         -- Null for an unowned holder, which is a real state rather than a gap:
         -- the bootstrap identity and any shared runner are nobody's. The
-        -- coalesce is the shape knowledge.ts already uses for authors, because
+        -- Coalesce the account name and address because
         -- a better-auth account may carry an empty name and the address is a
         -- better answer than a blank.
         COALESCE(NULLIF(owner_account.name, ''), owner_account.email) AS owner,

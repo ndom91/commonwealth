@@ -15,12 +15,12 @@ import { can, isRole, type Permission, type Role, type WorkspaceRef } from './ro
  * and hydration never runs — every page still renders from SSR and nothing
  * responds to a click. It has happened once already.
  *
- * A plain *data* export is fine, because it reaches nothing: `knowledge.ts`
+ * A plain *data* export is fine, because it reaches nothing: `concepts.ts`
  * exports `PAGE_SIZE` and its client module is still free of `db.js`. The line
  * is what the export touches, not whether it is a server function.
  *
  * So this file, whose every export reaches the database, is imported only by
- * `knowledge.ts`, `management.ts` and `session.ts` — modules whose own exports
+ * `concepts.ts`, `management.ts` and `session.ts` — modules whose own exports
  * are all server functions or plain data, and which are therefore stripped. */
 
 export type Membership = { userId: string; workspaceId: string; slug: string; role: Role };
@@ -126,7 +126,7 @@ export function validateWorkspace(value: unknown): string {
 }
 
 /* The payload shape of a scoped server function, and the validator for one that
-   takes nothing else. Both live here rather than in `knowledge.ts` and
+   takes nothing else. Both live here rather than in `concepts.ts` and
    `management.ts` because they belong to the gate, not to either subject — and
    because two identical copies is how the two drift. */
 export type Scoped<T> = T & { workspace: string };

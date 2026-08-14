@@ -69,9 +69,11 @@ it**: the server runs under `tsx`, the admin under Vite, tests under
 `ERR_MODULE_NOT_FOUND` on `packages/pipeline/src/chunking.js` — the barrel's
 `.js` specifier that only exists as `.ts`. Use `node --import tsx`.
 
-Deliberately *not* shared: `knowledge-repository.ts`. It writes jsonb (see
-below) and is bound to the MCP `Actor` permission model, so sharing it would be
-wrong on the admin side in two separate ways. Each package keeps its own SQL.
+`@commonwealth/corpus` is shared for Git bundle access and `indexWorkspace()`.
+The indexer takes the workspace id and slug explicitly so it can be called from
+either service without inheriting either service's request or permission model.
+The MCP and admin repository wrappers keep their own authorisation and event
+writes; only the commit-to-index pipeline is shared.
 
 `@commonwealth/rate-limit` is the same arrangement and the same caveat.
 
@@ -142,8 +144,8 @@ encoded JSON. That inverts how raw tagged templates must write jsonb:
 
 Using the other package's form does not error in either direction — it stores a
 jsonb **string** instead of an object, which only shows up later as a field that
-reads back `undefined`. There are rows in `events` from before this was
-understood; `eventMetadata()` in `admin/src/lib/knowledge.ts` unwraps them.
+reads back `undefined`. Event metadata is otherwise ordinary JSON and is read
+directly by the activity surface.
 
 Full explanation in `admin/src/lib/db.ts`. Do not align the two without
 unpicking the mutation first.
@@ -154,32 +156,25 @@ Inside a `client.begin()` block, a fragment or `now()` built from the pooled
 `client` is not the transaction's handle. The statement runs, writes nothing
 where the fragment was, and reports success. Build fragments from the
 `transaction` handle, or branch into separate statements. Read-only queries on
-the pool are fine — see the shared `IS_STALE` / `NEEDS_REVIEW` fragments in
-`admin/src/lib/knowledge.ts`.
+the pool are fine.
 
-## Indexing runs after the request that created the source
+## Indexing publishes complete Git commits
 
-`writeNewSource` in `admin/src/lib/knowledge.ts` writes the source as
-`indexing` and returns; `indexSource` embeds afterwards, without being awaited.
-Three things follow from that:
+Git bundles are authoritative. `indexWorkspace()` reads one workspace `HEAD`,
+embeds every indexable non-deprecated concept from that commit, then publishes
+it by setting `workspace_index_state.indexed_commit_sha` inside the transaction
+that inserted its `concepts` and `concept_chunks` rows. Every MCP and admin read
+joins against that published commit. Three things follow from that:
 
-- **Nothing in `indexSource` may touch the request.** `requireMember()` reads
-  `getRequest()`, and by the time it runs the response has been sent. The member
-  and workspace ids are passed in as arguments for this reason. The
-  module-scoped `client` is unaffected and safe to use.
-- **`active` is an invariant, not a default.** Every MCP read filters on
-  `status = 'active'`, so it must mean "every chunk of the current revision is
-  in the table". Anything that sets a source active — `indexSource`,
-  `restoreSource` — has to establish that first, which is why `restoreSource`
-  counts chunks against `chunkMarkdown` and restores to `failed` when they
-  disagree.
-- **A dead process leaves rows stuck.** There is no queue; the sweep at the top
-  of `admin/scripts/migrate.ts` marks any surviving `indexing` row `failed` on
-  the next migration, and Retry recovers it. This assumes one admin process.
-
-`reviseSource` deliberately still embeds inline. A revision cannot use the same
-mechanism, because the *current* revision stays live and good while a new one
-indexes — the state would have to live on the revision, not the source.
+- **The published commit is the retrieval invariant.** A concept is searchable
+  only when every chunk from the same Git commit exists. An indexing failure
+  leaves the previous published commit searchable and records `failed` state.
+- **A newer commit wins without a partial handoff.** `indexing_commit_sha` is
+  claimed before embedding and checked under a row lock before publication. A
+  run superseded by a newer commit returns without replacing that newer state.
+- **Writes wait for publication.** Admin and MCP concept mutations commit Git,
+  index the resulting snapshot, and only then return success. There is no source
+  ingestion queue or retry state in Postgres.
 
 ## The workspace comes from the URL, and the server re-derives it
 
@@ -196,12 +191,12 @@ const { userId, workspaceId, role } = await requireMember('write', data.workspac
 authorisation and scoping can never disagree. Three rules follow:
 
 - **Every server function that reads or writes workspace data takes a
-  `workspace`.** `Scoped<T>` in `knowledge.ts` and `management.ts` is the type;
+  `workspace`.** `Scoped<T>` in `concepts.ts` and `management.ts` is the type;
   `validateWorkspace` is the validator. The exceptions are `getSession`,
   `getWorkspaces`, and the two pre-account invitation functions, which have no
   caller-supplied workspace at all.
-- **The predicate goes in the same `WHERE` as the id.** A query keyed by a source
-  or identity id also filters `workspace_id`, so a foreign id answers "not found"
+- **The predicate goes in the same `WHERE` as the id.** A query keyed by an
+  identity id also filters `workspace_id`, so a foreign id answers "not found"
   instead of being fetched and then refused. This includes the `UPDATE`s that run
   after a scoped `SELECT` inside the same transaction — the guard is cheap and it
   survives someone moving the statements around later.
@@ -212,7 +207,7 @@ authorisation and scoping can never disagree. Three rules follow:
 
 A missing `workspace` is a *runtime* failure, not a compile error — the
 validators take `unknown`. When adding a call site, check it passes one; the
-sources loader shipped without it and typechecked cleanly.
+concept register loader shipped without it and typechecked cleanly.
 
 `src/` needs none of this. It has always scoped to `actor.workspaceId`, so agents
 were isolated before workspaces were visible in the browser. If a change here

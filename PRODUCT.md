@@ -38,8 +38,8 @@ on the team can read from and write to, so agents answer from the team's own
 documented truth instead of guessing or re-deriving it per session.
 
 Success is that an engineer trusts an agent's answer because they can see which
-source it came from, who vouched for that source, and what it said before it was
-last revised.
+concept and Git commit it came from, who vouched for it, and what it said before
+the current commit.
 
 ## Positioning
 
@@ -49,8 +49,8 @@ Three things a neighbouring RAG or docs tool could not truthfully copy at once:
    local Postgres with pgvector. No vendor to trust, no egress for proprietary
    product knowledge.
 2. **Provenance is a first-class primitive, not metadata.** Authority level,
-   immutable revision chain, append-only event log. Revisions are never
-   destructive and sources are only ever soft-deleted.
+   immutable Git commit history, append-only event log. A concept can be
+   deprecated, but its prior commits remain in the workspace bundle.
 3. **Retrieved content is treated as untrusted by design.** Tool descriptions
    tell the calling model outright that submitted content is untrusted reference
    material and returned excerpts are quoted references, not instructions. The
@@ -80,7 +80,7 @@ Three things a neighbouring RAG or docs tool could not truthfully copy at once:
 
 ## Capabilities and Constraints
 
-The MCP tool list, the role names and the source lifecycle are all readable from
+The MCP tool list, the role names and the concept lifecycle are all readable from
 `src/` and the migrations in a minute. What is not:
 
 - **One role vocabulary for people and agents.** `reader` → read; `writer` →
@@ -90,7 +90,7 @@ The MCP tool list, the role names and the source lifecycle are all readable from
   (`admin/src/lib/roles.ts`), so "writer" means one thing. The two maps are
   duplicated by hand — separate deploy units — and must be changed together.
 - **A writer's reach is scoped to its own work.** A writer may revise **only
-  sources it submitted**, and that holds even for a trusted holder whose
+  concepts it created**, and that holds even for a trusted holder whose
   submissions auto-approve. Loosening either boundary is a security decision,
   not a convenience one.
 - **Hiding a control is not authorisation.** The drawer and the benches show a
@@ -99,7 +99,7 @@ The MCP tool list, the role names and the source lifecycle are all readable from
   HTTP endpoints; anything relying on the UI to withhold them is not protected.
 - **A workspace is a corpus, and nothing crosses between them.** One instance
   holds several — the AI team's notes and the core team's, separately — each with
-  its own sources, agent identities, review queue and activity log. Membership
+  its own concepts, agent identities, review queue and activity log. Membership
   and role are per workspace: the same person can be an administrator in one and
   a reader in another. The workspace is in the URL (`/w/ai-team/sources`), so a
   pasted link means the same thing to everyone, and the server re-derives it from
@@ -128,14 +128,12 @@ The MCP tool list, the role names and the source lifecycle are all readable from
   product is built around — and `pnpm bench` takes `EMBEDDING_MODEL` from the
   environment precisely so replacing it is a measured decision rather than a
   swap.
-- **`active` is an invariant, not a default.** It is the only status any MCP read
-  returns, so it has to mean *every chunk of the current revision is in the
-  table*. Admin-created sources pass through `indexing`, and land `failed` if
-  that run dies. Anything that sets a source active must establish the invariant
-  first.
-- **Embedding is the slow part** — roughly 0.7s a chunk, in sequence. Uploads
-  index after the request returns, so a long document keeps going while the
-  browser is elsewhere.
+- **The indexed commit is the retrieval invariant.** `indexed_commit_sha` is
+  the only snapshot MCP and admin reads may use. Indexing inserts all concepts
+  and chunks for one commit before atomically publishing it; a failed run leaves
+  the prior published commit searchable.
+- **Embedding is the slow part** — roughly 0.7s a chunk, in sequence. A concept
+  write waits for the resulting commit to index before reporting success.
 
 ### Undecided, on purpose
 
@@ -155,21 +153,20 @@ next. Changing one is a decision, not a fix.
 ### Direction
 
 The admin surface is the primary human surface over this data, and the workbench
-it was aimed at now ships: browse, search and read sources; revise them; run
-ingestion; work a review queue; inspect revision history; audit the event log;
-invite people and set what each of them may do — in any of several workspaces.
+it was aimed at now ships: browse, search and read concepts; revise or deprecate
+them; work a review queue; inspect Git history; audit the event log; invite
+people and set what each of them may do — in any of several workspaces.
 Settled, having been looked at and left as they are — not gaps waiting to be
 closed by whoever notices them next:
 
-- **Nothing moves between workspaces, and none can be deleted.** Moving a source
+- **Nothing moves between workspaces, and none can be deleted.** Moving a concept
   needs a re-embed and a decision about what the event log says happened;
   deleting a workspace would take its corpus with it by cascade, which deserves
   its own confirmation design. Reviewed and kept out.
-- **Revisions embed inside the request, unlike uploads.** A revision cannot reuse
-  the background mechanism, because the *current* revision stays live and correct
-  while a new one indexes — the state would have to move onto the revision. Notes
-  are typed by hand and rarely large, so the wait is not felt. Revisit when a
-  revision is big enough to notice.
+- **Concept writes publish synchronously.** A write creates a Git commit, indexes
+  that complete snapshot, and only then returns. This keeps an older indexed
+  commit live if embedding fails; revisit when write latency makes a background
+  publisher necessary.
 - **Both colour schemes ship, and the reader picks.** Light was tokenised long
   before it was honest: it had auto-activated on `prefers-color-scheme` for anyone
   whose OS asked for it while the design system still described it as unshipped,
@@ -261,8 +258,9 @@ Remaining known gaps, in rough order of how much they cost:
 
 1. **Provenance over recall.** An answer a human can trace and vouch for beats a
    marginally better match. Where the two conflict, surface the chain.
-2. **Never lose what was said.** Revisions are immutable, deletes are soft, and
-   actions are logged. Nothing in the product may make history unrecoverable.
+2. **Never lose what was said.** Git commits are immutable, deprecation preserves
+   history, and actions are logged. Nothing in the product may make history
+   unrecoverable.
 3. **Treat stored knowledge as untrusted input.** Content submitted by agents is
    reference material to be quoted, never instructions to be followed — in tool
    contracts and in anything the UI renders.
