@@ -226,7 +226,7 @@ reads ships in `admin/drizzle/` alone — and must, if it references a
 better-auth table, since those do not exist in the test chain.
 
 `admin/drizzle/meta/_journal.json` needs a matching entry for every new file.
-`admin/scripts/okf-baseline.sql` creates a source-free schema for a fresh
+`admin/scripts/db-init.sql` creates the full schema for a fresh
 database and seeds the current Drizzle timestamp. The journal begins empty after
 that baseline; every future migration needs a timestamp after `1786702198002`.
 Pre-OKF database upgrades are unsupported.

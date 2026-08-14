@@ -28,7 +28,7 @@ if (!ledger?.exists) {
   if (legacy?.exists) {
     throw new Error('Pre-OKF databases are not supported; start from a clean database.');
   }
-  const baseline = await readFile(new URL('./okf-baseline.sql', import.meta.url), 'utf8');
+  const baseline = await readFile(new URL('./db-init.sql', import.meta.url), 'utf8');
   const okfBaselineHash = createHash('sha256').update(baseline).digest('hex');
   await client.unsafe(baseline);
   await client`CREATE SCHEMA IF NOT EXISTS "drizzle"`;
