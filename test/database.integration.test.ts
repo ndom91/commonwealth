@@ -22,6 +22,7 @@ if (!databaseUrl) {
       OLLAMA_URL: 'http://unused',
       EMBEDDING_MODEL: 'test-embedding-model',
       PORT: 3000,
+      CORPUS_PATH: '/tmp/commonwealth-corpus-test',
       MARKITDOWN_URL: 'http://unused',
       SOURCE_STORAGE_PATH: '/tmp/commonwealth-test',
       MAX_UPLOAD_BYTES: 1024,

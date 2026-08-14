@@ -38,6 +38,7 @@ const environment = v.object({
      was written for, and compose pins both together. */
   EMBEDDING_QUERY_INSTRUCTION: v.optional(v.string()),
   PORT: positiveInt(3000),
+  CORPUS_PATH: v.optional(v.string(), '/app/corpora'),
   MARKITDOWN_URL: v.optional(v.pipe(v.string(), v.url()), 'http://markitdown:8000'),
   SOURCE_STORAGE_PATH: v.optional(v.string(), '/app/storage'),
   MAX_UPLOAD_BYTES: positiveInt(10 * 1024 * 1024),

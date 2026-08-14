@@ -5,6 +5,7 @@ services:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      CORPUS_PATH: ${COMPOSE_CORPUS_PATH:-/app/corpora}
       # Paired with EMBEDDING_MODEL above, and only correct for it.
       # qwen3-embedding is asymmetric: queries want `Instruct: …\nQuery: …`,
       # documents want raw text. Only this service embeds queries — the admin
@@ -27,6 +28,7 @@ services:
         condition: service_healthy
     volumes:
       - source_data:/app/storage
+      - corpus_data:/app/corpora
     ports:
       - "127.0.0.1:${HOST_PORT:-3000}:3000"
 
@@ -45,6 +47,7 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       MARKITDOWN_URL: ${COMPOSE_MARKITDOWN_URL:-http://markitdown:8000}
       SOURCE_STORAGE_PATH: ${COMPOSE_SOURCE_STORAGE_PATH:-/app/storage}
+      CORPUS_PATH: ${COMPOSE_CORPUS_PATH:-/app/corpora}
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10000000}
       PORT: 3001
       # False, unlike `app`: this one is bound to loopback with nothing in front
@@ -65,6 +68,7 @@ services:
     # hash, so both services must look in one place or each sees only its own.
     volumes:
       - source_data:/app/storage
+      - corpus_data:/app/corpora
     ports:
       - "127.0.0.1:${ADMIN_PORT:-3001}:3001"
 
@@ -166,3 +170,4 @@ volumes:
   caddy_data:
   caddy_config:
   source_data:
+  corpus_data:

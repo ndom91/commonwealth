@@ -7,7 +7,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "start": "node .output/server/index.mjs",
-    "migrate": "tsx scripts/migrate.ts",
+    "migrate": "node --env-file-if-exists=../.env ./node_modules/tsx/dist/cli.mjs scripts/migrate.ts",
     "db:studio": "node --env-file=../.env ./node_modules/drizzle-kit/bin.cjs studio",
     "reindex": "tsx scripts/reindex.ts"
   },

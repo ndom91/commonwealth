@@ -22,6 +22,7 @@ RUN corepack enable && pnpm --filter @commonwealth/admin build
 
 FROM node:24-alpine
 WORKDIR /app
+RUN apk add --no-cache git
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/admin ./admin
 # Vite bundles the pipeline into .output, so nothing at runtime imports it — but
