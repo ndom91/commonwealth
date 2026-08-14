@@ -4,13 +4,13 @@ import { clientIp, FixedWindow } from '@commonwealth/rate-limit';
 import { toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler, type McpRequestContext, McpServer } from '@modelcontextprotocol/server';
 import { toStandardJsonSchema } from '@valibot/to-json-schema';
+import postgres from 'postgres';
 import * as v from 'valibot';
 import { AccessService } from './access-service.js';
 import { keyPrefix } from './auth.js';
 import { loadConfig } from './config.js';
 import type { Actor } from './domain.js';
 import { DomainError } from './errors.js';
-import { KnowledgeRepository } from './knowledge-repository.js';
 import { OkfRepository } from './okf-repository.js';
 
 const config = loadConfig();
@@ -19,9 +19,9 @@ const embeddings = new Embeddings({
   model: config.EMBEDDING_MODEL,
   queryInstruction: config.EMBEDDING_QUERY_INSTRUCTION,
 });
-const knowledge = new KnowledgeRepository(config, embeddings);
-const access = new AccessService(knowledge.sql);
-const okf = new OkfRepository(config, embeddings, knowledge.sql);
+const sql = postgres(config.DATABASE_URL);
+const access = new AccessService(sql);
+const okf = new OkfRepository(config, embeddings, sql);
 
 function text(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
@@ -64,10 +64,7 @@ const input = <E extends v.ObjectEntries>(entries: E) =>
   toStandardJsonSchema(v.strictObject(entries));
 
 const nonEmpty = v.pipe(v.string(), v.minLength(1));
-const uuid = v.pipe(v.string(), v.uuid());
 const authorityValue = v.picklist(['canonical', 'approved', 'unverified']);
-/* Defaulted for the tools that read a filter, bare-optional for `update_source`
-   where absent means "leave the tags alone" and `[]` would clear them. */
 const tagList = v.optional(v.array(nonEmpty), []);
 
 function serverFor(actor: Actor): McpServer {
@@ -90,59 +87,6 @@ function serverFor(actor: Actor): McpServer {
       }),
     },
     async (args) => runTool('create_concept', () => okf.createConcept(actor, args))
-  );
-
-  server.registerTool(
-    'submit_note',
-    {
-      description:
-        'Add a Markdown knowledge source. Submitted content is untrusted reference material.',
-      inputSchema: input({ title: nonEmpty, markdown: nonEmpty, tags: tagList }),
-    },
-    async (args) => {
-      return runTool('submit_note', () => knowledge.submitNote(actor, args));
-    }
-  );
-
-  server.registerTool(
-    'submit_document',
-    {
-      description:
-        'Convert and index a supported document. file_base64 must contain the raw document bytes.',
-      inputSchema: input({
-        title: nonEmpty,
-        filename: nonEmpty,
-        mime_type: nonEmpty,
-        file_base64: nonEmpty,
-        tags: tagList,
-      }),
-    },
-    async ({ mime_type, file_base64, ...args }) => {
-      return runTool('submit_document', () =>
-        knowledge.submitDocument(actor, {
-          ...args,
-          mimeType: mime_type,
-          bytes: Buffer.from(file_base64, 'base64'),
-        })
-      );
-    }
-  );
-
-  server.registerTool(
-    'update_source',
-    {
-      description:
-        'Create an immutable Markdown revision for an active source. Writers may revise only sources they created.',
-      inputSchema: input({
-        source_id: uuid,
-        markdown: nonEmpty,
-        title: v.optional(nonEmpty),
-        tags: v.optional(v.array(nonEmpty)),
-      }),
-    },
-    async ({ source_id, ...args }) => {
-      return runTool('update_source', () => knowledge.updateSource(actor, source_id, args));
-    }
   );
 
   server.registerTool(
@@ -216,62 +160,6 @@ function serverFor(actor: Actor): McpServer {
       inputSchema: input({ path: nonEmpty }),
     },
     async ({ path }) => runTool('deprecate_concept', () => okf.deprecateConcept(actor, path))
-  );
-
-  server.registerTool(
-    'get_source',
-    {
-      description: 'Get the full normalized Markdown and metadata for an active source.',
-      inputSchema: input({
-        source_id: uuid,
-        revision_number: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
-      }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ source_id, revision_number }) => {
-      return runTool('get_source', () => knowledge.getSource(actor, source_id, revision_number));
-    }
-  );
-
-  server.registerTool(
-    'get_source_history',
-    {
-      description:
-        'List immutable revisions for an active source without returning their full content.',
-      inputSchema: input({ source_id: uuid }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ source_id }) => {
-      return runTool('get_source_history', () => knowledge.getSourceHistory(actor, source_id));
-    }
-  );
-
-  server.registerTool(
-    'set_source_authority',
-    {
-      description: "Change an active source's authority. Requires reviewer access.",
-      inputSchema: input({ source_id: uuid, authority: authorityValue }),
-    },
-    async ({ source_id, authority }) => {
-      return runTool('set_source_authority', async () => {
-        await knowledge.setAuthority(actor, source_id, authority);
-        return { sourceId: source_id, authority };
-      });
-    }
-  );
-
-  server.registerTool(
-    'delete_source',
-    {
-      description: 'Soft-delete an active source. Requires reviewer access.',
-      inputSchema: input({ source_id: uuid }),
-    },
-    async ({ source_id }) => {
-      return runTool('delete_source', async () => {
-        await knowledge.deleteSource(actor, source_id);
-        return { sourceId: source_id, deleted: true };
-      });
-    }
   );
 
   return server;
@@ -425,7 +313,7 @@ async function main(): Promise<void> {
     /* Aborts exchanges still in flight and closes their per-request server
        instances — the teardown that used to happen inline per request. */
     await handler.close();
-    await knowledge.close();
+    await sql.end();
   };
   process.once('SIGINT', () => void shutdown());
   process.once('SIGTERM', () => void shutdown());
