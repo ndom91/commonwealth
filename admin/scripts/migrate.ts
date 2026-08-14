@@ -69,19 +69,6 @@ if (legacyLedger?.exists) {
 
 await migrate(db, { migrationsFolder: new URL('../drizzle', import.meta.url).pathname });
 
-/* Indexing runs in the admin process, not in a queue, so a source left
-   `indexing` is one whose runner died with the process. Migrations run before
-   the app starts, which makes this the one moment where that is certain: any
-   such row cannot have a live runner. Marking it `failed` is what puts a Retry
-   button in front of a human instead of a bar that never moves.
-   Assumes a single admin process, which is what Compose runs. */
-const stalled = await client`
-  UPDATE sources SET status = 'failed' WHERE status = 'indexing' RETURNING id
-`;
-if (stalled.length > 0) {
-  console.log(`Marked ${stalled.length} interrupted source(s) as failed; they can be retried.`);
-}
-
 const embeddingModel = process.env.EMBEDDING_MODEL;
 if (!embeddingModel) throw new Error('EMBEDDING_MODEL is required');
 /* `slug` is better-auth's, not ours — the organization plugin requires it and

@@ -541,10 +541,9 @@ export const updatePersonRole = createServerFn({ method: 'POST' })
 
 /* Removing someone's access, and retiring the agents they held.
  *
- * The membership goes; the account and everything they wrote stay. Sources
- * carry `created_by_admin_id` with `ON DELETE SET NULL`, so deleting the
- * account would quietly unattribute their submissions — which is the opposite
- * of what a provenance product should do when someone leaves.
+ * The membership goes; the account and its attributable history stay. Deleting
+ * the account would quietly unattribute its concept commits — which is the
+ * opposite of what a provenance product should do when someone leaves.
  *
  * Their *credentials* are a different question, and the answer is that they
  * stop working. A key outliving the person it was minted for is an agent
@@ -553,13 +552,11 @@ export const updatePersonRole = createServerFn({ method: 'POST' })
  * that is not one person's.
  *
  * "Retired" here means voided and disabled, not deleted. The `users` row cannot
- * be deleted — `sources.created_by`, `source_revisions.created_by`,
- * `events.actor_id` and `api_keys.user_id` all reference it with no `ON DELETE`
- * clause, so a delete raises a foreign-key violation for any holder that ever
- * wrote anything, and `sources_author_present` blocks nulling it out. That is
- * the schema agreeing with Principle 2: nothing here may make history
- * unrecoverable. Voiding the secrets achieves what deletion was wanted for; the
- * row stays so the corpus keeps its provenance. */
+ * be deleted — `events.actor_admin_id` and `api_keys.user_id` reference it with
+ * no `ON DELETE` clause, so a delete raises a foreign-key violation for any
+ * holder with recorded activity. That is the schema agreeing with Principle 2:
+ * nothing here may make history unrecoverable. Voiding the secrets achieves what
+ * deletion was wanted for; the row stays so the corpus keeps its provenance. */
 export const removePerson = createServerFn({ method: 'POST' })
   .validator((value: unknown): Scoped<{ userId: string }> => {
     const userId = (value as { userId?: string })?.userId?.trim();
@@ -1029,8 +1026,8 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
  * nobody and unable to accept a source.
  *
  * The index configuration is copied from the workspace you are standing in
- * rather than read from the environment. `chunks.embedding` is `vector(1024)`
- * for the whole table and `EMBEDDING_MODEL` is one process-wide variable, so
+ * rather than read from the environment. `concept_chunks.embedding` is
+ * `vector(1024)` for the whole table and `EMBEDDING_MODEL` is one process-wide variable, so
  * every workspace on an instance necessarily shares a model; copying makes that
  * explicit and keeps `index_configuration`'s existing job — refusing a silent
  * model change — working per workspace.

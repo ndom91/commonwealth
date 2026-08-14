@@ -1,4 +1,4 @@
-/* Not an option. The dimension is fixed here because the `chunks.embedding`
+/* Not an option. The dimension is fixed here because the `concept_chunks.embedding`
    column is `vector(1024)` and because a caller free to pass its own number is
    a caller free to disagree with the other one. Changing it means changing the
    migration and reindexing every chunk — see `PLAN.md`. */

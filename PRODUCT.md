@@ -143,7 +143,7 @@ These are open product questions, not gaps to be closed by whoever notices them
 next. Changing one is a decision, not a fix.
 
 - **One embedding model for the whole instance, across all workspaces.**
-  `chunks.embedding` is `vector(1024)` for the entire table and `EMBEDDING_MODEL`
+   `concept_chunks.embedding` is `vector(1024)` for the entire table and `EMBEDDING_MODEL`
   is one process-wide variable read by both services, so a workspace cannot pick
   its own model without either giving up the fixed dimension (and the ANN index
   with it) or holding a chunk table per dimension. Separate corpora were the

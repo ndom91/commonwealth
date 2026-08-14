@@ -29,8 +29,8 @@ export function embeddings(): Embeddings {
   return cached;
 }
 
-/* Written to `chunks.embedding_model` on every row. Retrieval mixes chunks from
-   whichever model wrote them, so this must be the same value the MCP server
+/* Written to `concept_chunks.embedding_model` on every row. Retrieval mixes
+   chunks from whichever model wrote them, so this must be the same value the MCP server
    uses or the index quietly holds two incompatible vector spaces. */
 export function embeddingModel(): string {
   return required('EMBEDDING_MODEL');

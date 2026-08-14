@@ -45,8 +45,8 @@ export const verification = pgTable('verification', {
 });
 
 /* better-auth's `organization`, remapped onto the workspace table the knowledge
-   side already scopes everything to (`sources`, `users`, `events` and
-   `index_configuration` all carry `workspace_id`). Declared here so the drizzle
+   side already scopes everything to (`concepts`, `concept_chunks`, `users`,
+   `events` and `index_configuration` all carry `workspace_id`). Declared here so the drizzle
    adapter can reach it; the remapping itself is in `lib/auth.ts`.
 
    `slug`, `logo` and `metadata` are the plugin's, not ours. Only `slug` is

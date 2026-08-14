@@ -1,38 +1,26 @@
-/* A number for retrieval quality, so tuning it stops being an argument.
+/* Retrieval benchmark against a disposable Git-native workspace.
  *
- * `PLAN.md` describes a much heavier evaluation — throughput, RAM, image size,
- * cold start — as the gate for calling a model a *release default*. This is not
- * that. It answers one question, "is search finding the right passage", and it
- * is deliberately small enough to run after every change to the pipeline.
- *
- * It drives `KnowledgeRepository` directly rather than going over MCP: the
- * search SQL is the thing under test, and HTTP would only add auth and rate
- * limiting to the measurement.
- *
- * Everything happens in its own workspace, seeded from `bench/corpus/` — copies
- * of the repo's own docs, taken on purpose so that editing a doc cannot move
- * the numbers underneath a comparison. Live workspaces are never touched.
- *
- *   pnpm bench            reseed and score
- *   pnpm bench --no-seed  score what is already indexed
+ *   pnpm bench            commit the fixture corpus and score it
+ *   pnpm bench --no-seed  score the published fixture commit
  */
 
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { commitFiles } from '@commonwealth/corpus';
+import { indexWorkspace } from '@commonwealth/corpus/indexer';
+import { Embeddings, serializeOkfDocument } from '@commonwealth/pipeline';
+import postgres from 'postgres';
 import type { Actor } from '../src/domain.js';
-import { KnowledgeRepository } from '../src/knowledge-repository.js';
+import { OkfRepository } from '../src/okf-repository.js';
 
 type Relevant = { doc: string; anchor: string };
-type Style = 'sentence' | 'keyword';
-type Question = { question: string; style?: Style; relevant: Relevant[] };
-type SearchResult = { title?: string; excerpt?: string };
+type Question = { question: string; relevant: Relevant[] };
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CORPUS = join(here, 'corpus');
-const WORKSPACE = 'Benchmark';
-const SLUG = 'benchmark';
-const LIMIT = 10;
+const fixturePath = join(here, 'corpus');
+const slug = 'benchmark';
+const corpusPath = process.env.CORPUS_PATH?.trim() || '/tmp/commonwealth-bench-corpus';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -46,6 +34,7 @@ const config = {
   EMBEDDING_MODEL: required('EMBEDDING_MODEL'),
   EMBEDDING_QUERY_INSTRUCTION: process.env.EMBEDDING_QUERY_INSTRUCTION,
   PORT: 0,
+  CORPUS_PATH: corpusPath,
   MARKITDOWN_URL: 'http://unused',
   SOURCE_STORAGE_PATH: '/tmp/commonwealth-bench',
   MAX_UPLOAD_BYTES: 1,
@@ -56,212 +45,101 @@ const config = {
   RATE_LIMIT_ADDRESS_WINDOW: 60,
   RATE_LIMIT_ADDRESS_MAX: 600,
 };
+const sql = postgres(config.DATABASE_URL);
+const embeddings = new Embeddings({
+  ollamaUrl: config.OLLAMA_URL,
+  model: config.EMBEDDING_MODEL,
+  queryInstruction: config.EMBEDDING_QUERY_INSTRUCTION,
+});
 
-const { Embeddings } = await import('@commonwealth/pipeline');
-const knowledge = new KnowledgeRepository(
-  config,
-  new Embeddings({
-    ollamaUrl: config.OLLAMA_URL,
-    model: config.EMBEDDING_MODEL,
-    queryInstruction: config.EMBEDDING_QUERY_INSTRUCTION,
-  })
-);
-const sql = knowledge.sql;
-
-/* Idempotent: the workspace, its index configuration and its actor are created
-   once and reused, so repeated runs compare like with like. */
 const [workspace] = await sql<{ id: string }[]>`
-  INSERT INTO workspaces (name, slug) VALUES (${WORKSPACE}, ${SLUG})
-  ON CONFLICT (slug) DO UPDATE SET name = ${WORKSPACE}
-  RETURNING id
+  INSERT INTO workspaces (name, slug) VALUES ('Benchmark', ${slug})
+  ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name RETURNING id
 `;
-if (!workspace) throw new Error('Could not create the benchmark workspace');
-
+if (!workspace) throw new Error('Could not create benchmark workspace');
 await sql`
   INSERT INTO index_configuration (workspace_id, embedding_model, embedding_dimensions)
   VALUES (${workspace.id}, ${config.EMBEDDING_MODEL}, 1024)
   ON CONFLICT (workspace_id) DO NOTHING
 `;
-
-let [agent] = await sql<{ id: string }[]>`
+let [user] = await sql<{ id: string }[]>`
   SELECT id FROM users WHERE workspace_id = ${workspace.id} AND display_name = 'Benchmark'
 `;
-if (!agent) {
-  [agent] = await sql<{ id: string }[]>`
+if (!user) {
+  [user] = await sql<{ id: string }[]>`
     INSERT INTO users (workspace_id, display_name, role, auto_approve)
     VALUES (${workspace.id}, 'Benchmark', 'admin', true) RETURNING id
   `;
 }
-if (!agent) throw new Error('Could not create the benchmark actor');
-
+if (!user) throw new Error('Could not create benchmark identity');
 const actor: Actor = {
-  id: agent.id,
+  id: user.id,
   workspaceId: workspace.id,
+  workspaceSlug: slug,
   name: 'Benchmark',
   role: 'admin',
   autoApprove: true,
 };
 
 if (!process.argv.includes('--no-seed')) {
-  /* Hard delete rather than the product's soft delete: this workspace holds no
-     history worth keeping, and a soft-deleted source would keep its chunks and
-     its content hash, so the next reseed would collide on both.
-   *
-   * Events first. `events.source_id` has no cascade — deliberately, because the
-   * log is append-only and outlives what it describes — so dropping a source
-   * out from under its own history is refused. That is right everywhere except
-   * here, where the history is nothing but previous benchmark runs. */
-  await sql`DELETE FROM events WHERE workspace_id = ${workspace.id}`;
-  await sql`DELETE FROM sources WHERE workspace_id = ${workspace.id}`;
-
-  const files = (await readdir(CORPUS)).filter((name) => name.endsWith('.md')).sort();
-  const startedAt = Date.now();
-  let chunks = 0;
-  for (const file of files) {
-    const markdown = await readFile(join(CORPUS, file), 'utf8');
-    const result = await knowledge.submitNote(actor, { title: file, markdown, tags: [] });
-    chunks += result.chunkCount;
-    console.log(`  indexed ${file} — ${result.chunkCount} chunks`);
-  }
-  const seconds = (Date.now() - startedAt) / 1000;
-  console.log(
-    `\n${files.length} documents, ${chunks} chunks in ${seconds.toFixed(1)}s ` +
-      `(${(chunks / seconds).toFixed(1)} chunks/sec)\n`
-  );
+  const files = (await readdir(fixturePath)).filter((name) => name.endsWith('.md')).sort();
+  const committed = await commitFiles({
+    actor: `commonwealth/${actor.id}`,
+    corpusPath,
+    workspace: slug,
+    subject: 'Seed benchmark corpus',
+    files: await Promise.all(
+      files.map(async (name) => ({
+        path: `bench/${name}`,
+        text: serializeOkfDocument({
+          frontmatter: {
+            type: 'Reference',
+            title: name,
+            tags: ['benchmark'],
+            commonwealth: { authority: 'approved' },
+          },
+          body: await readFile(join(fixturePath, name), 'utf8'),
+        }),
+      }))
+    ),
+  });
+  const indexed = await indexWorkspace({
+    corpusPath,
+    embeddingModel: config.EMBEDDING_MODEL,
+    embeddings,
+    sql,
+    workspaceId: workspace.id,
+    workspaceSlug: slug,
+  });
+  if (!indexed.indexed || indexed.commit !== committed)
+    throw new Error('Benchmark commit was not published');
 }
 
 const { questions } = JSON.parse(await readFile(join(here, 'questions.json'), 'utf8')) as {
   questions: Question[];
 };
-
-/* A hit is the right document *and* the right passage within it. Matching on
-   the document alone would score a five-chunk file as correct for any of its
-   chunks, which is most of what this is trying to measure.
- *
- * Whitespace is flattened on both sides. An anchor is a phrase, and where the
- * source file happens to wrap a line is not part of it — four labels in the
- * first run "missed" only because the stored chunk had a newline where the
- * anchor had a space, which understated the score against a real improvement.
- * Now that chunks keep their newlines, this matters. */
-const flatten = (text: string): string => text.replace(/\s+/g, ' ');
-
-const hits = (result: SearchResult, relevant: Relevant[]): boolean =>
-  relevant.some(
-    (entry) =>
-      result.title === entry.doc && flatten(result.excerpt ?? '').includes(flatten(entry.anchor))
-  );
-
-/* A label pointing at text no chunk contains can never be found, and would be
-   reported as a retrieval failure forever. Cheaper to refuse than to spend an
-   afternoon tuning against a typo. */
-const reachable = await sql<{ title: string; content: string }[]>`
-  SELECT revision.title, chunks.content
-  FROM chunks
-  JOIN source_revisions AS revision ON revision.id = chunks.source_revision_id
-  JOIN sources ON sources.current_revision_id = revision.id
-  WHERE sources.workspace_id = ${workspace.id}
-`;
-const impossible = questions.flatMap((item) =>
-  item.relevant
-    .filter(
-      (entry) =>
-        !reachable.some(
-          (row) => row.title === entry.doc && flatten(row.content).includes(flatten(entry.anchor))
-        )
-    )
-    .map((entry) => `${entry.doc} :: "${entry.anchor}"  (${item.question})`)
-);
-if (impossible.length > 0) {
-  console.error(
-    `\n${impossible.length} gold label(s) match no chunk. Fix these before reading any number:`
-  );
-  for (const entry of impossible) console.error(`  · ${entry}`);
-  await knowledge.close();
-  process.exit(1);
-}
-
-const latencies: number[] = [];
-const misses: string[] = [];
-const ranks: Array<{ rank: number; question: string; style: Style }> = [];
-
-for (const item of questions) {
-  const startedAt = Date.now();
-  const results = (await knowledge.search(actor, {
-    query: item.question,
+const repository = new OkfRepository(config, embeddings, sql);
+const flatten = (text: string) => text.replace(/\s+/g, ' ');
+let found = 0;
+const started = Date.now();
+for (const question of questions) {
+  const results = await repository.search(actor, {
+    query: question.question,
     tags: [],
-    limit: LIMIT,
+    limit: 5,
     explain: false,
-  })) as SearchResult[];
-  latencies.push(Date.now() - startedAt);
-
-  const rank = results.findIndex((result) => hits(result, item.relevant)) + 1;
-  ranks.push({ rank, question: item.question, style: item.style ?? 'sentence' });
-  if (rank === 0) misses.push(item.question);
-}
-
-const percentile = (values: number[], fraction: number): number => {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))] ?? 0;
-};
-
-/* Scored per style as well as overall. Sentence and keyword queries are the two
-   sides of the precision/recall trade a lexical arm makes, so a change that
-   lifts one and sinks the other has to be visible as that rather than averaging
-   into "no effect". */
-const score = (subset: typeof ranks) => {
-  const found = subset.filter((entry) => entry.rank > 0);
-  return {
-    n: subset.length,
-    recallAt5: subset.filter((entry) => entry.rank > 0 && entry.rank <= 5).length,
-    mrr: found.reduce((sum, entry) => sum + 1 / entry.rank, 0) / (subset.length || 1),
-  };
-};
-
-const line = (label: string, subset: typeof ranks) => {
-  if (subset.length === 0) return;
-  const { n, recallAt5, mrr } = score(subset);
-  console.log(
-    `  ${label.padEnd(10)} Recall@5 ${((recallAt5 / n) * 100).toFixed(1).padStart(5)}%  (${recallAt5}/${n})` +
-      `    MRR ${mrr.toFixed(3)}`
+  });
+  const hit = results.some((result) =>
+    question.relevant.some(
+      (relevant) =>
+        result.title === relevant.doc &&
+        flatten(String(result.excerpt ?? '')).includes(flatten(relevant.anchor))
+    )
   );
-};
-
-console.log(`${ranks.length} questions against ${WORKSPACE}, top ${LIMIT}\n`);
-line('overall', ranks);
-line(
-  'sentence',
-  ranks.filter((entry) => entry.style === 'sentence')
-);
-line(
-  'keyword',
-  ranks.filter((entry) => entry.style === 'keyword')
-);
+  if (hit) found++;
+}
+const seconds = (Date.now() - started) / 1000;
 console.log(
-  `\n  latency     p50 ${percentile(latencies, 0.5)}ms   p95 ${percentile(latencies, 0.95)}ms`
+  `${questions.length} questions: Recall@5 ${((found / questions.length) * 100).toFixed(1)}% (${found}/${questions.length}) in ${seconds.toFixed(1)}s`
 );
-console.log(`  model       ${config.EMBEDDING_MODEL}`);
-console.log(`  query hint  ${config.EMBEDDING_QUERY_INSTRUCTION ? 'on' : 'off'}`);
-
-/* Named, not counted. A miss is a question to read and argue with — either the
-   retrieval is wrong or the gold label is, and only looking tells you which. */
-if (misses.length > 0) {
-  console.log(`\n  not found in the top ${LIMIT}:`);
-  for (const miss of misses) console.log(`    · ${miss}`);
-}
-
-/* Per-question ranks, for judging a change to *ranking* rather than to what is
-   indexed. At this corpus size one question is several points of Recall@5, so a
-   re-ranking that helps six and hurts five averages to nothing and reads as "no
-   effect". Diffing two of these tables shows what actually moved — it is what
-   established that the first RRF attempt was a true no-op rather than a wash. */
-if (process.argv.includes('--ranks')) {
-  console.log('\n  rank per question:');
-  for (const entry of ranks) {
-    console.log(
-      `    ${entry.rank === 0 ? '  —' : String(entry.rank).padStart(3)}  ` +
-        `${entry.style === 'keyword' ? '[kw] ' : '     '}${entry.question}`
-    );
-  }
-}
-
-await knowledge.close();
+await sql.end();

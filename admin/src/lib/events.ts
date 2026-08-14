@@ -2,9 +2,8 @@ import type { TransactionSql } from 'postgres';
 
 /* Filing a row on the custody line.
  *
- * Twenty call sites across `knowledge.ts` and `management.ts` used to write this
- * INSERT by hand, in two shapes that differed only by whether a `source_id` was
- * present. The statement is not complicated; the reason to have it once is that
+ * The concept and management call sites used to write this INSERT by hand. The
+ * statement is not complicated; the reason to have it once is that
  * three separate things about it are easy to get quietly wrong, and getting any
  * of them wrong produces a row that looks fine.
  *
@@ -33,13 +32,6 @@ import type { TransactionSql } from 'postgres';
  * forever. It lists what the *admin* writes; the MCP server also writes
  * `search`, and `activity.tsx` phrases both plus anything unmapped. */
 export type EventType =
-  | 'source_submitted'
-  | 'source_indexed'
-  | 'source_index_failed'
-  | 'source_revised'
-  | 'source_authority_changed'
-  | 'source_deleted'
-  | 'source_restored'
   | 'concept_created'
   | 'concept_revised'
   | 'concept_verified'
@@ -65,19 +57,16 @@ export type Event = {
      member. */
   actor: string | null;
   type: EventType;
-  /* Present for the seven source events, absent for the rest. */
-  sourceId?: string;
   metadata?: Record<string, unknown>;
 };
 
 export async function fileEvent(sql: TransactionSql, event: Event): Promise<void> {
   await sql`
-    INSERT INTO events (workspace_id, actor_admin_id, event_type, source_id, metadata)
+    INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
     VALUES (
       ${event.workspaceId},
       ${event.actor},
       ${event.type},
-      ${event.sourceId ?? null},
       ${JSON.stringify(event.metadata ?? {})}::jsonb
     )
   `;

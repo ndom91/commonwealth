@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import test from 'node:test';
 import { commitFiles } from '@commonwealth/corpus';
+import postgres from 'postgres';
 import { AccessService } from '../src/access-service.js';
 import { hashApiKey, keyPrefix } from '../src/auth.js';
 import type { Config } from '../src/config.js';
-import { KnowledgeRepository } from '../src/knowledge-repository.js';
 import { runMigrations } from '../src/migrations.js';
 import { indexWorkspace } from '../src/okf-indexer.js';
 import { OkfRepository } from '../src/okf-repository.js';
@@ -20,7 +20,7 @@ if (!databaseUrl) {
     throw new Error('TEST_DATABASE_URL must target the dedicated commonwealth_test database');
   });
 } else {
-  test('migrates, revises, filters, and retrieves knowledge', async () => {
+  test('migrates, indexes, and retrieves OKF concepts', async () => {
     const corpusPath = '/tmp/commonwealth-corpus-integration-test';
     const config: Config = {
       DATABASE_URL: databaseUrl,
@@ -49,83 +49,52 @@ if (!databaseUrl) {
         return (await this.embed([text]))[0];
       },
     };
-    const knowledge = new KnowledgeRepository(config, embeddings);
-    const access = new AccessService(knowledge.sql);
+    const sql = postgres(databaseUrl);
+    const access = new AccessService(sql);
     const bootstrapKey = 'test-bootstrap-key-that-is-long-enough';
 
     try {
       await rm(corpusPath, { recursive: true, force: true });
-      await knowledge.sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
-      await runMigrations(knowledge.sql);
-      const [workspace] = await knowledge.sql<{ id: string }[]>`
+      await sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
+      await runMigrations(sql);
+      const [retired] = await sql<
+        {
+          source_column: boolean;
+          sources: string | null;
+          revisions: string | null;
+          tags: string | null;
+          chunks: string | null;
+        }[]
+      >`
+        SELECT
+          EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'events' AND column_name = 'source_id') AS source_column,
+          to_regclass('sources') AS sources,
+          to_regclass('source_revisions') AS revisions,
+          to_regclass('source_tags') AS tags,
+          to_regclass('chunks') AS chunks
+      `;
+      assert.deepEqual(retired, {
+        source_column: false,
+        sources: null,
+        revisions: null,
+        tags: null,
+        chunks: null,
+      });
+      const [workspace] = await sql<{ id: string }[]>`
         INSERT INTO workspaces (name, slug) VALUES ('test', 'test') RETURNING id
       `;
       assert.ok(workspace);
-      const [user] = await knowledge.sql<{ id: string }[]>`
+      const [user] = await sql<{ id: string }[]>`
         INSERT INTO users (workspace_id, display_name, role) VALUES (${workspace.id}, 'Test Admin', 'admin') RETURNING id
       `;
       assert.ok(user);
-      await knowledge.sql`
+      await sql`
         INSERT INTO api_keys (user_id, key_prefix, secret_hash)
         VALUES (${user.id}, ${keyPrefix(bootstrapKey)}, ${hashApiKey(bootstrapKey)})
       `;
       const actor = await access.authenticate(bootstrapKey);
       assert.ok(actor);
-
-      const source = await knowledge.submitNote(actor, {
-        title: 'Billing API',
-        markdown: '# Billing\n\nInvoices return error code BILLING_REQUIRED.',
-        tags: ['billing'],
-      });
-      const revision = await knowledge.updateSource(actor, source.id, {
-        title: 'Billing API v2',
-        markdown: '# Billing\n\nInvoices return error code PAYMENT_REQUIRED.',
-      });
-      const history = (await knowledge.getSourceHistory(actor, source.id)) as Array<{
-        revision_number: number;
-        is_current: boolean;
-      }>;
-      const results = (await knowledge.search(actor, {
-        query: 'PAYMENT_REQUIRED',
-        tags: ['billing'],
-        limit: 5,
-        sourceType: 'note',
-        explain: true,
-      })) as Array<{ sourceId: string; revisionNumber: number; scores: { keywordScore: number } }>;
-
-      assert.equal(revision.revisionNumber, 2);
-      assert.equal(history.length, 2);
-      assert.equal(history[0]?.is_current, true);
-      assert.equal(results[0]?.sourceId, source.id);
-      assert.equal(results[0]?.revisionNumber, 2);
-      assert.ok(results[0]?.scores.keywordScore > 0);
-
-      /* The lexical query is built by casting the query's own lexemes to
-         tsquery. `to_tsvector` normalises first, so operators arrive as
-         ordinary words — but that is the sort of claim worth holding a test
-         against, since the failure mode is a query that throws for a caller
-         who typed an ampersand. */
-      for (const query of ['a & b | c ! (d)', "'; DROP TABLE chunks; --", '<script>x</script>']) {
-        await assert.doesNotReject(
-          () => knowledge.search(actor, { query, tags: [], limit: 5, explain: false }),
-          `search should treat ${query} as text`
-        );
-      }
-      const [surviving] = await knowledge.sql<{ chunks: string }[]>`
-        SELECT count(*) AS chunks FROM chunks
-      `;
-      assert.ok(Number(surviving?.chunks) > 0, 'chunks survived');
-
-      /* A question of nothing but stopwords normalises to an empty tsquery.
-         Postgres matches nothing and ranks 0 for that, so the search degrades
-         to semantic-only instead of failing. */
-      const stopwords = await knowledge.search(actor, {
-        query: 'the of and to',
-        tags: [],
-        limit: 5,
-        explain: false,
-      });
-      assert.ok(Array.isArray(stopwords));
 
       const commit = await commitFiles({
         actor: 'agent:test',
@@ -143,11 +112,11 @@ if (!databaseUrl) {
         corpusPath,
         embeddingModel: config.EMBEDDING_MODEL,
         embeddings,
-        sql: knowledge.sql,
+        sql,
         workspaceId: workspace.id,
         workspaceSlug: 'test',
       });
-      const [indexState] = await knowledge.sql<
+      const [indexState] = await sql<
         { indexed_commit_sha: string; chunks: string; concepts: string }[]
       >`
         SELECT workspace_index_state.indexed_commit_sha,
@@ -162,7 +131,7 @@ if (!databaseUrl) {
       assert.equal(Number(indexState?.concepts), 1);
       assert.equal(Number(indexState?.chunks), 1);
 
-      const okf = new OkfRepository(config, embeddings, knowledge.sql);
+      const okf = new OkfRepository(config, embeddings, sql);
       const created = await okf.createConcept(actor, {
         markdown: '# Runbook\n\nRestart the worker.\n',
         path: 'playbooks/restart.md',
@@ -170,7 +139,7 @@ if (!databaseUrl) {
         title: 'Restart worker',
         type: 'Playbook',
       });
-      const [createdConcept] = await knowledge.sql<{ concepts: string; path: string }[]>`
+      const [createdConcept] = await sql<{ concepts: string; path: string }[]>`
         SELECT (SELECT count(*) FROM concepts WHERE workspace_id = ${workspace.id}
                 AND commit_sha = ${created.commit}) AS concepts,
                (SELECT path FROM concepts WHERE workspace_id = ${workspace.id}
@@ -193,6 +162,23 @@ if (!databaseUrl) {
       assert.equal(found[0]?.path, created.path);
       assert.equal(retrieved.path, created.path);
       assert.match(String(retrieved.markdown), /Restart the worker/);
+
+      /* The lexical query is constructed from lexemes rather than caller-supplied
+         tsquery syntax, so punctuation remains data instead of SQL grammar. */
+      for (const query of [
+        'a & b | c ! (d)',
+        "'; DROP TABLE concept_chunks; --",
+        '<script>x</script>',
+      ]) {
+        await assert.doesNotReject(
+          () => okf.search(actor, { query, tags: [], limit: 5, explain: false }),
+          `search should treat ${query} as text`
+        );
+      }
+      const [surviving] = await sql<{ chunks: string }[]>`
+        SELECT count(*) AS chunks FROM concept_chunks
+      `;
+      assert.ok(Number(surviving?.chunks) > 0, 'concept chunks survived');
 
       const revised = await okf.reviseConcept(actor, {
         markdown: '# Runbook\n\nRestart the background worker.\n',
@@ -218,7 +204,7 @@ if (!databaseUrl) {
       await okf.deprecateConcept(actor, created.path);
       await assert.rejects(() => okf.getConcept(actor, created.path), /Concept not found/);
     } finally {
-      await knowledge.close();
+      await sql.end();
       await rm(corpusPath, { recursive: true, force: true });
     }
   });

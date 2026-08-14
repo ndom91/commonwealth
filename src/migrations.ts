@@ -83,19 +83,6 @@ async function inspectLegacySchema(
     index_configuration: ['workspace_id', 'embedding_model', 'embedding_dimensions'],
     users: ['id', 'workspace_id', 'display_name', 'role'],
     api_keys: ['id', 'user_id', 'key_prefix', 'secret_hash'],
-    sources: [
-      'id',
-      'workspace_id',
-      'title',
-      'source_type',
-      'status',
-      'authority',
-      'content_hash',
-      'markdown_content',
-      'created_by',
-    ],
-    source_tags: ['source_id', 'tag'],
-    chunks: ['id', 'source_id', 'ordinal', 'content', 'embedding', 'embedding_model'],
     events: ['id', 'workspace_id', 'event_type', 'metadata'],
   };
   const entries = Object.entries(requiredColumns);

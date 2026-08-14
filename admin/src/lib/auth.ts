@@ -7,8 +7,9 @@ import * as schema from '../db/schema.js';
 import { db } from './db.js';
 
 /* The organization plugin, pointed at the workspace table the knowledge side
- * already scopes everything to rather than a duplicate of it. `sources`,
- * `users`, `events` and `index_configuration` all carry `workspace_id`, and
+ * already scopes everything to rather than a duplicate of it. `concepts`,
+ * `concept_chunks`, `users`, `events` and `index_configuration` all carry
+ * `workspace_id`, and
  * `src/access-service.ts` already scopes every MCP request by it — agents have
  * been multi-tenant all along. This makes people multi-tenant on the same axis.
  *
