@@ -39,3 +39,9 @@ export {
   type DocumentIngestionOptions,
 } from './document-ingestion.js';
 export { EMBEDDING_DIMENSIONS, type EmbeddingOptions, Embeddings } from './embeddings.js';
+export {
+  type OkfDocument,
+  parseOkfDocument,
+  serializeOkfDocument,
+  validateOkfPath,
+} from './okf.js';

@@ -12,6 +12,7 @@
     "reindex": "tsx scripts/reindex.ts"
   },
   "dependencies": {
+    "@commonwealth/corpus": "workspace:*",
     "@commonwealth/pipeline": "workspace:*",
     "@commonwealth/rate-limit": "workspace:*",
     "@radix-ui/react-tooltip": "^1.2.16",

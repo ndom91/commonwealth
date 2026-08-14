@@ -19,5 +19,5 @@
   // tsconfig and devDependencies: it has no runtime deps, and checking it under
   // the strictest options in the repo means the looser admin build cannot be
   // the first place a problem in it surfaces.
-  "include": ["src", "test", "packages/pipeline/src"]
+  "include": ["src", "test", "packages/corpus/src", "packages/pipeline/src"]
 }

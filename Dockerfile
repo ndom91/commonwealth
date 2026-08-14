@@ -5,6 +5,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # `workspace:*`, so `--frozen-lockfile` cannot resolve without it, and copying
 # only the manifest keeps this layer cached when pipeline source changes.
 COPY packages/pipeline/package.json packages/pipeline/package.json
+COPY packages/corpus/package.json packages/corpus/package.json
 RUN corepack enable && pnpm install --frozen-lockfile
 
 FROM node:24-alpine

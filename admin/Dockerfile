@@ -5,6 +5,7 @@ COPY admin/package.json admin/package.json
 # Manifest only — admin depends on the pipeline with `workspace:*`, which
 # `--frozen-lockfile` must be able to resolve before any source is present.
 COPY packages/pipeline/package.json packages/pipeline/package.json
+COPY packages/corpus/package.json packages/corpus/package.json
 RUN corepack enable && pnpm install --frozen-lockfile
 
 FROM node:24-alpine AS build
