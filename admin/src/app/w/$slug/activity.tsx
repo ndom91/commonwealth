@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { AppShell, accessionOf } from '../../../components/chrome.js';
+import { AppShell } from '../../../components/chrome.js';
 import { day, Stamp, useMounted } from '../../../components/stamp.js';
+import { listEvents, listEventTypes } from '../../../lib/concepts.js';
 import { readFailure } from '../../../lib/failure.js';
-import { listEvents, listEventTypes } from '../../../lib/knowledge.js';
 import { documentTitle } from '../../../lib/title.js';
 
 type ActivityFilters = { type?: string };
@@ -39,8 +39,7 @@ type EventRow = {
   event_type: string;
   metadata: Record<string, unknown>;
   created_at: string;
-  source_id: string | null;
-  source_title: string | null;
+  concept_path: string | null;
   actor_agent: string | null;
   actor_admin: string | null;
 };
@@ -82,6 +81,10 @@ const PHRASING: Record<string, string> = {
   source_authority_changed: 'Changed authority',
   source_deleted: 'Withdrew a source',
   source_restored: 'Restored a source',
+  concept_created: 'Created a concept',
+  concept_revised: 'Revised a concept',
+  concept_verified: 'Verified a concept',
+  concept_deprecated: 'Deprecated a concept',
   api_key_created: 'Issued a credential',
   api_key_revoked: 'Voided a credential',
   identity_amended: 'Amended a holder',
@@ -285,19 +288,15 @@ function Activity() {
                     </span>
                     {/* Omitted rather than emptied: a blank grid cell would add a
                         dead line once the columns stack on narrow screens. */}
-                    {event.source_id && (
+                    {event.concept_path && (
                       <span className="log__subject">
-                        {event.source_title ? (
-                          <Link
-                            to="/w/$slug/sources/$sourceId"
-                            params={{ slug, sourceId: event.source_id }}
-                            search={{}}
-                          >
-                            {event.source_title}
-                          </Link>
-                        ) : (
-                          <span className="register">{accessionOf(event.source_id)}</span>
-                        )}
+                        <Link
+                          to="/w/$slug/sources/$path"
+                          params={{ slug, path: event.concept_path }}
+                          search={{}}
+                        >
+                          {event.concept_path}
+                        </Link>
                       </span>
                     )}
                     <span className="log__actor">

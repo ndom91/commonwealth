@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Stamp } from '../../../../components/stamp.js';
+import { getRegisterSummary } from '../../../../lib/concepts.js';
 import { readFailure } from '../../../../lib/failure.js';
-import { getRegisterSummary } from '../../../../lib/knowledge.js';
 
 /* What the bench holds while no source is selected.
  *

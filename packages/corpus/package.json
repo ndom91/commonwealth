@@ -11,6 +11,10 @@
     ".": {
       "types": "./src/corpus.ts",
       "default": "./src/corpus.ts"
+    },
+    "./indexer": {
+      "types": "./src/indexer.ts",
+      "default": "./src/indexer.ts"
     }
   }
 }

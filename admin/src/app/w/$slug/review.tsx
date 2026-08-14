@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { AppShell, accessionOf, SealChip } from '../../../components/chrome.js';
+import { AppShell, SealChip } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
+import { listReviewQueue } from '../../../lib/concepts.js';
 import { readFailure } from '../../../lib/failure.js';
-import { listReviewQueue } from '../../../lib/knowledge.js';
 import { requireRole } from '../../../lib/route-guards.js';
 import { documentTitle } from '../../../lib/title.js';
 
@@ -30,15 +30,12 @@ export const Route = createFileRoute('/w/$slug/review')({
 });
 
 type QueueRow = {
-  id: string;
-  source_type: 'note' | 'upload';
+  path: string;
+  type: string;
   authority: 'unverified' | 'approved' | 'canonical';
-  created_at: string;
   last_verified_at: string | null;
   title: string;
-  revision_number: number;
-  content_updated_at: string;
-  author: string | null;
+  generated_at: string | null;
   is_unverified: boolean;
   is_stale: boolean;
 };
@@ -103,18 +100,16 @@ function QueueGroup({ label, note, rows }: { label: string; note: string; rows: 
       <p className="queue__note">{note}</p>
       <ul className="index__list">
         {rows.map((row) => (
-          <li key={row.id}>
+          <li key={row.path}>
             <Link
-              to="/w/$slug/sources/$sourceId"
-              params={{ slug, sourceId: row.id }}
+              to="/w/$slug/sources/$path"
+              params={{ slug, path: row.path }}
               search={{}}
               className="entry"
             >
               <span className="entry__name">{row.title}</span>
               <span className="entry__accession">
-                {accessionOf(row.id)} · r{row.revision_number} ·{' '}
-                <Stamp at={row.content_updated_at} />
-                {row.author ? ` · ${row.author}` : ''}
+                {row.type} · {row.path} · <Stamp at={row.generated_at} />
                 {row.last_verified_at ? (
                   <>
                     {' · verified '}

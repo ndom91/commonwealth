@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, Outlet, redirect } from '@tanstack/react-router';
-import { getNavCounts } from '../../lib/knowledge.js';
+import { getNavCounts } from '../../lib/concepts.js';
 import { getSession, getWorkspaceViewer } from '../../lib/session.js';
 import { workspaceTitle } from '../../lib/title.js';
 

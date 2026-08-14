@@ -26,7 +26,7 @@ import { Route as WSlugSettingsIdentitiesRouteImport } from './app/w/$slug/setti
 import { Route as WSlugSettingsPeopleRouteImport } from './app/w/$slug/settings/people'
 import { Route as WSlugSettingsWorkspaceRouteImport } from './app/w/$slug/settings/workspace'
 import { Route as WSlugSourcesIndexRouteImport } from './app/w/$slug/sources/index'
-import { Route as WSlugSourcesSourceIdRouteImport } from './app/w/$slug/sources/$sourceId'
+import { Route as WSlugSourcesPathRouteImport } from './app/w/$slug/sources/$path'
 import { Route as WSlugSourcesNewRouteImport } from './app/w/$slug/sources/new'
 import { Route as WSlugSettingsIdentitiesIndexRouteImport } from './app/w/$slug/settings/identities/index'
 import { Route as WSlugSettingsIdentitiesIdentityIdRouteImport } from './app/w/$slug/settings/identities/$identityId'
@@ -116,9 +116,9 @@ const WSlugSourcesIndexRoute = WSlugSourcesIndexRouteImport.update({
   path: '/',
   getParentRoute: () => WSlugSourcesRoute,
 } as any)
-const WSlugSourcesSourceIdRoute = WSlugSourcesSourceIdRouteImport.update({
-  id: '/$sourceId',
-  path: '/$sourceId',
+const WSlugSourcesPathRoute = WSlugSourcesPathRouteImport.update({
+  id: '/$path',
+  path: '/$path',
   getParentRoute: () => WSlugSourcesRoute,
 } as any)
 const WSlugSourcesNewRoute = WSlugSourcesNewRouteImport.update({
@@ -155,7 +155,7 @@ export interface FileRoutesByFullPath {
   '/w/$slug/settings/identities': typeof WSlugSettingsIdentitiesRouteWithChildren
   '/w/$slug/settings/people': typeof WSlugSettingsPeopleRoute
   '/w/$slug/settings/workspace': typeof WSlugSettingsWorkspaceRoute
-  '/w/$slug/sources/$sourceId': typeof WSlugSourcesSourceIdRoute
+  '/w/$slug/sources/$path': typeof WSlugSourcesPathRoute
   '/w/$slug/sources/new': typeof WSlugSourcesNewRoute
   '/w/$slug/settings/': typeof WSlugSettingsIndexRoute
   '/w/$slug/sources/': typeof WSlugSourcesIndexRoute
@@ -175,7 +175,7 @@ export interface FileRoutesByTo {
   '/w/$slug/review': typeof WSlugReviewRoute
   '/w/$slug/settings/people': typeof WSlugSettingsPeopleRoute
   '/w/$slug/settings/workspace': typeof WSlugSettingsWorkspaceRoute
-  '/w/$slug/sources/$sourceId': typeof WSlugSourcesSourceIdRoute
+  '/w/$slug/sources/$path': typeof WSlugSourcesPathRoute
   '/w/$slug/sources/new': typeof WSlugSourcesNewRoute
   '/w/$slug/settings': typeof WSlugSettingsIndexRoute
   '/w/$slug/sources': typeof WSlugSourcesIndexRoute
@@ -199,7 +199,7 @@ export interface FileRoutesById {
   '/w/$slug/settings/identities': typeof WSlugSettingsIdentitiesRouteWithChildren
   '/w/$slug/settings/people': typeof WSlugSettingsPeopleRoute
   '/w/$slug/settings/workspace': typeof WSlugSettingsWorkspaceRoute
-  '/w/$slug/sources/$sourceId': typeof WSlugSourcesSourceIdRoute
+  '/w/$slug/sources/$path': typeof WSlugSourcesPathRoute
   '/w/$slug/sources/new': typeof WSlugSourcesNewRoute
   '/w/$slug/settings/': typeof WSlugSettingsIndexRoute
   '/w/$slug/sources/': typeof WSlugSourcesIndexRoute
@@ -224,7 +224,7 @@ export interface FileRouteTypes {
     | '/w/$slug/settings/identities'
     | '/w/$slug/settings/people'
     | '/w/$slug/settings/workspace'
-    | '/w/$slug/sources/$sourceId'
+    | '/w/$slug/sources/$path'
     | '/w/$slug/sources/new'
     | '/w/$slug/settings/'
     | '/w/$slug/sources/'
@@ -244,7 +244,7 @@ export interface FileRouteTypes {
     | '/w/$slug/review'
     | '/w/$slug/settings/people'
     | '/w/$slug/settings/workspace'
-    | '/w/$slug/sources/$sourceId'
+    | '/w/$slug/sources/$path'
     | '/w/$slug/sources/new'
     | '/w/$slug/settings'
     | '/w/$slug/sources'
@@ -267,7 +267,7 @@ export interface FileRouteTypes {
     | '/w/$slug/settings/identities'
     | '/w/$slug/settings/people'
     | '/w/$slug/settings/workspace'
-    | '/w/$slug/sources/$sourceId'
+    | '/w/$slug/sources/$path'
     | '/w/$slug/sources/new'
     | '/w/$slug/settings/'
     | '/w/$slug/sources/'
@@ -406,11 +406,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WSlugSourcesIndexRouteImport
       parentRoute: typeof WSlugSourcesRoute
     }
-    '/w/$slug/sources/$sourceId': {
-      id: '/w/$slug/sources/$sourceId'
-      path: '/$sourceId'
-      fullPath: '/w/$slug/sources/$sourceId'
-      preLoaderRoute: typeof WSlugSourcesSourceIdRouteImport
+    '/w/$slug/sources/$path': {
+      id: '/w/$slug/sources/$path'
+      path: '/$path'
+      fullPath: '/w/$slug/sources/$path'
+      preLoaderRoute: typeof WSlugSourcesPathRouteImport
       parentRoute: typeof WSlugSourcesRoute
     }
     '/w/$slug/sources/new': {
@@ -473,13 +473,13 @@ const WSlugSettingsRouteWithChildren = WSlugSettingsRoute._addFileChildren(
 )
 
 interface WSlugSourcesRouteChildren {
-  WSlugSourcesSourceIdRoute: typeof WSlugSourcesSourceIdRoute
+  WSlugSourcesPathRoute: typeof WSlugSourcesPathRoute
   WSlugSourcesNewRoute: typeof WSlugSourcesNewRoute
   WSlugSourcesIndexRoute: typeof WSlugSourcesIndexRoute
 }
 
 const WSlugSourcesRouteChildren: WSlugSourcesRouteChildren = {
-  WSlugSourcesSourceIdRoute: WSlugSourcesSourceIdRoute,
+  WSlugSourcesPathRoute: WSlugSourcesPathRoute,
   WSlugSourcesNewRoute: WSlugSourcesNewRoute,
   WSlugSourcesIndexRoute: WSlugSourcesIndexRoute,
 }

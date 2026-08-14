@@ -1,208 +1,80 @@
 import { createFileRoute, Link, Outlet, useNavigate } from '@tanstack/react-router';
 import { Search, X } from 'lucide-react';
-import {
-  AppShell,
-  accessionOf,
-  authoritySeal,
-  IconButton,
-  SealChip,
-} from '../../../components/chrome.js';
+import { AppShell, authoritySeal, IconButton, SealChip } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
+import { listConcepts, searchConcepts } from '../../../lib/concepts.js';
 import { readFailure } from '../../../lib/failure.js';
-import { listSources, listSubmitters, searchSources } from '../../../lib/knowledge.js';
 import { documentTitle } from '../../../lib/title.js';
 
-/* Filters live in the URL rather than component state: a filtered register is
-   a thing people send each other, and the review queue hands off into it. */
 export type SourceFilters = {
   authority?: 'unverified' | 'approved' | 'canonical';
-  type?: 'note' | 'upload';
-  status?: 'active' | 'indexing' | 'deleted' | 'failed';
-  /* The identity that submitted the source — `sources.created_by`, an agent
-     holder rather than an administrator. */
-  submitter?: string;
-  /* A keyword query narrows the same filtered register rather than replacing
-     it. "Everything this agent submitted, about deployments" is one question,
-     not two. */
+  type?: string;
   q?: string;
 };
 
-const oneOf = <T extends string>(value: unknown, allowed: readonly T[]): T | undefined =>
-  typeof value === 'string' && (allowed as readonly string[]).includes(value)
-    ? (value as T)
-    : undefined;
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/* `ts_headline` wraps matched terms in STX/ETX rather than markup. Splitting on
-   them and returning React children keeps the highlight real while every piece
-   of body text stays escaped — source content is never parsed as HTML. */
 function highlight(excerpt: string) {
   return excerpt.split('\u0002').flatMap((chunk, index) => {
     const [matched, rest] = chunk.split('\u0003');
-    if (index === 0) return [<span key={index}>{chunk}</span>];
-    return [<mark key={`m${index}`}>{matched}</mark>, <span key={index}>{rest ?? ''}</span>];
+    return index === 0
+      ? [<span key={index}>{chunk}</span>]
+      : [<mark key={`m${index}`}>{matched}</mark>, <span key={index}>{rest ?? ''}</span>];
   });
 }
 
 export const Route = createFileRoute('/w/$slug/sources')({
   validateSearch: (search: Record<string, unknown>): SourceFilters => ({
-    authority: oneOf(search.authority, ['unverified', 'approved', 'canonical'] as const),
-    type: oneOf(search.type, ['note', 'upload'] as const),
-    status: oneOf(search.status, ['active', 'indexing', 'deleted', 'failed'] as const),
-    submitter:
-      typeof search.submitter === 'string' && UUID.test(search.submitter)
-        ? search.submitter
-        : undefined,
+    authority: ['unverified', 'approved', 'canonical'].includes(String(search.authority))
+      ? (search.authority as SourceFilters['authority'])
+      : undefined,
+    type: typeof search.type === 'string' && search.type.trim() ? search.type.trim() : undefined,
     q: typeof search.q === 'string' && search.q.trim() ? search.q.trim().slice(0, 200) : undefined,
   }),
   loaderDeps: ({ search }) => search,
-  /* The register and the rail load here rather than in the component so that
-     the bench — a child route — can move both by calling `router.invalidate()`
-     after it changes a source's authority or withdraws it. */
   loader: async ({ deps, params }) => {
-    /* Counts are decorative and degrade to a dash. A failure here means the
-       database is unreachable, which the register's own message explains in
-       full; two alarms for one fault would be noise. */
-    const filters = {
-      authority: deps.authority,
-      sourceType: deps.type,
-      status: deps.status,
-      submitter: deps.submitter,
-    };
     try {
-      /* Submitters are read alongside the register so the filter offers only
-         identities that have actually submitted something. */
-      const [register, submitters] = await Promise.all([
-        deps.q
-          ? searchSources({ data: { workspace: params.slug, ...filters, query: deps.q } }).then(
-              (sources) => ({
-                sources,
-                hasMore: false,
-              })
-            )
-          : listSources({ data: { workspace: params.slug, ...filters } }),
-        listSubmitters({ data: { workspace: params.slug } }),
-      ]);
-      return { register, submitters, failure: undefined };
+      const sources = deps.q
+        ? await searchConcepts({
+            data: {
+              workspace: params.slug,
+              authority: deps.authority,
+              type: deps.type,
+              query: deps.q,
+            },
+          })
+        : await listConcepts({
+            data: { workspace: params.slug, authority: deps.authority, type: deps.type },
+          });
+      return { register: { sources, hasMore: false }, failure: undefined };
     } catch {
-      const submitters: Array<{ id: string; name: string; count: number }> = [];
-      return {
-        register: undefined,
-        submitters,
-        failure: readFailure('The register'),
-      };
+      return { register: undefined, failure: readFailure('The register') };
     }
   },
-  /* After `validateSearch`, not before it. These options are typed in
-     declaration order, and a `head` declared first leaves the search schema
-     unresolved for everything below it — `loaderDeps` then sees `{}`. */
   head: ({ match }) => ({
-    meta: [{ title: documentTitle('Sources', match.context.workspaceName) }],
+    meta: [{ title: documentTitle('Concepts', match.context.workspaceName) }],
   }),
   component: Sources,
 });
 
-export type SourceRow = {
-  id: string;
-  source_type: 'note' | 'upload';
-  status: 'active' | 'indexing' | 'deleted' | 'failed';
-  authority: 'unverified' | 'approved' | 'canonical';
-  created_at: string;
-  deleted_at: string | null;
-  last_verified_at: string | null;
-  title: string;
-  revision_number: number;
-  content_updated_at: string;
-  author: string | null;
+type ConceptRow = {
+  path: string;
+  commit_sha: string;
+  type: string;
+  title: string | null;
   tags: string[];
-  is_stale: boolean;
-  /* Present only on keyword hits: the best-matching fragment of the body with
-     the matched terms delimited. */
+  authority: 'unverified' | 'approved' | 'canonical';
+  generated_at: string | null;
   excerpt?: string;
 };
-
-/* What a register row shows in its seal column — and nothing at all when the row
- * is in the ordinary state.
- *
- * `approved` and `active` used to render a chip like every other state, which
- * meant a healthy workspace showed a column of identical `APPROVED` outlines: on
- * a register of thirteen sources, ten of them the same word. A mark that never
- * varies has stopped carrying information and become texture, and it was
- * out-shouting the one `CANONICAL` that a reader actually needs to find. Raising
- * the rule contrast made that louder, not quieter.
- *
- * So the column now marks only what departs from the ordinary: sealed, not yet
- * vouched for, withdrawn, stale, or failed to index. Approved-and-active is the
- * silent default, and its absence is legible because everything else is not.
- * A row's authority is still stated in full on its bench.
- *
- * Guard clauses rather than the nested ternary chain this replaces — the branches
- * are a priority order, and a reader should be able to see which one wins. */
-function RegisterMark({ source }: { source: SourceRow }) {
-  if (source.status === 'deleted') {
-    return (
-      <span className="entry__role">
-        <SealChip state="void">Withdrawn</SealChip>
-      </span>
-    );
-  }
-  /* Not a chip: being embedded is work in progress, not a seal state. The bench
-     draws the same distinction. */
-  if (source.status === 'indexing') {
-    return (
-      <span className="entry__role">
-        <span className="label">Indexing</span>
-      </span>
-    );
-  }
-  if (source.status === 'failed') {
-    return (
-      <span className="entry__role">
-        <SealChip state="suspended">Index failed</SealChip>
-      </span>
-    );
-  }
-  /* Stale and withdrawn override the authority chip: someone scanning the
-     register needs the reason a row cannot be trusted before its rank. */
-  if (source.is_stale) {
-    return (
-      <span className="entry__role">
-        <SealChip state="suspended">Stale</SealChip>
-      </span>
-    );
-  }
-  if (source.authority !== 'approved') {
-    return (
-      <span className="entry__role">
-        <SealChip state={authoritySeal(source.authority)}>{source.authority}</SealChip>
-      </span>
-    );
-  }
-
-  return null;
-}
 
 function Sources() {
   const { slug } = Route.useParams();
   const navigate = useNavigate({ from: '/w/$slug/sources' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
-  const { register, submitters, failure } = Route.useLoaderData();
-
-  const sources = (register?.sources ?? []) as unknown as SourceRow[];
-  const holders = submitters as Array<{ id: string; name: string; count: number }>;
-  const hasMore = register?.hasMore ?? false;
+  const { register, failure } = Route.useLoaderData();
+  const concepts = (register?.sources ?? []) as unknown as ConceptRow[];
   const searching = Boolean(filters.q);
-  /* An empty register means two different things, and saying the wrong one
-     misleads. With a filter or a query applied, sources are being excluded.
-     With neither, none has ever been submitted — a first-run state, which on a
-     self-hosted instance is what a new team sees before any agent has written
-     anything. */
-  const narrowed = Boolean(
-    filters.authority || filters.type || filters.status || filters.submitter
-  );
-
+  const narrowed = Boolean(filters.authority || filters.type);
   const setFilter = (key: keyof SourceFilters, value: string) =>
     void navigate({
       search: (previous: SourceFilters) => ({ ...previous, [key]: value || undefined }),
@@ -210,17 +82,17 @@ function Sources() {
 
   return (
     <AppShell
-      title="Sources"
+      title="Concepts"
       accession="Knowledge register"
       {...viewer}
       actions={
         <Link to="/w/$slug/sources/new" search={{}} className="btn btn--primary">
-          New source
+          New concept
         </Link>
       }
     >
       <div className="panes">
-        <section className="index" aria-label="Source register">
+        <section className="index" aria-label="Concept register">
           <form
             className="seek"
             onSubmit={(event) => {
@@ -241,7 +113,7 @@ function Sources() {
                 name="q"
                 type="search"
                 defaultValue={filters.q ?? ''}
-                placeholder="Words in the body"
+                placeholder="Words in the concept"
                 autoComplete="off"
               />
             </label>
@@ -258,7 +130,6 @@ function Sources() {
               />
             )}
           </form>
-
           <div className="filters">
             <label className="filters__field">
               <span className="label">Authority</span>
@@ -274,107 +145,61 @@ function Sources() {
             </label>
             <label className="filters__field">
               <span className="label">Type</span>
-              <select
+              <input
                 value={filters.type ?? ''}
                 onChange={(event) => setFilter('type', event.target.value)}
-              >
-                <option value="">All</option>
-                <option value="note">Note</option>
-                <option value="upload">Upload</option>
-              </select>
+                placeholder="Playbook"
+              />
             </label>
-            <label className="filters__field">
-              <span className="label">Status</span>
-              <select
-                value={filters.status ?? ''}
-                onChange={(event) => setFilter('status', event.target.value)}
-              >
-                <option value="">All</option>
-                <option value="active">Active</option>
-                <option value="indexing">Indexing</option>
-                <option value="deleted">Withdrawn</option>
-                <option value="failed">Failed</option>
-              </select>
-            </label>
-            {holders.length > 0 && (
-              <label className="filters__field filters__field--row">
-                <span className="label">Submitted by</span>
-                <select
-                  value={filters.submitter ?? ''}
-                  onChange={(event) => setFilter('submitter', event.target.value)}
-                >
-                  <option value="">Anyone</option>
-                  {holders.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.name} · {entry.count}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
           </div>
-
           {failure && (
             <p className="notice index__note" role="alert">
               {failure}
             </p>
           )}
-
-          {!failure && sources.length === 0 && (
+          {!failure && concepts.length === 0 && (
             <p className="empty index__note">
               {searching ? (
-                <>
-                  No title or source body matches. Try fewer words, or clear the search to browse
-                  the register.
-                </>
+                'No concept title or body matches. Try fewer words, or clear the search to browse the register.'
               ) : narrowed ? (
-                <>
-                  No sources match these filters. Widen one, or set them all back to All to browse
-                  the whole register.
-                </>
+                'No concepts match these filters. Widen one, or set them back to All.'
               ) : (
                 <>
-                  The register is empty. Agents write to it over MCP with{' '}
-                  <code className="register">submit_note</code> and{' '}
-                  <code className="register">submit_document</code>; anything they submit appears
-                  here for review.
+                  The register is empty. Create a concept here or use MCP{' '}
+                  <code className="register">create_concept</code>.
                 </>
               )}
             </p>
           )}
-
           <ul className="index__list">
-            {sources.map((source) => (
-              <li key={source.id}>
+            {concepts.map((concept) => (
+              <li key={concept.path}>
                 <Link
-                  to="/w/$slug/sources/$sourceId"
-                  params={{ slug, sourceId: source.id }}
+                  to="/w/$slug/sources/$path"
+                  params={{ slug, path: concept.path }}
                   search={filters}
                   className="entry"
                   activeProps={{ 'aria-current': 'page' }}
                 >
-                  <span className="entry__name">{source.title}</span>
+                  <span className="entry__name">{concept.title ?? concept.path}</span>
                   <span className="entry__accession">
-                    {accessionOf(source.id)} · r{source.revision_number} ·{' '}
-                    <Stamp at={source.content_updated_at} />
-                    {source.author ? ` · ${source.author}` : ''}
+                    {concept.type} · {concept.path} · <Stamp at={concept.generated_at} />
                   </span>
-                  {source.excerpt && (
-                    <span className="entry__excerpt">{highlight(source.excerpt)}</span>
+                  {concept.excerpt && (
+                    <span className="entry__excerpt">{highlight(concept.excerpt)}</span>
                   )}
-                  <RegisterMark source={source} />
+                  {concept.authority !== 'approved' && (
+                    <span className="entry__role">
+                      <SealChip state={authoritySeal(concept.authority)}>
+                        {concept.authority}
+                      </SealChip>
+                    </span>
+                  )}
                 </Link>
               </li>
             ))}
           </ul>
-
-          {hasMore && (
-            <p className="empty index__note">
-              Showing the {sources.length} most recent. Narrow with a filter to see older sources.
-            </p>
-          )}
         </section>
-
         <Outlet />
       </div>
     </AppShell>

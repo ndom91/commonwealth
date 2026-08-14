@@ -4,9 +4,9 @@ import { createServerFn } from '@tanstack/react-start';
 import { getRequest } from '@tanstack/react-start/server';
 import { provisioning } from './auth.js';
 import { requireMember, type Scoped, SLUG, validateScope, validateWorkspace } from './authorize.js';
+import { PAGE_SIZE } from './concepts.js';
 import { client } from './db.js';
 import { fileEvent } from './events.js';
-import { PAGE_SIZE } from './knowledge.js';
 import { can, canGrant, isRole, type Role } from './roles.js';
 
 /* Checked before the value reaches a `::uuid` cast, so a malformed id comes
