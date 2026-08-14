@@ -1,9 +1,54 @@
--- Applied only to a database with no Drizzle ledger. `0000_bored_the_fury.sql`
--- creates better-auth's tables first; this file creates the source-free OKF schema.
+-- Applied only to a database with no Drizzle ledger.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS vector;
 
-DROP TABLE "admin_role";
+CREATE TABLE "user" (
+  "id" text PRIMARY KEY NOT NULL,
+  "name" text NOT NULL,
+  "email" text NOT NULL UNIQUE,
+  "email_verified" boolean NOT NULL DEFAULT false,
+  "image" text,
+  "created_at" timestamp NOT NULL,
+  "updated_at" timestamp NOT NULL
+);
+
+CREATE TABLE "account" (
+  "id" text PRIMARY KEY NOT NULL,
+  "account_id" text NOT NULL,
+  "provider_id" text NOT NULL,
+  "user_id" text NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "password" text,
+  "created_at" timestamp NOT NULL,
+  "updated_at" timestamp NOT NULL
+);
+
+CREATE TABLE "session" (
+  "id" text PRIMARY KEY NOT NULL,
+  "expires_at" timestamp NOT NULL,
+  "token" text NOT NULL UNIQUE,
+  "created_at" timestamp NOT NULL,
+  "updated_at" timestamp NOT NULL,
+  "ip_address" text,
+  "user_agent" text,
+  "user_id" text NOT NULL REFERENCES "user"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE "verification" (
+  "id" text PRIMARY KEY NOT NULL,
+  "identifier" text NOT NULL,
+  "value" text NOT NULL,
+  "expires_at" timestamp NOT NULL,
+  "created_at" timestamp,
+  "updated_at" timestamp
+);
+
+CREATE TABLE "managed_api_key" (
+  "id" uuid PRIMARY KEY NOT NULL,
+  "knowledge_user_id" uuid NOT NULL,
+  "label" text NOT NULL,
+  "created_by_admin_id" text REFERENCES "user"("id"),
+  "expires_at" timestamp
+);
 
 CREATE TABLE "workspaces" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),

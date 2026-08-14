@@ -227,8 +227,9 @@ better-auth table, since those do not exist in the test chain.
 
 `admin/drizzle/meta/_journal.json` needs a matching entry for every new file.
 `admin/scripts/okf-baseline.sql` creates a source-free schema for a fresh
-database and seeds the current Drizzle timestamp. The historical Drizzle files
-remain for deployed OKF instances; pre-OKF database upgrades are unsupported.
+database and seeds the current Drizzle timestamp. The journal begins empty after
+that baseline; every future migration needs a timestamp after `1786702198002`.
+Pre-OKF database upgrades are unsupported.
 
 better-auth issues string ids, so `user.id` is `text`. A `uuid` foreign key
 referencing it cannot be created.

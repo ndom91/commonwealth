@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
@@ -14,9 +15,8 @@ import { client, db } from '../src/lib/db.js';
 process.env.BETTER_AUTH_ALLOW_SIGN_UP = 'true';
 const { auth } = await import('../src/lib/auth.js');
 
-/* Drizzle advances by the latest `created_at`; the hash records the historical
-   migration whose timestamp marks this source-free baseline as complete. */
-const okfBaselineHash = '0c5d03dcbee8b1c80e2b90f5138444b71279f66a1809f9f75db494c5e191e06d';
+/* Drizzle advances by the latest `created_at`. Keep the timestamp as the floor
+   for every future journal entry; the hash identifies this bootstrap payload. */
 const okfBaselineTimestamp = 1786702198002;
 const [ledger] = await client<{ exists: boolean }[]>`
   SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS exists
@@ -28,10 +28,9 @@ if (!ledger?.exists) {
   if (legacy?.exists) {
     throw new Error('Pre-OKF databases are not supported; start from a clean database.');
   }
-  await client.unsafe(
-    await readFile(new URL('../drizzle/0000_bored_the_fury.sql', import.meta.url), 'utf8')
-  );
-  await client.unsafe(await readFile(new URL('./okf-baseline.sql', import.meta.url), 'utf8'));
+  const baseline = await readFile(new URL('./okf-baseline.sql', import.meta.url), 'utf8');
+  const okfBaselineHash = createHash('sha256').update(baseline).digest('hex');
+  await client.unsafe(baseline);
   await client`CREATE SCHEMA IF NOT EXISTS "drizzle"`;
   await client`
     CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
