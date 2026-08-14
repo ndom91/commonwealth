@@ -8,6 +8,7 @@ import type { Config } from '../src/config.js';
 import { KnowledgeRepository } from '../src/knowledge-repository.js';
 import { runMigrations } from '../src/migrations.js';
 import { indexWorkspace } from '../src/okf-indexer.js';
+import { OkfRepository } from '../src/okf-repository.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseName = databaseUrl ? new URL(databaseUrl).pathname.slice(1) : undefined;
@@ -57,7 +58,7 @@ if (!databaseUrl) {
       await knowledge.sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
       await runMigrations(knowledge.sql);
       const [workspace] = await knowledge.sql<{ id: string }[]>`
-        INSERT INTO workspaces (name) VALUES ('test') RETURNING id
+        INSERT INTO workspaces (name, slug) VALUES ('test', 'test') RETURNING id
       `;
       assert.ok(workspace);
       const [user] = await knowledge.sql<{ id: string }[]>`
@@ -160,6 +161,38 @@ if (!databaseUrl) {
       assert.equal(indexState?.indexed_commit_sha, commit);
       assert.equal(Number(indexState?.concepts), 1);
       assert.equal(Number(indexState?.chunks), 1);
+
+      const okf = new OkfRepository(config, embeddings, knowledge.sql);
+      const created = await okf.createConcept(actor, {
+        markdown: '# Runbook\n\nRestart the worker.\n',
+        path: 'playbooks/restart.md',
+        tags: ['operations'],
+        title: 'Restart worker',
+        type: 'Playbook',
+      });
+      const [createdConcept] = await knowledge.sql<{ concepts: string; path: string }[]>`
+        SELECT (SELECT count(*) FROM concepts WHERE workspace_id = ${workspace.id}
+                AND commit_sha = ${created.commit}) AS concepts,
+               (SELECT path FROM concepts WHERE workspace_id = ${workspace.id}
+                AND commit_sha = ${created.commit} AND path = ${created.path}) AS path
+      `;
+
+      assert.equal(created.path, 'playbooks/restart.md');
+      assert.equal(Number(createdConcept?.concepts), 2);
+      assert.equal(createdConcept?.path, created.path);
+
+      const found = await okf.search(actor, {
+        explain: true,
+        limit: 5,
+        query: 'restart worker',
+        tags: ['operations'],
+        type: 'Playbook',
+      });
+      const retrieved = await okf.getConcept(actor, created.path);
+
+      assert.equal(found[0]?.path, created.path);
+      assert.equal(retrieved.path, created.path);
+      assert.match(String(retrieved.markdown), /Restart the worker/);
     } finally {
       await knowledge.close();
       await rm(corpusPath, { recursive: true, force: true });

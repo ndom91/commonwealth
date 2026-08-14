@@ -24,9 +24,11 @@ export class AccessService {
 
   async authenticate(key: string): Promise<Actor | null> {
     const keys = await this.sql<KeyRow[]>`
-      SELECT users.id, users.workspace_id AS "workspaceId", users.display_name AS name,
-             users.role, users.auto_approve AS "autoApprove", api_keys.secret_hash
-      FROM api_keys JOIN users ON users.id = api_keys.user_id
+       SELECT users.id, users.workspace_id AS "workspaceId", workspaces.slug AS "workspaceSlug",
+              users.display_name AS name,
+              users.role, users.auto_approve AS "autoApprove", api_keys.secret_hash
+       FROM api_keys JOIN users ON users.id = api_keys.user_id
+       JOIN workspaces ON workspaces.id = users.workspace_id
       WHERE api_keys.key_prefix = ${keyPrefix(key)}
         AND api_keys.revoked_at IS NULL AND users.disabled_at IS NULL
     `;
@@ -37,6 +39,7 @@ export class AccessService {
     return {
       id: match.id,
       workspaceId: match.workspaceId,
+      workspaceSlug: match.workspaceSlug,
       name: match.name,
       role: match.role,
       autoApprove: match.autoApprove,

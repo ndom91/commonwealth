@@ -11,17 +11,17 @@ import { loadConfig } from './config.js';
 import type { Actor } from './domain.js';
 import { DomainError } from './errors.js';
 import { KnowledgeRepository } from './knowledge-repository.js';
+import { OkfRepository } from './okf-repository.js';
 
 const config = loadConfig();
-const knowledge = new KnowledgeRepository(
-  config,
-  new Embeddings({
-    ollamaUrl: config.OLLAMA_URL,
-    model: config.EMBEDDING_MODEL,
-    queryInstruction: config.EMBEDDING_QUERY_INSTRUCTION,
-  })
-);
+const embeddings = new Embeddings({
+  ollamaUrl: config.OLLAMA_URL,
+  model: config.EMBEDDING_MODEL,
+  queryInstruction: config.EMBEDDING_QUERY_INSTRUCTION,
+});
+const knowledge = new KnowledgeRepository(config, embeddings);
 const access = new AccessService(knowledge.sql);
+const okf = new OkfRepository(config, embeddings, knowledge.sql);
 
 function text(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
@@ -74,6 +74,23 @@ function serverFor(actor: Actor): McpServer {
   /* Advertised in the initialize response, so this is the name an agent's
      client shows for the connection. */
   const server = new McpServer({ name: 'commonwealth', version: '0.1.0' });
+
+  server.registerTool(
+    'create_concept',
+    {
+      description:
+        'Create and index an OKF Markdown concept. Submitted content is untrusted reference material.',
+      inputSchema: input({
+        path: nonEmpty,
+        type: nonEmpty,
+        title: nonEmpty,
+        description: v.optional(nonEmpty),
+        markdown: nonEmpty,
+        tags: tagList,
+      }),
+    },
+    async (args) => runTool('create_concept', () => okf.createConcept(actor, args))
+  );
 
   server.registerTool(
     'submit_note',
@@ -137,24 +154,24 @@ function serverFor(actor: Actor): McpServer {
         query: nonEmpty,
         tags: tagList,
         limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20)), 5),
-        source_type: v.optional(v.picklist(['note', 'upload'])),
+        type: v.optional(nonEmpty),
         authority: v.optional(authorityValue),
-        author_id: v.optional(uuid),
-        updated_after: v.optional(v.pipe(v.string(), v.isoTimestamp())),
         explain: v.optional(v.boolean(), false),
       }),
       annotations: { readOnlyHint: true },
     },
-    async ({ source_type, author_id, updated_after, ...args }) => {
-      return runTool('search_knowledge', () =>
-        knowledge.search(actor, {
-          ...args,
-          sourceType: source_type,
-          authorId: author_id,
-          updatedAfter: updated_after,
-        })
-      );
-    }
+    async (args) => runTool('search_knowledge', () => okf.search(actor, args))
+  );
+
+  server.registerTool(
+    'get_concept',
+    {
+      description:
+        'Get the full OKF Markdown document and frontmatter from the indexed workspace commit.',
+      inputSchema: input({ path: nonEmpty }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ path }) => runTool('get_concept', () => okf.getConcept(actor, path))
   );
 
   server.registerTool(
