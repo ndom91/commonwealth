@@ -1,7 +1,49 @@
--- The Git bundle is authoritative; these tables are its derived, commit-pinned
--- retrieval index. They intentionally coexist with the legacy source tables
--- during the code cutover, so the old API remains operational until every read
--- and write has moved to paths and commits.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE workspaces (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  slug text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE index_configuration (
+  workspace_id uuid PRIMARY KEY REFERENCES workspaces(id),
+  embedding_model text NOT NULL,
+  embedding_dimensions integer NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES workspaces(id),
+  display_name text NOT NULL,
+  role text NOT NULL CHECK (role IN ('reader', 'writer', 'reviewer', 'admin')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  disabled_at timestamptz,
+  auto_approve boolean NOT NULL DEFAULT false
+);
+
+CREATE TABLE api_keys (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id),
+  key_prefix text NOT NULL,
+  secret_hash text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  last_used_at timestamptz,
+  revoked_at timestamptz
+);
+
+CREATE TABLE events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES workspaces(id),
+  actor_id uuid REFERENCES users(id),
+  event_type text NOT NULL,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE workspace_index_state (
   workspace_id uuid PRIMARY KEY REFERENCES workspaces(id),
   indexed_commit_sha text,
@@ -21,7 +63,7 @@ CREATE TABLE concepts (
   description text,
   tags text[] NOT NULL DEFAULT '{}'::text[],
   frontmatter jsonb NOT NULL,
-  status text NOT NULL CHECK (status IN ('stable', 'deprecated')),
+  status text NOT NULL CHECK (status IN ('draft', 'stable', 'deprecated')),
   authority text NOT NULL CHECK (authority IN ('canonical', 'approved', 'unverified')),
   generated_by text,
   generated_at timestamptz,
@@ -48,7 +90,7 @@ CREATE TABLE concept_chunks (
     REFERENCES concepts(workspace_id, path, commit_sha) ON DELETE CASCADE
 );
 
-CREATE INDEX concepts_workspace_commit_path_idx
-  ON concepts (workspace_id, commit_sha, path);
+CREATE INDEX events_created_at_idx ON events (created_at DESC);
+CREATE INDEX concepts_workspace_commit_path_idx ON concepts (workspace_id, commit_sha, path);
 CREATE INDEX concept_chunks_search_vector_idx ON concept_chunks USING gin(search_vector);
 CREATE INDEX concept_chunks_embedding_idx ON concept_chunks USING hnsw (embedding vector_cosine_ops);

@@ -40,22 +40,6 @@ async function runMigrationsLocked(sql: Sql): Promise<void> {
   >`SELECT name, checksum FROM schema_migrations`;
   const appliedByName = new Map(applied.map((migration) => [migration.name, migration.checksum]));
 
-  if (applied.length === 0) {
-    const legacySchema = await inspectLegacySchema(sql);
-    if (legacySchema.anyTables && !legacySchema.complete) {
-      throw new Error(`Legacy schema is incomplete: ${legacySchema.missing.join(', ')}`);
-    }
-    if (legacySchema.complete) {
-      const initialMigration = migrations[0];
-      if (!initialMigration) throw new Error('Initial migration is missing');
-      await sql`
-        INSERT INTO schema_migrations (name, checksum)
-        VALUES (${initialMigration.name}, ${initialMigration.checksum})
-      `;
-      appliedByName.set(initialMigration.name, initialMigration.checksum);
-    }
-  }
-
   for (const migration of migrations) {
     const existingChecksum = appliedByName.get(migration.name);
     if (existingChecksum) {
@@ -73,36 +57,6 @@ async function runMigrationsLocked(sql: Sql): Promise<void> {
       `;
     });
   }
-}
-
-async function inspectLegacySchema(
-  sql: Sql
-): Promise<{ anyTables: boolean; complete: boolean; missing: string[] }> {
-  const requiredColumns: Record<string, string[]> = {
-    workspaces: ['id', 'name'],
-    index_configuration: ['workspace_id', 'embedding_model', 'embedding_dimensions'],
-    users: ['id', 'workspace_id', 'display_name', 'role'],
-    api_keys: ['id', 'user_id', 'key_prefix', 'secret_hash'],
-    events: ['id', 'workspace_id', 'event_type', 'metadata'],
-  };
-  const entries = Object.entries(requiredColumns);
-  const tables = entries.map(([table]) => table);
-  const rows = await sql<{ table_name: string; column_name: string }[]>`
-    SELECT table_name, column_name FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = ANY(${tables}::text[])
-  `;
-  const columnsByTable = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const columns = columnsByTable.get(row.table_name) ?? new Set<string>();
-    columns.add(row.column_name);
-    columnsByTable.set(row.table_name, columns);
-  }
-  const missing = entries.flatMap(([table, columns]) =>
-    columns
-      .filter((column) => !columnsByTable.get(table)?.has(column))
-      .map((column) => `${table}.${column}`)
-  );
-  return { anyTables: rows.length > 0, complete: missing.length === 0, missing };
 }
 
 async function loadMigrations(): Promise<Migration[]> {

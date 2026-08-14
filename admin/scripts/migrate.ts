@@ -14,42 +14,24 @@ import { client, db } from '../src/lib/db.js';
 process.env.BETTER_AUTH_ALLOW_SIGN_UP = 'true';
 const { auth } = await import('../src/lib/auth.js');
 
-const mcpBaselineHash = '41bf842e59b6710cf23897cde38427fd8f3f8f7a70e9261212c4bf1734b1d027';
-const mcpBaselineTimestamp = 1784914839303;
-const legacyMigrations = new Map([
-  ['0001_initial.sql', 'd95eb64ea4107d4e6adbbe840798dc0952afc4e1759506990456efe321fdaf89'],
-  ['0002_source_revisions.sql', '3d56a0e1c11579668d7f96f36bbdcf4a42f65a54d62624b709ead1cae27f2dce'],
-  [
-    '0003_normalize_source_payload.sql',
-    '9410ff40f6e424ac77794f683a90dd03df4e3050c0689c3c076cf260e372bf14',
-  ],
-  [
-    '0004_defer_initial_revision_constraint.sql',
-    '06c1e6db175cc64cb8fc544b0106e4f9e15c86a4a5f9b600d7f7f504772063b4',
-  ],
-]);
-
-const [legacyLedger] = await client<{ exists: boolean }[]>`
-  SELECT to_regclass('schema_migrations') IS NOT NULL AS exists
+/* Drizzle advances by the latest `created_at`; the hash records the historical
+   migration whose timestamp marks this source-free baseline as complete. */
+const okfBaselineHash = '0c5d03dcbee8b1c80e2b90f5138444b71279f66a1809f9f75db494c5e191e06d';
+const okfBaselineTimestamp = 1786702198002;
+const [ledger] = await client<{ exists: boolean }[]>`
+  SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS exists
 `;
-if (legacyLedger?.exists) {
-  const applied = await client<
-    { name: string; checksum: string }[]
-  >`SELECT name, checksum FROM schema_migrations`;
-  if (
-    applied.length !== legacyMigrations.size ||
-    applied.some(({ name, checksum }) => legacyMigrations.get(name) !== checksum)
-  ) {
-    throw new Error('Cannot cut over an unknown legacy MCP migration state');
+if (!ledger?.exists) {
+  const [legacy] = await client<{ exists: boolean }[]>`
+    SELECT to_regclass('sources') IS NOT NULL AS exists
+  `;
+  if (legacy?.exists) {
+    throw new Error('Pre-OKF databases are not supported; start from a clean database.');
   }
-  const [dashboardInstalled] = await client<
-    { exists: boolean }[]
-  >`SELECT to_regclass('user') IS NOT NULL AS exists`;
-  if (!dashboardInstalled?.exists) {
-    await client.unsafe(
-      await readFile(new URL('../drizzle/0000_bored_the_fury.sql', import.meta.url), 'utf8')
-    );
-  }
+  await client.unsafe(
+    await readFile(new URL('../drizzle/0000_bored_the_fury.sql', import.meta.url), 'utf8')
+  );
+  await client.unsafe(await readFile(new URL('./okf-baseline.sql', import.meta.url), 'utf8'));
   await client`CREATE SCHEMA IF NOT EXISTS "drizzle"`;
   await client`
     CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
@@ -60,9 +42,9 @@ if (legacyLedger?.exists) {
   `;
   await client`
     INSERT INTO "drizzle"."__drizzle_migrations" ("hash", "created_at")
-    SELECT ${mcpBaselineHash}, ${mcpBaselineTimestamp}
+    SELECT ${okfBaselineHash}, ${okfBaselineTimestamp}
     WHERE NOT EXISTS (
-      SELECT 1 FROM "drizzle"."__drizzle_migrations" WHERE "hash" = ${mcpBaselineHash}
+      SELECT 1 FROM "drizzle"."__drizzle_migrations" WHERE "hash" = ${okfBaselineHash}
     )
   `;
 }

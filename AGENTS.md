@@ -226,9 +226,9 @@ reads ships in `admin/drizzle/` alone — and must, if it references a
 better-auth table, since those do not exist in the test chain.
 
 `admin/drizzle/meta/_journal.json` needs a matching entry for every new file.
-The `legacyMigrations` checksum map in `admin/scripts/migrate.ts` describes a
-frozen pre-cutover state; editing it breaks the cutover check for older
-databases.
+`admin/scripts/okf-baseline.sql` creates a source-free schema for a fresh
+database and seeds the current Drizzle timestamp. The historical Drizzle files
+remain for deployed OKF instances; pre-OKF database upgrades are unsupported.
 
 better-auth issues string ids, so `user.id` is `text`. A `uuid` foreign key
 referencing it cannot be created.
