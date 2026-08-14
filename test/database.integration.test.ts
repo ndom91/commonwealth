@@ -193,6 +193,30 @@ if (!databaseUrl) {
       assert.equal(found[0]?.path, created.path);
       assert.equal(retrieved.path, created.path);
       assert.match(String(retrieved.markdown), /Restart the worker/);
+
+      const revised = await okf.reviseConcept(actor, {
+        markdown: '# Runbook\n\nRestart the background worker.\n',
+        path: created.path,
+        title: 'Restart background worker',
+      });
+      const verified = await okf.verifyConcept(actor, {
+        authority: 'canonical',
+        path: created.path,
+      });
+      const conceptHistory = await okf.getConceptHistory(actor, created.path);
+      const verifiedConcept = await okf.getConcept(actor, created.path);
+
+      assert.match(revised.commit, /^[0-9a-f]{40}$/);
+      assert.match(verified.commit, /^[0-9a-f]{40}$/);
+      assert.equal(conceptHistory.length, 3);
+      assert.equal(
+        (verifiedConcept.frontmatter as { commonwealth?: { authority?: string } }).commonwealth
+          ?.authority,
+        'canonical'
+      );
+
+      await okf.deprecateConcept(actor, created.path);
+      await assert.rejects(() => okf.getConcept(actor, created.path), /Concept not found/);
     } finally {
       await knowledge.close();
       await rm(corpusPath, { recursive: true, force: true });

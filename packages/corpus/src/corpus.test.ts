@@ -7,6 +7,7 @@ import {
   commitFiles,
   ensureRepository,
   head,
+  history,
   listConceptPaths,
   readFileAtCommit,
 } from './corpus.js';
@@ -32,6 +33,9 @@ test('initializes, commits, and reads a workspace OKF bundle', async () => {
     assert.match(commit, /^[0-9a-f]{40}$/);
     assert.equal(await head(corpusPath, 'core-team'), commit);
     assert.deepEqual(await listConceptPaths(corpusPath, 'core-team'), ['playbooks/deploy.md']);
+    const entries = await history(corpusPath, 'core-team', 'playbooks/deploy.md');
+    assert.equal(entries[0]?.commit, commit);
+    assert.equal(entries[0]?.subject, 'Create playbooks/deploy.md');
     assert.equal(
       await readFileAtCommit(corpusPath, 'core-team', 'playbooks/deploy.md'),
       '---\ntype: Playbook\ntitle: Deploy\n---\n\n# Deploy\n'

@@ -175,6 +175,50 @@ function serverFor(actor: Actor): McpServer {
   );
 
   server.registerTool(
+    'get_concept_history',
+    {
+      description: 'List Git commits that changed an OKF concept.',
+      inputSchema: input({ path: nonEmpty }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ path }) => runTool('get_concept_history', () => okf.getConceptHistory(actor, path))
+  );
+
+  server.registerTool(
+    'revise_concept',
+    {
+      description: 'Create and index an immutable Git revision of an OKF concept.',
+      inputSchema: input({
+        path: nonEmpty,
+        markdown: nonEmpty,
+        title: v.optional(nonEmpty),
+        description: v.optional(nonEmpty),
+        tags: v.optional(v.array(nonEmpty)),
+      }),
+    },
+    async (args) => runTool('revise_concept', () => okf.reviseConcept(actor, args))
+  );
+
+  server.registerTool(
+    'verify_concept',
+    {
+      description: 'Record a reviewer verification and authority decision in an OKF concept.',
+      inputSchema: input({ path: nonEmpty, authority: authorityValue }),
+    },
+    async (args) => runTool('verify_concept', () => okf.verifyConcept(actor, args))
+  );
+
+  server.registerTool(
+    'deprecate_concept',
+    {
+      description:
+        'Mark an OKF concept deprecated and remove it from the indexed workspace snapshot.',
+      inputSchema: input({ path: nonEmpty }),
+    },
+    async ({ path }) => runTool('deprecate_concept', () => okf.deprecateConcept(actor, path))
+  );
+
+  server.registerTool(
     'get_source',
     {
       description: 'Get the full normalized Markdown and metadata for an active source.',

@@ -21,6 +21,12 @@ export type CommitInput = {
   workspace: string;
 };
 
+export type HistoryEntry = {
+  commit: string;
+  subject: string;
+  timestamp: string;
+};
+
 // commitFiles writes concept files in an isolated worktree and advances the workspace main branch.
 export async function commitFiles(input: CommitInput): Promise<string> {
   const repository = repositoryPath(input.corpusPath, input.workspace);
@@ -86,6 +92,26 @@ export async function head(corpusPath: string, workspace: string): Promise<strin
   const repository = await ensureRepository(corpusPath, workspace);
 
   return (await git(repository, ['rev-parse', 'main'])).trim();
+}
+
+// history returns commits that changed a concept, newest first.
+export async function history(
+  corpusPath: string,
+  workspace: string,
+  path: string
+): Promise<HistoryEntry[]> {
+  const repository = await ensureRepository(corpusPath, workspace);
+  const safePath = validateOkfPath(path);
+  const output = await git(repository, ['log', '--format=%H%x09%aI%x09%s', '--', safePath]);
+  const entries: HistoryEntry[] = [];
+  for (const line of output.trim().split('\n')) {
+    if (!line) continue;
+    const [commit, timestamp, subject] = line.split('\t');
+    if (!commit || !timestamp || subject === undefined) continue;
+    entries.push({ commit, timestamp, subject });
+  }
+
+  return entries;
 }
 
 // listConceptPaths returns every non-reserved Markdown concept at a commit.
