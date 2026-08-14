@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
+import { rm } from 'node:fs/promises';
 import test from 'node:test';
+import { commitFiles } from '@commonwealth/corpus';
 import { AccessService } from '../src/access-service.js';
 import { hashApiKey, keyPrefix } from '../src/auth.js';
 import type { Config } from '../src/config.js';
 import { KnowledgeRepository } from '../src/knowledge-repository.js';
 import { runMigrations } from '../src/migrations.js';
+import { indexWorkspace } from '../src/okf-indexer.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const databaseName = databaseUrl ? new URL(databaseUrl).pathname.slice(1) : undefined;
@@ -17,12 +20,13 @@ if (!databaseUrl) {
   });
 } else {
   test('migrates, revises, filters, and retrieves knowledge', async () => {
+    const corpusPath = '/tmp/commonwealth-corpus-integration-test';
     const config: Config = {
       DATABASE_URL: databaseUrl,
       OLLAMA_URL: 'http://unused',
       EMBEDDING_MODEL: 'test-embedding-model',
       PORT: 3000,
-      CORPUS_PATH: '/tmp/commonwealth-corpus-test',
+      CORPUS_PATH: corpusPath,
       MARKITDOWN_URL: 'http://unused',
       SOURCE_STORAGE_PATH: '/tmp/commonwealth-test',
       MAX_UPLOAD_BYTES: 1024,
@@ -49,6 +53,7 @@ if (!databaseUrl) {
     const bootstrapKey = 'test-bootstrap-key-that-is-long-enough';
 
     try {
+      await rm(corpusPath, { recursive: true, force: true });
       await knowledge.sql.unsafe('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
       await runMigrations(knowledge.sql);
       const [workspace] = await knowledge.sql<{ id: string }[]>`
@@ -120,8 +125,44 @@ if (!databaseUrl) {
         explain: false,
       });
       assert.ok(Array.isArray(stopwords));
+
+      const commit = await commitFiles({
+        actor: 'agent:test',
+        corpusPath,
+        files: [
+          {
+            path: 'playbooks/deploy.md',
+            text: '---\ntype: Playbook\ntitle: Deploy\ntags: [operations]\n---\n\n# Deploy\n\nRun `pnpm deploy`.\n',
+          },
+        ],
+        subject: 'Create playbooks/deploy.md',
+        workspace: 'test',
+      });
+      const indexed = await indexWorkspace({
+        corpusPath,
+        embeddingModel: config.EMBEDDING_MODEL,
+        embeddings,
+        sql: knowledge.sql,
+        workspaceId: workspace.id,
+        workspaceSlug: 'test',
+      });
+      const [indexState] = await knowledge.sql<
+        { indexed_commit_sha: string; chunks: string; concepts: string }[]
+      >`
+        SELECT workspace_index_state.indexed_commit_sha,
+               (SELECT count(*) FROM concepts WHERE workspace_id = ${workspace.id}) AS concepts,
+               (SELECT count(*) FROM concept_chunks WHERE workspace_id = ${workspace.id}) AS chunks
+        FROM workspace_index_state WHERE workspace_id = ${workspace.id}
+      `;
+
+      assert.equal(indexed.commit, commit);
+      assert.equal(indexed.indexed, true);
+      assert.equal(indexState?.indexed_commit_sha, commit);
+      assert.equal(Number(indexState?.concepts), 1);
+      assert.equal(Number(indexState?.chunks), 1);
     } finally {
       await knowledge.close();
+      await rm(corpusPath, { recursive: true, force: true });
     }
   });
 }

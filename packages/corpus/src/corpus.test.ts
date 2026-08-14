@@ -3,7 +3,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { commitFiles, ensureRepository, readFileAtCommit } from './corpus.js';
+import {
+  commitFiles,
+  ensureRepository,
+  head,
+  listConceptPaths,
+  readFileAtCommit,
+} from './corpus.js';
 
 test('initializes, commits, and reads a workspace OKF bundle', async () => {
   const corpusPath = await mkdtemp(join(tmpdir(), 'commonwealth-corpus-test-'));
@@ -24,6 +30,8 @@ test('initializes, commits, and reads a workspace OKF bundle', async () => {
 
     assert.match(repository, /core-team$/);
     assert.match(commit, /^[0-9a-f]{40}$/);
+    assert.equal(await head(corpusPath, 'core-team'), commit);
+    assert.deepEqual(await listConceptPaths(corpusPath, 'core-team'), ['playbooks/deploy.md']);
     assert.equal(
       await readFileAtCommit(corpusPath, 'core-team', 'playbooks/deploy.md'),
       '---\ntype: Playbook\ntitle: Deploy\n---\n\n# Deploy\n'

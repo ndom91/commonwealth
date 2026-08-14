@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { validateOkfPath } from '@commonwealth/pipeline';
 
@@ -79,6 +79,32 @@ export async function ensureRepository(corpusPath: string, workspace: string): P
 
     return repository;
   }
+}
+
+// head returns the current main commit for a workspace bundle.
+export async function head(corpusPath: string, workspace: string): Promise<string> {
+  const repository = await ensureRepository(corpusPath, workspace);
+
+  return (await git(repository, ['rev-parse', 'main'])).trim();
+}
+
+// listConceptPaths returns every non-reserved Markdown concept at a commit.
+export async function listConceptPaths(
+  corpusPath: string,
+  workspace: string,
+  commit = 'main'
+): Promise<string[]> {
+  const repository = await ensureRepository(corpusPath, workspace);
+  const output = await git(repository, ['ls-tree', '-r', '--name-only', commit]);
+  const paths: string[] = [];
+  for (const path of output.split('\n')) {
+    if (!path.endsWith('.md')) continue;
+    const name = basename(path);
+    if (name === 'index.md' || name === 'log.md') continue;
+    paths.push(validateOkfPath(path));
+  }
+
+  return paths;
 }
 
 // readFileAtCommit reads an exact concept version from a workspace repository.
