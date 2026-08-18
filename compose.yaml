@@ -14,20 +14,15 @@ services:
       EMBEDDING_QUERY_INSTRUCTION: ${EMBEDDING_QUERY_INSTRUCTION:-Given a question from a teammate, retrieve passages from the team knowledge base that answer it}
       PORT: 3000
       MAX_REQUEST_BYTES: ${MAX_REQUEST_BYTES:-15000000}
-      # True because Caddy is always in front of this service here. Set it false
-      # if you publish the port directly, or the rate limiter believes an
-      # `X-Forwarded-For` the client wrote and every request gets a fresh
-      # allowance. See `clientIp` in `@commonwealth/rate-limit`.
-      TRUST_FORWARDED_FOR: ${APP_TRUST_FORWARDED_FOR:-true}
+      # Containers publish only to loopback, so no proxy is assumed by default.
+      # Set this true only when a trusted reverse proxy forwards client addresses.
+      TRUST_FORWARDED_FOR: ${APP_TRUST_FORWARDED_FOR:-false}
     depends_on:
       postgres:
         condition: service_healthy
       ollama-init:
         condition: service_completed_successfully
-      markitdown:
-        condition: service_healthy
     volumes:
-      - source_data:/app/storage
       - corpus_data:/app/corpora
     ports:
       - "127.0.0.1:${HOST_PORT:-3000}:3000"
@@ -45,10 +40,7 @@ services:
       # two models in one index do not error, they quietly stop matching.
       OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
-      MARKITDOWN_URL: ${COMPOSE_MARKITDOWN_URL:-http://markitdown:8000}
-      SOURCE_STORAGE_PATH: ${COMPOSE_SOURCE_STORAGE_PATH:-/app/storage}
       CORPUS_PATH: ${COMPOSE_CORPUS_PATH:-/app/corpora}
-      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10000000}
       PORT: 3001
       # False, unlike `app`: this one is bound to loopback with nothing in front
       # of it. Set it true — and configure better-auth's `trustedProxies` — if
@@ -62,12 +54,7 @@ services:
         condition: service_healthy
       ollama-init:
         condition: service_completed_successfully
-      markitdown:
-        condition: service_healthy
-    # The same volume `app` mounts. Uploaded originals are addressed by content
-    # hash, so both services must look in one place or each sees only its own.
     volumes:
-      - source_data:/app/storage
       - corpus_data:/app/corpora
     ports:
       - "127.0.0.1:${ADMIN_PORT:-3001}:3001"
@@ -133,41 +120,7 @@ services:
     entrypoint: ["/bin/sh", "-c", "for attempt in $$(seq 1 60); do ollama list && exec ollama pull $${EMBEDDING_MODEL}; sleep 2; done; echo 'Ollama was not ready after 120 seconds' >&2; exit 1"]
     restart: "no"
 
-  markitdown:
-    build: ./markitdown
-    # Published on loopback for the same reason as ollama: `pnpm dev` runs on the
-    # host, where the compose service name does not resolve.
-    ports:
-      - "127.0.0.1:${MARKITDOWN_PORT:-8000}:8000"
-    cpus: 1.0
-    mem_limit: 1g
-    pids_limit: 128
-    healthcheck:
-      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8000/health')"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-
-  caddy:
-    image: caddy:2-alpine
-    profiles: ["public"]
-    environment:
-      CADDY_DOMAIN: ${CADDY_DOMAIN:-localhost}
-    depends_on:
-      app:
-        condition: service_started
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
 volumes:
   postgres_data:
   ollama_data:
-  caddy_data:
-  caddy_config:
-  source_data:
   corpus_data:

@@ -33,11 +33,6 @@
  * only exists as `.ts`. */
 
 export { type Chunk, chunkMarkdown, embeddingInput } from './chunking.js';
-export {
-  type ConvertedDocument,
-  DocumentIngestion,
-  type DocumentIngestionOptions,
-} from './document-ingestion.js';
 export { EMBEDDING_DIMENSIONS, type EmbeddingOptions, Embeddings } from './embeddings.js';
 export {
   type OkfDocument,

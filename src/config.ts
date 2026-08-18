@@ -39,15 +39,10 @@ const environment = v.object({
   EMBEDDING_QUERY_INSTRUCTION: v.optional(v.string()),
   PORT: positiveInt(3000),
   CORPUS_PATH: v.optional(v.pipe(v.string(), v.minLength(1)), '/app/corpora'),
-  MARKITDOWN_URL: v.optional(v.pipe(v.string(), v.url()), 'http://markitdown:8000'),
-  SOURCE_STORAGE_PATH: v.optional(v.string(), '/app/storage'),
-  MAX_UPLOAD_BYTES: positiveInt(10 * 1024 * 1024),
   MAX_REQUEST_BYTES: positiveInt(15 * 1024 * 1024),
-  /* Defaults to true because the shipped compose always puts Caddy in front of
-     this service. Set it to `false` if you expose the port directly, or the
-     limiter counts every caller against one address it can never distinguish —
-     and worse, believes a header the client wrote. See `clientIp`. */
-  TRUST_FORWARDED_FOR: boolean(true),
+  /* Containers bind to loopback by default, so no proxy is trusted unless the
+     operator explicitly says one is forwarding client addresses. */
+  TRUST_FORWARDED_FOR: boolean(false),
   /* Per credential. An agent working hard does a handful of calls a second in
      bursts; this is well clear of that and still bounds the scrypt cost of a
      flood carrying a real key prefix. See the note in `index.ts`. */

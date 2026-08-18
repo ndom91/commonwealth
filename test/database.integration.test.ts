@@ -28,9 +28,6 @@ if (!databaseUrl) {
       EMBEDDING_MODEL: 'test-embedding-model',
       PORT: 3000,
       CORPUS_PATH: corpusPath,
-      MARKITDOWN_URL: 'http://unused',
-      SOURCE_STORAGE_PATH: '/tmp/commonwealth-test',
-      MAX_UPLOAD_BYTES: 1024,
       MAX_REQUEST_BYTES: 4096,
       /* Unused here — this test drives the repository directly and never goes
          through the HTTP surface the limiters guard — but `Config` is the whole

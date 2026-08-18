@@ -101,11 +101,11 @@ key can send its prefix with a wrong secret and buy one scrypt per request. That
 is why the per-credential bucket is keyed on the prefix rather than the whole
 token — a hundred wrong secrets for one prefix share one allowance.
 
-`TRUST_FORWARDED_FOR` differs per service and is not a preference: `app` is
-behind Caddy so it defaults true, `admin` is bound to loopback so it defaults
-false. Reading a forwarded header with no proxy in front lets any caller mint a
-fresh bucket per request by setting it, which is worse than having no limiter,
-because it looks like one.
+`TRUST_FORWARDED_FOR` defaults false for both services because Compose binds
+them to loopback and ships no proxy. An operator who puts a trusted proxy in
+front must set it true for that service. Reading a forwarded header with no
+proxy in front lets any caller mint a fresh bucket per request by setting it,
+which is worse than having no limiter, because it looks like one.
 
 ## Two Postgres clients that behave differently
 

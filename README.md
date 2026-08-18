@@ -30,11 +30,17 @@ is Apache-2.0 licensed and approximately 639 MB. Treat it as a baseline: run
 frozen corpus and reads `EMBEDDING_MODEL` from the environment so the two runs
 are comparable. `PLAN.md` records what that measures and what it still does not.
 
+Compose binds the MCP server and admin app to loopback. Put your existing
+reverse proxy in front of them for public access; examples are in
+[`docs/proxy/`](docs/proxy/). Set `APP_TRUST_FORWARDED_FOR=true` and/or
+`ADMIN_TRUST_FORWARDED_FOR=true` only for a service reached through that trusted
+proxy.
+
 ## Local development
 
 ```sh
 pnpm install --frozen-lockfile
-docker compose up -d postgres ollama ollama-init markitdown app
+docker compose up -d postgres ollama ollama-init app
 docker compose up admin-migrate
 pnpm --filter @commonwealth/admin dev
 ```

@@ -16,8 +16,8 @@ export type HeaderReader = (name: string) => string | undefined;
  *     like protection.
  *
  * The second is the dangerous direction, so trusting the header is opt-in. In
- * the shipped compose `app` is always behind Caddy and `admin` is bound to
- * loopback with no proxy at all, which is where the defaults come from.
+ * Compose binds both services to loopback with no proxy, so the defaults leave
+ * the header untrusted. An operator with a trusted proxy opts in per service.
  *
  * The *last* entry of the chain is taken, not the first. A forwarded list is
  * appended to as it is relayed, so the rightmost value was written by the hop

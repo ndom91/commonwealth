@@ -8,13 +8,11 @@ export type Actor = {
   autoApprove: boolean;
 };
 export type Authority = 'canonical' | 'approved' | 'unverified';
-export type SourceType = 'note' | 'upload';
 
 export type SearchInput = {
   query: string;
   tags: string[];
   limit: number;
-  sourceType?: SourceType;
   authority?: Authority;
   authorId?: string;
   updatedAfter?: string;

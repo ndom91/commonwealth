@@ -1,0 +1,10 @@
+# Replace the hostnames with yours. Compose exposes both services on loopback.
+# Caddy manages TLS automatically for public DNS names.
+
+mcp.example.com {
+  reverse_proxy 127.0.0.1:3000
+}
+
+admin.example.com {
+  reverse_proxy 127.0.0.1:3001
+}

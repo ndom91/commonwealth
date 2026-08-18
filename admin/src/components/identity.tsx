@@ -78,9 +78,8 @@ export function custodyLine(identity: Identity) {
 export function CredentialTag({ issued, onDismiss }: { issued: Issued; onDismiss: () => void }) {
   const [copy, setCopy] = useState<'idle' | 'copied' | 'unavailable'>('idle');
 
-  /* The clipboard API is absent on insecure origins, and the documented
-     default deployment is plain HTTP with Caddy optional. Never report a copy
-     that did not happen — the user would redact a secret they never captured. */
+  /* The clipboard API is absent on insecure origins. Never report a copy that
+      did not happen — the user would redact a secret they never captured. */
   async function copySecret() {
     const ok = await navigator.clipboard
       ?.writeText(issued.key)

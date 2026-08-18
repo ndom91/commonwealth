@@ -237,8 +237,8 @@ async function handleMcp(request: IncomingMessage, response: ServerResponse): Pr
       return;
     }
 
-    /* Falls back to the socket address, which behind Caddy is Caddy — hence
-       `TRUST_FORWARDED_FOR`, which the shipped topology sets. */
+    /* A trusted proxy makes the socket address its own, so only deployments
+       that explicitly opt in read the forwarded address. */
     const address = clientIp((name) => request.headers[name] as string | undefined, {
       trustForwarded: config.TRUST_FORWARDED_FOR,
       fallback: request.socket.remoteAddress ?? 'unknown',

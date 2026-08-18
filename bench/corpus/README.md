@@ -40,7 +40,7 @@ the evaluation corpus described in `PLAN.md` before changing the default.
 
 ```sh
 pnpm install --frozen-lockfile
-docker compose up -d postgres ollama ollama-init markitdown app
+docker compose up -d postgres ollama ollama-init app
 docker compose up admin-migrate
 pnpm --filter @commonwealth/admin dev
 ```
