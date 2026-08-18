@@ -1,5 +1,5 @@
 {
-  "name": "@commonwealth/admin",
+  "name": "@commonwealth/web",
   "private": true,
   "type": "module",
   "scripts": {

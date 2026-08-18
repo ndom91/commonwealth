@@ -81,13 +81,13 @@ Three things a neighbouring RAG or docs tool could not truthfully copy at once:
 ## Capabilities and Constraints
 
 The MCP tool list, the role names and the concept lifecycle are all readable from
-`src/` and the migrations in a minute. What is not:
+`mcp-server/src/` and the migrations in a minute. What is not:
 
 - **One role vocabulary for people and agents.** `reader` → read; `writer` →
   read and write; `reviewer` → adds authority changes and deletes; `admin` →
   all. The same four names govern an agent presenting an API key
-  (`src/access-service.ts`) and a person signing in to the browser
-  (`admin/src/lib/roles.ts`), so "writer" means one thing. The two maps are
+   (`mcp-server/src/access-service.ts`) and a person signing in to the browser
+   (`web/src/lib/roles.ts`), so "writer" means one thing. The two maps are
   duplicated by hand — separate deploy units — and must be changed together.
 - **A writer's reach is scoped to its own work.** A writer may revise **only
   concepts it created**, and that holds even for a trusted holder whose
@@ -119,7 +119,7 @@ The MCP tool list, the role names and the concept lifecycle are all readable fro
 - **Scoping lives in the `WHERE`, not after the fetch.** A query that takes an id
   carries `workspace_id` in the *same* predicate, so a foreign id reads as "not
   found" rather than being fetched and then refused. There is exactly one write in
-  `admin/src/lib` without a workspace predicate — claiming an invitation, found by
+   `web/src/lib` without a workspace predicate — claiming an invitation, found by
   token digest — and it is commented as such.
 - **One index, one model.** Embeddings from different models must never be mixed
   in one index. Changing `EMBEDDING_MODEL` or the vector dimension requires
@@ -152,7 +152,7 @@ next. Changing one is a decision, not a fix.
 
 ### Direction
 
-The admin surface is the primary human surface over this data, and the workbench
+The web surface is the primary human surface over this data, and the workbench
 it was aimed at now ships: browse, search and read concepts; revise or deprecate
 them; work a review queue; inspect Git history; audit the event log; invite
 people and set what each of them may do — in any of several workspaces.
@@ -223,7 +223,7 @@ Remaining known gaps, in rough order of how much they cost:
   says out loud.** Chain-of-custody evidence handling is where the whole visual
   grammar comes from — an identity is a badge issued to a holder, a key is a
   sealed credential, revoking is voiding, the event log is the custody line — and
-  `admin/DESIGN.md` documents it and is binding. It stopped being *shown* because
+`web/DESIGN.md` documents it and is binding. It stopped being *shown* because
   it was the same phrase on every page of every workspace: true, and telling the
   reader nothing they could act on. The vocabulary it produced is still on the
   surface where it labels one specific thing — "Custody line", "In custody" —

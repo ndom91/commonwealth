@@ -3,10 +3,10 @@
 Notes an agent cannot infer from reading the code, and that cost real debugging
 time when they were discovered.
 
-## `src/` changes need a container rebuild
+## `mcp-server/src/` changes need a container rebuild
 
 The MCP server runs from a built image, not a watcher. Editing anything under
-`src/` has no effect on `http://localhost:3000/mcp` until:
+`mcp-server/src/` has no effect on `http://localhost:3000/mcp` until:
 
 ```bash
 docker compose up -d --build app
@@ -14,10 +14,10 @@ docker compose up -d --build app
 
 Nothing warns you. The server keeps answering with the code it was built with,
 so a change looks silently ineffective rather than broken — a policy you just
-added simply never fires. If a `src/` change appears not to work, rebuild
+added simply never fires. If an `mcp-server/src/` change appears not to work, rebuild
 before debugging it.
 
-The admin app is different: `pnpm dev` in `admin/` is a Vite dev server and
+The web app is different: `pnpm dev` in `web/` is a Vite dev server and
 picks changes up on save. Server functions occasionally need a manual reload
 of the page to re-run.
 
@@ -37,7 +37,7 @@ The choice was a pinned beta or staying on zod.
 Two consequences worth knowing before you touch a tool:
 
 - **Valibot schemas must go through `toStandardJsonSchema`** (from
-  `@valibot/to-json-schema`, wrapped as `input()` in `src/index.ts`). Valibot is
+  `@valibot/to-json-schema`, wrapped as `input()` in `mcp-server/src/index.ts`). Valibot is
   the one Standard Schema library that doesn't carry JSON Schema conversion on
   the schema itself — Zod and ArkType are accepted bare. Pass a raw `v.object()`
   and registration still succeeds, but `tools/list` advertises an empty schema
@@ -79,9 +79,9 @@ writes; only the commit-to-index pipeline is shared.
 
 ## Rate limiting is in memory, and that is a choice with consequences
 
-Three surfaces are limited: `POST /mcp` (`src/index.ts`), the two
-unauthenticated invitation server functions (`admin/src/lib/management.ts`), and
-better-auth's own `/api/auth/*` (configured in `admin/src/lib/auth.ts`).
+Three surfaces are limited: `POST /mcp` (`mcp-server/src/index.ts`), the two
+unauthenticated invitation server functions (`web/src/lib/management.ts`), and
+better-auth's own `/api/auth/*` (configured in `web/src/lib/auth.ts`).
 
 All of them count in process memory. **Counters reset when a process restarts,
 and two replicas of a service each get a full allowance.** That is fine for a
@@ -127,7 +127,7 @@ engines read it as UTC; one that read it as local time would shift every
 timestamp in the product by the reader's own offset without erroring.
 
 So **every timestamp reaching the UI goes through `isoUtc`** in
-`admin/src/components/stamp.tsx`, which normalises `Date`, the Postgres form and
+`web/src/components/stamp.tsx`, which normalises `Date`, the Postgres form and
 plain ISO to one `Z`-suffixed string, and returns `null` rather than
 `Invalid Date` for anything else. Render it with `<Stamp>`; there is no other
 date helper.
@@ -139,15 +139,15 @@ encoded JSON. That inverts how raw tagged templates must write jsonb:
 
 | Package | Client | Correct form |
 |---|---|---|
-| `src/` (MCP server) | bare postgres.js | `${sql.json(x)}` |
-| `admin/` | wrapped by Drizzle | `${JSON.stringify(x)}::jsonb` |
+| `mcp-server/` | bare postgres.js | `${sql.json(x)}` |
+| `web/` | wrapped by Drizzle | `${JSON.stringify(x)}::jsonb` |
 
 Using the other package's form does not error in either direction — it stores a
 jsonb **string** instead of an object, which only shows up later as a field that
 reads back `undefined`. Event metadata is otherwise ordinary JSON and is read
 directly by the activity surface.
 
-Full explanation in `admin/src/lib/db.ts`. Do not align the two without
+Full explanation in `web/src/lib/db.ts`. Do not align the two without
 unpicking the mutation first.
 
 ## Fragments must come from the handle that runs them
@@ -178,7 +178,7 @@ joins against that published commit. Three things follow from that:
 
 ## The workspace comes from the URL, and the server re-derives it
 
-Every route under `admin/src/app/w/$slug/` is one corpus. The slug in the path is
+Every route under `web/src/app/w/$slug/` is one corpus. The slug in the path is
 the scope; `app/w/$slug.tsx` resolves it to a workspace and confirms membership
 before any child renders. That layout is **not** the enforcement — it decides
 what to draw. Every server function takes the same slug and re-checks it:
@@ -209,24 +209,24 @@ A missing `workspace` is a *runtime* failure, not a compile error — the
 validators take `unknown`. When adding a call site, check it passes one; the
 concept register loader shipped without it and typechecked cleanly.
 
-`src/` needs none of this. It has always scoped to `actor.workspaceId`, so agents
+`mcp-server/src/` needs none of this. It has always scoped to `actor.workspaceId`, so agents
 were isolated before workspaces were visible in the browser. If a change here
 seems to require one there, the scoping model is wrong.
 
 ## Two migration chains, on purpose
 
-- `admin/drizzle/` is the **live schema**. `pnpm migrate` runs this. Anything
+- `web/drizzle/` is the **live schema**. `pnpm migrate` runs this. Anything
   the running system needs goes here.
-- `db/migrations/` is applied only by `runMigrations` in
-  `test/database.integration.test.ts`. It exists so the integration suite
+- `mcp-server/db/migrations/` is applied only by `runMigrations` in
+  `mcp-server/test/database.integration.test.ts`. It exists so the integration suite
   builds a schema the MCP server's code still matches.
 
 A column the MCP server reads must ship in **both**. A column only the admin
-reads ships in `admin/drizzle/` alone — and must, if it references a
-better-auth table, since those do not exist in the test chain.
+reads ships in `web/drizzle/` alone — and must, if it references a
+  better-auth table, since those do not exist in the test chain.
 
-`admin/drizzle/meta/_journal.json` needs a matching entry for every new file.
-`admin/scripts/db-init.sql` creates the full schema for a fresh
+`web/drizzle/meta/_journal.json` needs a matching entry for every new file.
+`web/scripts/db-init.sql` creates the full schema for a fresh
 database and seeds the current Drizzle timestamp. The journal begins empty after
 that baseline; every future migration needs a timestamp after `1786702198002`.
 Pre-OKF database upgrades are unsupported.
@@ -249,6 +249,6 @@ mistake for coverage.
 
 ## Design changes
 
-`admin/DESIGN.md` is the design record and is tracked. Its sidecar,
-`admin/.impeccable/design.json`, is gitignored but should be kept in step —
+`web/DESIGN.md` is the design record and is tracked. Its sidecar,
+`web/.impeccable/design.json`, is gitignored but should be kept in step —
 new components and named rules belong in both.

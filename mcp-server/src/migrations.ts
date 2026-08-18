@@ -10,7 +10,7 @@ const migrationsDirectory = fileURLToPath(new URL('../db/migrations/', import.me
 /* The lock key is a literal, and both services must use the *same* literal or
    they stop excluding each other. It changed with the rename, so the two images
    have to be deployed together — which the shipped compose does anyway, since
-   both build from one tree and `admin-migrate` runs to completion before
+    both build from one tree and `web-migrate` runs to completion before
    anything else starts. Worth knowing before hand-rolling a partial deploy. */
 export async function runMigrations(sql: Sql): Promise<void> {
   const connection = await sql.reserve();

@@ -141,7 +141,7 @@ export { requireArchivedAdmin };
  * Deliberately not routed through the organization plugin's `hasPermission`:
  * its statements describe *its* endpoints (creating members, cancelling
  * invitations), not this product's verbs. `roles.ts` holds the map, mirroring
- * `src/access-service.ts` so people and agents are granted alike. */
+ * `mcp-server/src/access-service.ts` so people and agents are granted alike. */
 export async function requireMember(permission: Permission, slug: string): Promise<Membership> {
   const membership = await readMembership(slug);
   /* One sentence for "no session", "no such workspace" and "not a member of

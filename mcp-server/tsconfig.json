@@ -1,0 +1,4 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["src", "test", "../packages/corpus/src", "../packages/pipeline/src"]
+}

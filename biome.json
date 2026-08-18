@@ -36,7 +36,7 @@
       "!.certs",
       "!packages/graphql/types.ts",
       "!packages/linear-api/graphql/types.ts",
-      "!admin/src/routeTree.gen.ts",
+      "!web/src/routeTree.gen.ts",
       "!test-results",
       "!playroom/dist",
       "!ui/theme/colors/source"

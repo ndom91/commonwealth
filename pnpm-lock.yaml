@@ -7,16 +7,28 @@ settings:
 importers:
 
   .:
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.5.5
+        version: 2.5.5
+      '@types/node':
+        specifier: ^24.0.3
+        version: 24.13.3
+      tsx:
+        specifier: ^4.20.3
+        version: 4.23.1
+
+  mcp-server:
     dependencies:
       '@commonwealth/corpus':
         specifier: workspace:*
-        version: link:packages/corpus
+        version: link:../packages/corpus
       '@commonwealth/pipeline':
         specifier: workspace:*
-        version: link:packages/pipeline
+        version: link:../packages/pipeline
       '@commonwealth/rate-limit':
         specifier: workspace:*
-        version: link:packages/rate-limit
+        version: link:../packages/rate-limit
       '@modelcontextprotocol/node':
         specifier: 2.0.0-beta.5
         version: 2.0.0-beta.5(@modelcontextprotocol/server@2.0.0-beta.5)(hono@4.12.32)
@@ -33,9 +45,6 @@ importers:
         specifier: ^1.4.2
         version: 1.4.2(typescript@7.0.2)
     devDependencies:
-      '@biomejs/biome':
-        specifier: ^2.5.5
-        version: 2.5.5
       '@types/node':
         specifier: ^24.0.3
         version: 24.13.3
@@ -46,7 +55,24 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  admin:
+  packages/corpus:
+    dependencies:
+      '@commonwealth/pipeline':
+        specifier: workspace:*
+        version: link:../pipeline
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
+
+  packages/pipeline:
+    dependencies:
+      yaml:
+        specifier: ^2.8.1
+        version: 2.9.0
+
+  packages/rate-limit: {}
+
+  web:
     dependencies:
       '@commonwealth/corpus':
         specifier: workspace:*
@@ -112,20 +138,6 @@ importers:
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
-
-  packages/corpus:
-    dependencies:
-      '@commonwealth/pipeline':
-        specifier: workspace:*
-        version: link:../pipeline
-
-  packages/pipeline:
-    dependencies:
-      yaml:
-        specifier: ^2.8.1
-        version: 2.9.0
-
-  packages/rate-limit: {}
 
 packages:
 

@@ -6,33 +6,22 @@
   "license": "GPL-3.0-only",
   "packageManager": "pnpm@11.5.1",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test 'test/**/*.test.ts' 'packages/*/src/**/*.test.ts'",
+    "dev": "pnpm --filter @commonwealth/mcp-server dev",
+    "start": "pnpm --filter @commonwealth/mcp-server start",
+    "typecheck": "pnpm --filter @commonwealth/mcp-server typecheck && pnpm --filter @commonwealth/web typecheck",
+    "test": "pnpm --filter @commonwealth/mcp-server test && node --import tsx --test 'packages/*/src/**/*.test.ts'",
     "lint": "pnpm biome check",
     "lint:fix": "pnpm run lint --write",
     "format": "biome check .",
     "format:fix": "biome check --write .",
-    "migrate": "pnpm --filter @commonwealth/admin migrate",
-    "db:studio": "pnpm --filter @commonwealth/admin db:studio",
-    "reindex": "pnpm --filter @commonwealth/admin reindex",
-    "bench": "node --import tsx bench/run.ts"
-  },
-  "dependencies": {
-    "@commonwealth/corpus": "workspace:*",
-    "@commonwealth/pipeline": "workspace:*",
-    "@commonwealth/rate-limit": "workspace:*",
-    "@modelcontextprotocol/node": "2.0.0-beta.5",
-    "@modelcontextprotocol/server": "2.0.0-beta.5",
-    "@valibot/to-json-schema": "^1.7.1",
-    "postgres": "^3.4.7",
-    "valibot": "^1.4.2"
+    "migrate": "pnpm --filter @commonwealth/web migrate",
+    "db:studio": "pnpm --filter @commonwealth/web db:studio",
+    "reindex": "pnpm --filter @commonwealth/web reindex",
+    "bench": "pnpm --filter @commonwealth/mcp-server bench"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
     "@types/node": "^24.0.3",
-    "tsx": "^4.20.3",
-    "typescript": "^7.0.2"
+    "tsx": "^4.20.3"
   }
 }

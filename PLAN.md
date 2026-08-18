@@ -13,11 +13,11 @@ Before treating a model as a release default, benchmark it on representative
 product documents and questions. Measure Recall@5, MRR, indexing throughput,
 query latency, RAM usage, image size, and cold-start time on CPU-only hardware.
 
-**Partly done.** `bench/run.ts` (`pnpm bench`) scores Recall@5 and MRR against a
-hand-written gold set in `bench/questions.json`, reports indexing throughput in
+**Partly done.** `mcp-server/bench/run.ts` (`pnpm bench`) scores Recall@5 and MRR against a
+hand-written gold set in `mcp-server/bench/questions.json`, reports indexing throughput in
 chunks/sec and query latency at p50 and p95, and prints the model and query-hint
 settings alongside them so a number can never be read without knowing what
-produced it. It seeds its own `benchmark` workspace from `bench/corpus/` — frozen
+produced it. It seeds its own `benchmark` workspace from `mcp-server/bench/corpus/` — frozen
 copies of this repo's own docs, taken so that editing a doc cannot move the
 numbers underneath a comparison — and never touches a live workspace. Misses are
 named rather than counted, because a miss is a question to read: either the

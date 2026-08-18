@@ -7,8 +7,8 @@ storage/
 coverage/
 __pycache__/
 playground/
-admin/.output/
-admin/.tanstack/
+web/.output/
+web/.tanstack/
 .impeccable/
 playground/
 .DS_Store

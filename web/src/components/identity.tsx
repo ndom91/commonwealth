@@ -9,7 +9,7 @@ import type { Role } from '../lib/roles.js';
  * The role vocabulary is *not* one of them. It used to be redeclared here, which
  * made three copies of a four-word list whose whole point is that there is one:
  * `roles.ts` says so in its opening paragraph, and explains that the copy in
- * `src/access-service.ts` is unavoidable only because that is a separate deploy
+ * `mcp-server/src/access-service.ts` is unavoidable only because that is a separate deploy
  * unit. This one was avoidable — `chrome.tsx` has always imported `Role` from
  * `roles.ts`, so it was never a client-bundle problem, just an old habit. */
 

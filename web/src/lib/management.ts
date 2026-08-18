@@ -178,7 +178,7 @@ export const createIdentity = createServerFn({ method: 'POST' })
     let identityId: string | undefined;
     await client.begin(async (transaction) => {
       /* Filed under the workspace the caller is looking at. An agent belongs to
-         exactly one workspace — `src/access-service.ts` reads
+         exactly one workspace — `mcp-server/src/access-service.ts` reads
          `users.workspace_id` off the key and scopes everything to it — so this
          is also the decision about which corpus the credential can reach. */
       const [identity] = await transaction<{ id: string }[]>`
@@ -991,7 +991,7 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
     const role = isRole(invitation.role) ? invitation.role : ('reader' as Role);
 
     await client.begin(async (transaction) => {
-      /* The one write in `admin/src/lib` with no workspace predicate, and the
+      /* The one write in `web/src/lib` with no workspace predicate, and the
          only one that should not have: the row was found by token digest, so
          its workspace came from the invitation rather than from a caller. */
       const [claimed] = await transaction<{ id: string }[]>`

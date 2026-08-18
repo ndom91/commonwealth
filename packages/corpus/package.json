@@ -5,7 +5,8 @@
   "type": "module",
   "license": "GPL-3.0-only",
   "dependencies": {
-    "@commonwealth/pipeline": "workspace:*"
+    "@commonwealth/pipeline": "workspace:*",
+    "postgres": "^3.4.9"
   },
   "exports": {
     ".": {

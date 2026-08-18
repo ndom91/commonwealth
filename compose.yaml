@@ -1,6 +1,8 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: mcp-server/Dockerfile
     environment:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
@@ -8,7 +10,7 @@ services:
       CORPUS_PATH: ${COMPOSE_CORPUS_PATH:-/app/corpora}
       # Paired with EMBEDDING_MODEL above, and only correct for it.
       # qwen3-embedding is asymmetric: queries want `Instruct: …\nQuery: …`,
-      # documents want raw text. Only this service embeds queries — the admin
+      # documents want raw text. Only this service embeds queries — the web app
       # embeds documents and searches lexically, so it takes no instruction.
       # Change the model and this has to change or be removed with it.
       EMBEDDING_QUERY_INSTRUCTION: ${EMBEDDING_QUERY_INSTRUCTION:-Given a question from a teammate, retrieve passages from the team knowledge base that answer it}
@@ -27,28 +29,28 @@ services:
     ports:
       - "127.0.0.1:${HOST_PORT:-3000}:3000"
 
-  admin:
+  web:
     build:
       context: .
-      dockerfile: admin/Dockerfile
+      dockerfile: web/Dockerfile
     environment:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      # Editing a source rewrites its chunks, so the admin now embeds too. It
+      # Editing a source rewrites its chunks, so the web app now embeds too. It
       # must resolve to the same Ollama and the same model as `app`: chunks from
       # two models in one index do not error, they quietly stop matching.
       OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       CORPUS_PATH: ${COMPOSE_CORPUS_PATH:-/app/corpora}
       PORT: 3001
-      # False, unlike `app`: this one is bound to loopback with nothing in front
-      # of it. Set it true — and configure better-auth's `trustedProxies` — if
+      # This service is bound to loopback with nothing in front of it by default.
+      # Set it true — and configure better-auth's `trustedProxies` — if
       # you put a proxy here, otherwise the invitation limiter counts every
       # caller in the world as one.
-      TRUST_FORWARDED_FOR: ${ADMIN_TRUST_FORWARDED_FOR:-false}
+      TRUST_FORWARDED_FOR: ${WEB_TRUST_FORWARDED_FOR:-false}
     depends_on:
-      admin-migrate:
+      web-migrate:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
@@ -57,12 +59,12 @@ services:
     volumes:
       - corpus_data:/app/corpora
     ports:
-      - "127.0.0.1:${ADMIN_PORT:-3001}:3001"
+      - "127.0.0.1:${WEB_PORT:-3001}:3001"
 
-  admin-migrate:
+  web-migrate:
     build:
       context: .
-      dockerfile: admin/Dockerfile
+      dockerfile: web/Dockerfile
     command: ["pnpm", "migrate"]
     environment:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
@@ -103,7 +105,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     # Published on loopback so `pnpm dev` on the host can embed. Without this the
-    # admin dev server can only reach Ollama by the compose hostname, which does
+    # web dev server can only reach Ollama by the compose hostname, which does
     # not resolve outside the network — so revising a source failed with a bare
     # "failed to fetch" and nothing to point at.
     ports:

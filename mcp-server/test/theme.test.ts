@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { other, parseTheme } from '../admin/src/lib/theme.js';
+import { other, parseTheme } from '../../web/src/lib/theme.js';
 
-/* The admin has no test runner of its own, so its one pure module is covered from
-   the root suite. It is here rather than beside the code because a test nothing
+/* The web app has no test runner of its own, so its one pure module is covered from
+   the MCP server suite. It is here rather than beside the code because a test nothing
    executes is worse than no test.
 
    Parsing the cookie is the framework's job (`getCookie`); validating what came

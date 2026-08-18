@@ -30,10 +30,10 @@ is Apache-2.0 licensed and approximately 639 MB. Treat it as a baseline: run
 frozen corpus and reads `EMBEDDING_MODEL` from the environment so the two runs
 are comparable. `PLAN.md` records what that measures and what it still does not.
 
-Compose binds the MCP server and admin app to loopback. Put your existing
+Compose binds the MCP server and web app to loopback. Put your existing
 reverse proxy in front of them for public access; examples are in
 [`docs/proxy/`](docs/proxy/). Set `APP_TRUST_FORWARDED_FOR=true` and/or
-`ADMIN_TRUST_FORWARDED_FOR=true` only for a service reached through that trusted
+`WEB_TRUST_FORWARDED_FOR=true` only for a service reached through that trusted
 proxy.
 
 ## Local development
@@ -41,13 +41,13 @@ proxy.
 ```sh
 pnpm install --frozen-lockfile
 docker compose up -d postgres ollama ollama-init app
-docker compose up admin-migrate
-pnpm --filter @commonwealth/admin dev
+docker compose up web-migrate
+pnpm --filter @commonwealth/web dev
 ```
 
 The development server runs on the host and connects through `DATABASE_URL`, which
 defaults to loopback Postgres. Containers use `COMPOSE_DATABASE_URL` and keep using
-the Docker network hostname. Do not run the `admin` Compose service while using the
+the Docker network hostname. Do not run the `web` Compose service while using the
 Vite development server; both use port 3001.
 
 ## License

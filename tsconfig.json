@@ -14,10 +14,7 @@
     // is the migration; without it every `node:` specifier and every `process`
     // and `Buffer` reads as an undeclared name.
     "types": ["node"]
-  },
-  // The shared pipeline is checked from here rather than carrying its own
-  // tsconfig and devDependencies: it has no runtime deps, and checking it under
-  // the strictest options in the repo means the looser admin build cannot be
-  // the first place a problem in it surfaces.
-  "include": ["src", "test", "packages/corpus/src", "packages/pipeline/src"]
+  }
+  // Package tsconfigs extend this base so the server, web app, and shared source
+  // agree on strictness without inheriting one another's file lists.
 }

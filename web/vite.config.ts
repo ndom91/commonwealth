@@ -9,5 +9,5 @@ export default defineConfig({
     nitro(),
     viteReact(),
   ],
-  server: { port: Number(process.env.ADMIN_PORT ?? 3001), strictPort: true },
+  server: { port: Number(process.env.WEB_PORT ?? 3001), strictPort: true },
 });

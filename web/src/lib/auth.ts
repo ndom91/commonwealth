@@ -10,7 +10,7 @@ import { db } from './db.js';
  * already scopes everything to rather than a duplicate of it. `concepts`,
  * `concept_chunks`, `users`, `events` and `index_configuration` all carry
  * `workspace_id`, and
- * `src/access-service.ts` already scopes every MCP request by it — agents have
+ * `mcp-server/src/access-service.ts` already scopes every MCP request by it — agents have
  * been multi-tenant all along. This makes people multi-tenant on the same axis.
  *
  * The plugin's own statements (`organization`, `member`, `invitation`, `team`,
@@ -174,7 +174,7 @@ export const auth = betterAuth({
 /* Redeeming an invitation needs sign-up permitted, and `disableSignUp` is
  * enforced inside the sign-up handler itself — so `auth.api.signUpEmail` on the
  * instance above throws `EMAIL_PASSWORD_SIGN_UP_DISABLED` regardless of being
- * called server-side. `admin/scripts/migrate.ts` hits the same wall and solves
+ * called server-side. `web/scripts/migrate.ts` hits the same wall and solves
  * it by forcing the env flag for its own process; a long-lived server cannot,
  * because the flag is read once at import and would then be open for everyone.
  *

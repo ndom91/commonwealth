@@ -64,7 +64,7 @@ export const workspaces = pgTable('workspaces', {
 /* Who may act, and how much. Replaces `admin_role`, which had no role column
    and so made everyone who could sign in an administrator.
 
-   The four roles are the agent vocabulary from `src/access-service.ts`, not
+    The four roles are the agent vocabulary from `mcp-server/src/access-service.ts`, not
    better-auth's `owner | admin | member`. One vocabulary for people and agents
    means `reader | writer | reviewer | admin` has a single definition. */
 export const member = pgTable('member', {

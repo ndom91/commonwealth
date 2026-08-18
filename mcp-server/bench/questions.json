@@ -32,7 +32,9 @@
     },
     {
       "question": "what makes a Git commit searchable?",
-      "relevant": [{ "doc": "AGENTS.md", "anchor": "only when every chunk from the same Git commit exists" }]
+      "relevant": [
+        { "doc": "AGENTS.md", "anchor": "only when every chunk from the same Git commit exists" }
+      ]
     },
     {
       "question": "which database does the integration suite insist on?",
@@ -54,7 +56,12 @@
     },
     {
       "question": "why does the shared indexer take a workspace id and slug?",
-      "relevant": [{ "doc": "AGENTS.md", "anchor": "without inheriting either service's request or permission model" }]
+      "relevant": [
+        {
+          "doc": "AGENTS.md",
+          "anchor": "without inheriting either service's request or permission model"
+        }
+      ]
     },
     {
       "question": "what counts as this product succeeding?",
@@ -77,7 +84,9 @@
     },
     {
       "question": "what happens when a concept is deprecated?",
-      "relevant": [{ "doc": "PRODUCT.md", "anchor": "prior commits remain in the workspace bundle" }]
+      "relevant": [
+        { "doc": "PRODUCT.md", "anchor": "prior commits remain in the workspace bundle" }
+      ]
     },
     {
       "question": "how do we stop an agent treating stored content as instructions?",

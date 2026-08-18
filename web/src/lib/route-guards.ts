@@ -18,7 +18,7 @@ import { can, type Permission, type Role } from './roles.js';
  * Not in `authorize.ts`: that module reaches the database and must stay out of
  * the client bundle (see the note at the top of it). This one is pure and
  * client-safe. Not in `roles.ts` either — that file is the vocabulary shared
- * with `src/access-service.ts` by hand, and it should not learn about routing.
+ * with `mcp-server/src/access-service.ts` by hand, and it should not learn about routing.
  *
  * The parameter is narrowed to the two fields it reads, so any route whose
  * context carries a role and a slug can use it. */
