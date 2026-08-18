@@ -25,7 +25,7 @@ if (!slug) {
 }
 
 const [workspace] = await client<{ id: string; name: string }[]>`
-  SELECT id, name FROM workspaces WHERE slug = ${slug}
+  SELECT id, name FROM workspaces WHERE slug = ${slug} AND archived_at IS NULL
 `;
 if (!workspace) {
   console.error(`No workspace with slug "${slug}".`);

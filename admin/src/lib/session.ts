@@ -1,7 +1,12 @@
 import { createServerFn } from '@tanstack/react-start';
 import { getCookie, getRequest, setCookie } from '@tanstack/react-start/server';
 import { auth } from './auth.js';
-import { readMembership, readWorkspaces, validateWorkspace } from './authorize.js';
+import {
+  readArchivedWorkspaces,
+  readMembership,
+  readWorkspaces,
+  validateWorkspace,
+} from './authorize.js';
 import { parseTheme, THEME_COOKIE, THEME_MAX_AGE } from './theme.js';
 
 /* Server functions only. Routes import from here, and this module reaches the
@@ -22,6 +27,10 @@ export const getSession = createServerFn({ method: 'GET' }).handler(async () => 
    the honest answer, since there is nothing it can reach. */
 export const getWorkspaces = createServerFn({ method: 'GET' }).handler(async () => {
   return readWorkspaces();
+});
+
+export const getArchivedWorkspaces = createServerFn({ method: 'GET' }).handler(async () => {
+  return readArchivedWorkspaces();
 });
 
 /* Everything the shell needs for one workspace, in one round trip: who is

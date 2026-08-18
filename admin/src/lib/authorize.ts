@@ -60,6 +60,7 @@ export async function readMembership(
     FROM member
     JOIN workspaces ON workspaces.id = member.workspace_id
     WHERE member.user_id = ${userId} AND workspaces.slug = ${slug}
+      AND workspaces.archived_at IS NULL
   `;
   if (!row || !isRole(row.role)) return null;
   return { userId, workspaceId: row.workspace_id, slug, role: row.role };
@@ -74,13 +75,54 @@ export async function readWorkspaces(knownUserId?: string): Promise<WorkspaceRef
     SELECT workspaces.id, workspaces.name, workspaces.slug, member.role
     FROM member
     JOIN workspaces ON workspaces.id = member.workspace_id
-    WHERE member.user_id = ${userId}
+    WHERE member.user_id = ${userId} AND workspaces.archived_at IS NULL
     ORDER BY member.created_at ASC, workspaces.name ASC
   `;
   return rows
     .filter((row) => isRole(row.role))
     .map((row) => ({ id: row.id, name: row.name, slug: row.slug, role: row.role as Role }));
 }
+
+export async function readArchivedWorkspaces(knownUserId?: string) {
+  const userId = knownUserId ?? (await signedInUser());
+  if (!userId) return [];
+  const rows = await client<
+    { id: string; name: string; slug: string; role: string; archived_at: string }[]
+  >`
+    SELECT workspaces.id, workspaces.name, workspaces.slug, member.role, workspaces.archived_at
+    FROM member
+    JOIN workspaces ON workspaces.id = member.workspace_id
+    WHERE member.user_id = ${userId} AND workspaces.archived_at IS NOT NULL
+    ORDER BY workspaces.archived_at DESC, workspaces.name ASC
+  `;
+  return rows
+    .filter((row) => isRole(row.role))
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      role: row.role as Role,
+      archivedAt: row.archived_at,
+    }));
+}
+
+async function requireArchivedAdmin(slug: string): Promise<Membership> {
+  const userId = await signedInUser();
+  if (!userId || !SLUG.test(slug)) throw new Error('That workspace is not available to you.');
+  const [row] = await client<{ workspace_id: string; role: string }[]>`
+    SELECT member.workspace_id, member.role
+    FROM member
+    JOIN workspaces ON workspaces.id = member.workspace_id
+    WHERE member.user_id = ${userId} AND workspaces.slug = ${slug}
+      AND workspaces.archived_at IS NOT NULL
+  `;
+  if (!row || !isRole(row.role) || !can(row.role as Role, 'admin')) {
+    throw new Error('That workspace is not available to you.');
+  }
+  return { userId, workspaceId: row.workspace_id, slug, role: row.role as Role };
+}
+
+export { requireArchivedAdmin };
 
 /* The gate. Every server function that touches a workspace's contents calls
  * this first, naming the permission it needs *and the workspace it is acting

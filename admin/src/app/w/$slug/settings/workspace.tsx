@@ -1,9 +1,15 @@
-import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { AppShell, SettingsTabs } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
 import { readFailure, writeFailure } from '../../../../lib/failure.js';
-import { createWorkspace, getWorkspaceFacts, renameWorkspace } from '../../../../lib/management.js';
+import {
+  archiveWorkspace,
+  createWorkspace,
+  getWorkspaceFacts,
+  renameWorkspace,
+} from '../../../../lib/management.js';
+import { can } from '../../../../lib/roles.js';
 import { documentTitle } from '../../../../lib/title.js';
 
 /* The workspace as an object: what it is called, what it is made of, and how to
@@ -55,9 +61,10 @@ function Workspace() {
       {...viewer}
     >
       <section className="detail" aria-label="This workspace">
-        <ThisWorkspace />
+        {can(viewer.role, 'admin') && <ThisWorkspace />}
         <Corpus facts={facts} failure={failure} />
         <NewWorkspace />
+        {can(viewer.role, 'admin') && <ArchiveWorkspace />}
       </section>
     </AppShell>
   );
@@ -275,8 +282,58 @@ function NewWorkspace() {
           <button className="btn btn--primary" disabled={pending || !value}>
             {pending ? 'Creating…' : 'Create workspace'}
           </button>
+          <Link to="/archived-workspaces" className="btn btn--quiet">
+            Archived workspaces
+          </Link>
         </div>
       </form>
+    </div>
+  );
+}
+
+function ArchiveWorkspace() {
+  const { slug } = Route.useParams();
+  const navigate = useNavigate();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function archive() {
+    setPending(true);
+    setError(undefined);
+    try {
+      await archiveWorkspace({ data: { workspace: slug } });
+      await navigate({ to: '/archived-workspaces' });
+    } catch (cause) {
+      setError(
+        writeFailure(cause, 'That workspace could not be archived.', 'Nothing was archived.')
+      );
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="bench__section">
+      <span className="label">Archive workspace</span>
+      <p className="line__caption prose">
+        Removes this project from the switcher and stops browser and MCP access. Its sources,
+        knowledge index, people, identities, and keys stay intact until an administrator restores
+        it.
+      </p>
+      {error && (
+        <p className="notice" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="bench__controls">
+        <button
+          type="button"
+          className="btn btn--void"
+          disabled={pending}
+          onClick={() => void archive()}
+        >
+          {pending ? 'Archiving…' : 'Archive workspace'}
+        </button>
+      </div>
     </div>
   );
 }

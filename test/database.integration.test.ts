@@ -203,6 +203,11 @@ if (!databaseUrl) {
 
       await okf.deprecateConcept(actor, created.path);
       await assert.rejects(() => okf.getConcept(actor, created.path), /Concept not found/);
+
+      /* An archived workspace retains its index and Git history, but its agent
+       * credentials must no longer authenticate at the MCP boundary. */
+      await sql`UPDATE workspaces SET archived_at = now() WHERE id = ${workspace.id}`;
+      assert.equal(await access.authenticate(bootstrapKey), null);
     } finally {
       await sql.end();
       await rm(corpusPath, { recursive: true, force: true });

@@ -820,13 +820,20 @@ is built rather than linking to nothing. **No section is dormant today**; every
 drawer routes somewhere, so that branch is currently unexercised and kept only
 as the pattern for the next unbuilt section.
 
-**The rail is cut to the holder's role.** A reader sees Knowledge and Custody;
-Review queue appears at `reviewer`, the Workspace group — Settings — at `admin`.
-Omitted, not
+**The rail is cut to the holder's role.** Every member sees the Workspace group
+because anyone may start a project. A reader sees its *Start workspace* entry;
+a writer also sees their own Identities; the full Settings entry appears at
+`admin`. Review queue appears at `reviewer`. Omitted, not
 disabled — a `PENDING` mark says *nobody can open this yet*, which is a
 different sentence from *this is not yours to open*, and showing a drawer that
 answers with a refusal tells someone about a job they do not have on every
 screen. Absence is the quieter and more accurate statement.
+
+Archiving is reversible custody, not destruction. It removes a workspace from
+the switcher and rejects its browser and MCP access while retaining its sources,
+index, identities, keys and memberships. The unscoped archive register is the
+recovery door: administrators can restore a project there even when it was their
+last active workspace.
 
 Each drawer carries a hand-drawn mark in the world's own grammar — a filing tab
 for Sources, a dashed seal for the review queue, an issued tag for Identities, a

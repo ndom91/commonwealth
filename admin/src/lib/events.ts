@@ -48,7 +48,9 @@ export type EventType =
   | 'member_role_changed'
   | 'member_removed'
   | 'workspace_created'
-  | 'workspace_renamed';
+  | 'workspace_renamed'
+  | 'workspace_archived'
+  | 'workspace_restored';
 
 export type Event = {
   workspaceId: string;

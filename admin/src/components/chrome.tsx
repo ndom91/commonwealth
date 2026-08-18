@@ -160,14 +160,20 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
       items: [{ mark: 'settings', label: 'Settings', to: '/w/$slug/settings/workspace' }],
     });
   } else if (can(role, 'write')) {
-    /* A writer has one thing to do in Settings — mint and void credentials for
-       their own agents — so the rail names that rather than a section whose
-       other two tabs would refuse them. The count is deliberately absent: it
-       counts every holder in the workspace, and this link leads to a register
-       showing only theirs. */
+    /* Writers can start a project and mint credentials for their own agents.
+        The identity count is deliberately absent: it counts every holder in the
+        workspace, while this link leads to a register showing only theirs. */
     groups.push({
       label: 'Workspace',
-      items: [{ mark: 'settings', label: 'Your identities', to: '/w/$slug/settings/identities' }],
+      items: [
+        { mark: 'settings', label: 'Start workspace', to: '/w/$slug/settings/workspace' },
+        { mark: 'settings', label: 'Your identities', to: '/w/$slug/settings/identities' },
+      ],
+    });
+  } else {
+    groups.push({
+      label: 'Workspace',
+      items: [{ mark: 'settings', label: 'Start workspace', to: '/w/$slug/settings/workspace' }],
     });
   }
   groups.push({
@@ -520,12 +526,11 @@ export function AppShell({
  * lives at `settings/identities/$id`, and the tab has to stay lit while you are
  * reading one.
  *
- * Workspace and People are administrators' pages and are omitted for everyone
- * else, on the same reasoning as the rail: a tab that answers "Administrator
- * access is required" is telling you about a job that is not yours. A writer
- * reaching Identities to mint their own credential sees one tab, which is a
- * bar with nothing to choose — so the bar is dropped entirely rather than
- * rendered with a single lit item.
+ * Workspace is available to every member because anyone may start a project;
+ * its administrative controls remain hidden from non-administrators. People is
+ * administrators' work and is omitted for everyone else. Writers can choose
+ * between Workspace and their own Identities; readers see Workspace without a
+ * redundant one-item tab bar.
  *
  * The identity count goes with it. It counts every holder in the workspace, and
  * a non-administrator's register shows only their own; a number that disagrees
@@ -539,7 +544,7 @@ export function SettingsTabs({
   counts: NavCounts | undefined;
   role: Role;
 }) {
-  if (!can(role, 'admin')) return null;
+  if (!can(role, 'admin') && !can(role, 'write')) return null;
   return (
     <nav className="tabs" aria-label="Settings sections">
       <Link
@@ -550,15 +555,17 @@ export function SettingsTabs({
       >
         Workspace
       </Link>
-      <Link
-        to="/w/$slug/settings/people"
-        params={{ slug }}
-        className="tabs__link"
-        activeProps={{ 'aria-current': 'page' }}
-      >
-        People
-        <Count value={counts?.people} />
-      </Link>
+      {can(role, 'admin') && (
+        <Link
+          to="/w/$slug/settings/people"
+          params={{ slug }}
+          className="tabs__link"
+          activeProps={{ 'aria-current': 'page' }}
+        >
+          People
+          <Count value={counts?.people} />
+        </Link>
+      )}
       <Link
         to="/w/$slug/settings/identities"
         params={{ slug }}

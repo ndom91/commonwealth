@@ -28,7 +28,7 @@ export class AccessService {
               users.display_name AS name,
               users.role, users.auto_approve AS "autoApprove", api_keys.secret_hash
        FROM api_keys JOIN users ON users.id = api_keys.user_id
-       JOIN workspaces ON workspaces.id = users.workspace_id
+        JOIN workspaces ON workspaces.id = users.workspace_id AND workspaces.archived_at IS NULL
       WHERE api_keys.key_prefix = ${keyPrefix(key)}
         AND api_keys.revoked_at IS NULL AND users.disabled_at IS NULL
     `;

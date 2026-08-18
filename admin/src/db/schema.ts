@@ -58,6 +58,7 @@ export const workspaces = pgTable('workspaces', {
   logo: text('logo'),
   metadata: text('metadata'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
 });
 
 /* Who may act, and how much. Replaces `admin_role`, which had no role column

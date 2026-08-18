@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { getWorkspaces } from '../lib/session.js';
+import { getArchivedWorkspaces, getWorkspaces } from '../lib/session.js';
 
 /* The only route that has to decide *which* workspace you meant.
  *
@@ -8,16 +8,19 @@ import { getWorkspaces } from '../lib/session.js';
  * one, and for anyone else a stable choice rather than whichever row the
  * database happened to return first.
  *
- * No membership means signed out in every way that matters: there is nothing to
- * land on, so it is the same redirect as no session. */
+ * With no active membership, an archived workspace is still a recovery path;
+ * otherwise there is nothing to land on, so it is the same redirect as no
+ * session. */
 export const Route = createFileRoute('/')({
   beforeLoad: async () => {
-    const workspaces = await getWorkspaces();
+    const [workspaces, archived] = await Promise.all([getWorkspaces(), getArchivedWorkspaces()]);
     const first = workspaces[0];
     throw redirect(
       first
         ? { to: '/w/$slug/sources', params: { slug: first.slug }, search: {} }
-        : { to: '/sign-in' }
+        : archived.length > 0
+          ? { to: '/archived-workspaces' }
+          : { to: '/sign-in' }
     );
   },
   component: () => null,

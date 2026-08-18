@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './app/__root'
 import { Route as IndexRouteImport } from './app/index'
+import { Route as ArchivedWorkspacesRouteImport } from './app/archived-workspaces'
 import { Route as DashboardRouteImport } from './app/dashboard'
 import { Route as SettingsRouteImport } from './app/settings'
 import { Route as SignInRouteImport } from './app/sign-in'
@@ -34,6 +35,11 @@ import { Route as WSlugSettingsIdentitiesIdentityIdRouteImport } from './app/w/$
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArchivedWorkspacesRoute = ArchivedWorkspacesRouteImport.update({
+  id: '/archived-workspaces',
+  path: '/archived-workspaces',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -141,6 +147,7 @@ const WSlugSettingsIdentitiesIdentityIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/archived-workspaces': typeof ArchivedWorkspacesRoute
   '/dashboard': typeof DashboardRoute
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
@@ -164,6 +171,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/archived-workspaces': typeof ArchivedWorkspacesRoute
   '/dashboard': typeof DashboardRoute
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
@@ -185,6 +193,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/archived-workspaces': typeof ArchivedWorkspacesRoute
   '/dashboard': typeof DashboardRoute
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
@@ -210,6 +219,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/archived-workspaces'
     | '/dashboard'
     | '/settings'
     | '/sign-in'
@@ -233,6 +243,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/archived-workspaces'
     | '/dashboard'
     | '/settings'
     | '/sign-in'
@@ -253,6 +264,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/archived-workspaces'
     | '/dashboard'
     | '/settings'
     | '/sign-in'
@@ -277,6 +289,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArchivedWorkspacesRoute: typeof ArchivedWorkspacesRoute
   DashboardRoute: typeof DashboardRoute
   SettingsRoute: typeof SettingsRoute
   SignInRoute: typeof SignInRoute
@@ -292,6 +305,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/archived-workspaces': {
+      id: '/archived-workspaces'
+      path: '/archived-workspaces'
+      fullPath: '/archived-workspaces'
+      preLoaderRoute: typeof ArchivedWorkspacesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -508,6 +528,7 @@ const WSlugRouteWithChildren = WSlugRoute._addFileChildren(WSlugRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArchivedWorkspacesRoute: ArchivedWorkspacesRoute,
   DashboardRoute: DashboardRoute,
   SettingsRoute: SettingsRoute,
   SignInRoute: SignInRoute,

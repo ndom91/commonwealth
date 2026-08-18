@@ -56,7 +56,8 @@ CREATE TABLE "workspaces" (
   "slug" text NOT NULL UNIQUE,
   "logo" text,
   "metadata" text,
-  "created_at" timestamptz NOT NULL DEFAULT now()
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  "archived_at" timestamptz
 );
 
 CREATE TABLE "index_configuration" (

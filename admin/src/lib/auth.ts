@@ -46,9 +46,9 @@ const membership = () =>
     /* Not `owner`, which is the default and would be a fifth role nobody else
        uses. See `roles.ts`. */
     creatorRole: 'admin',
-    /* Wave A runs on the single existing workspace. Creating more is wave B,
-       and until then this closes `POST /api/auth/organization/create` to
-       everyone rather than leaving it open because nothing links to it. */
+    /* Workspace creation is our transaction in `management.ts`: it also creates
+        membership and index configuration. Keep better-auth's narrower endpoint
+        closed so it cannot create an incomplete workspace. */
     allowUserToCreateOrganization: false,
     schema: {
       organization: {

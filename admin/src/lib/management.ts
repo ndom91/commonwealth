@@ -3,7 +3,14 @@ import { clientIp, FixedWindow } from '@commonwealth/rate-limit';
 import { createServerFn } from '@tanstack/react-start';
 import { getRequest } from '@tanstack/react-start/server';
 import { provisioning } from './auth.js';
-import { requireMember, type Scoped, SLUG, validateScope, validateWorkspace } from './authorize.js';
+import {
+  requireArchivedAdmin,
+  requireMember,
+  type Scoped,
+  SLUG,
+  validateScope,
+  validateWorkspace,
+} from './authorize.js';
 import { PAGE_SIZE } from './concepts.js';
 import { client } from './db.js';
 import { fileEvent } from './events.js';
@@ -1032,8 +1039,9 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
  * explicit and keeps `index_configuration`'s existing job — refusing a silent
  * model change — working per workspace.
  *
- * Gated on `admin` in the *current* workspace. There is no instance-level role,
- * so administering one corpus is what earns the right to start another. */
+ * Any signed-in member may start another workspace. The current workspace only
+ * supplies the instance-wide embedding configuration; it does not delegate
+ * authority to create a project. */
 export const createWorkspace = createServerFn({ method: 'POST' })
   .validator((value: unknown): Scoped<{ name: string; slug: string }> => {
     const input = (value ?? {}) as Partial<{ name: string; slug: string }>;
@@ -1048,7 +1056,7 @@ export const createWorkspace = createServerFn({ method: 'POST' })
     return { workspace: validateWorkspace(value), name, slug };
   })
   .handler(async ({ data }) => {
-    const { userId: creator, workspaceId: from } = await requireMember('admin', data.workspace);
+    const { userId: creator, workspaceId: from } = await requireMember('read', data.workspace);
 
     /* Both columns are unique, so both are checked here. Without the name
        check the insert still refuses — with a raw `23505` naming a constraint,
@@ -1181,6 +1189,47 @@ export const renameWorkspace = createServerFn({ method: 'POST' })
       });
     });
     return { name: data.name };
+  });
+
+/* Archiving removes a workspace from normal browser and MCP access without
+ * deleting its Git bundle, index, identities, keys, or membership. An
+ * administrator can restore it from the archived-workspaces register. */
+export const archiveWorkspace = createServerFn({ method: 'POST' })
+  .validator(validateScope)
+  .handler(async ({ data }) => {
+    const { userId: actor, workspaceId } = await requireMember('admin', data.workspace);
+    await client.begin(async (transaction) => {
+      const [archived] = await transaction<{ id: string }[]>`
+        UPDATE workspaces SET archived_at = now()
+        WHERE id = ${workspaceId} AND archived_at IS NULL
+        RETURNING id
+      `;
+      if (!archived) throw new Error('That workspace is no longer available.');
+      await fileEvent(transaction, {
+        workspaceId,
+        actor,
+        type: 'workspace_archived',
+      });
+    });
+  });
+
+export const restoreWorkspace = createServerFn({ method: 'POST' })
+  .validator(validateScope)
+  .handler(async ({ data }) => {
+    const { userId: actor, workspaceId } = await requireArchivedAdmin(data.workspace);
+    await client.begin(async (transaction) => {
+      const [restored] = await transaction<{ id: string }[]>`
+        UPDATE workspaces SET archived_at = NULL
+        WHERE id = ${workspaceId} AND archived_at IS NOT NULL
+        RETURNING id
+      `;
+      if (!restored) throw new Error('That workspace is no longer archived.');
+      await fileEvent(transaction, {
+        workspaceId,
+        actor,
+        type: 'workspace_restored',
+      });
+    });
   });
 
 /* Changing your own name and password goes through `authClient.updateUser` and

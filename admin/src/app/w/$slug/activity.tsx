@@ -98,6 +98,8 @@ const PHRASING: Record<string, string> = {
   member_removed: 'Removed someone',
   workspace_created: 'Created this workspace',
   workspace_renamed: 'Renamed the workspace',
+  workspace_archived: 'Archived this workspace',
+  workspace_restored: 'Restored this workspace',
   search: 'Searched',
 };
 
