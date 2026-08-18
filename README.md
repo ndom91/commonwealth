@@ -40,7 +40,7 @@ proxy.
 
 ```sh
 pnpm install --frozen-lockfile
-docker compose up -d postgres ollama ollama-init app
+docker compose up -d postgres ollama app
 docker compose up web-migrate
 pnpm --filter @commonwealth/web dev
 ```

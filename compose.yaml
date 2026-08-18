@@ -22,8 +22,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      ollama-init:
-        condition: service_completed_successfully
+      ollama:
+        condition: service_healthy
     volumes:
       - corpus_data:/app/corpora
     ports:
@@ -54,8 +54,8 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-      ollama-init:
-        condition: service_completed_successfully
+      ollama:
+        condition: service_healthy
     volumes:
       - corpus_data:/app/corpora
     ports:
@@ -96,9 +96,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   ollama:
-    image: ollama/ollama:latest
+    build: ./ollama
+    environment:
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:0.6b}
     healthcheck:
-      test: ["CMD", "ollama", "list"]
+      test: ["CMD-SHELL", "ollama list | awk 'NR > 1 { print $$1 }' | grep -Fqx \"$$EMBEDDING_MODEL\""]
       interval: 5s
       timeout: 5s
       retries: 24
@@ -110,17 +112,6 @@ services:
     # "failed to fetch" and nothing to point at.
     ports:
       - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
-
-  ollama-init:
-    image: ollama/ollama:latest
-    environment:
-      OLLAMA_HOST: ollama:11434
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:0.6b}
-    depends_on:
-      ollama:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c", "for attempt in $$(seq 1 60); do ollama list && exec ollama pull $${EMBEDDING_MODEL}; sleep 2; done; echo 'Ollama was not ready after 120 seconds' >&2; exit 1"]
-    restart: "no"
 
 volumes:
   postgres_data:
