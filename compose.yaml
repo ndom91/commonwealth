@@ -28,7 +28,7 @@ services:
     volumes:
       - corpus_data:/app/corpora
     ports:
-      - "127.0.0.1:${HOST_PORT:-3000}:3000"
+      - "0.0.0.0:${HOST_PORT:-3000}:3000"
 
   web:
     build:
@@ -62,7 +62,7 @@ services:
     volumes:
       - corpus_data:/app/corpora
     ports:
-      - "127.0.0.1:${WEB_PORT:-3001}:3001"
+      - "0.0.0.0:${WEB_PORT:-3001}:3001"
 
   web-migrate:
     build:
