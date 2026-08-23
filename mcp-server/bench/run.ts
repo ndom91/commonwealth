@@ -30,7 +30,7 @@ function required(name: string): string {
 
 const config = {
   DATABASE_URL: required('DATABASE_URL'),
-  OLLAMA_URL: required('OLLAMA_URL'),
+  EMBEDDING_URL: required('EMBEDDING_URL'),
   EMBEDDING_MODEL: required('EMBEDDING_MODEL'),
   EMBEDDING_QUERY_INSTRUCTION: process.env.EMBEDDING_QUERY_INSTRUCTION,
   PORT: 0,
@@ -44,7 +44,7 @@ const config = {
 };
 const sql = postgres(config.DATABASE_URL);
 const embeddings = new Embeddings({
-  ollamaUrl: config.OLLAMA_URL,
+  embeddingUrl: config.EMBEDDING_URL,
   model: config.EMBEDDING_MODEL,
   queryInstruction: config.EMBEDDING_QUERY_INSTRUCTION,
 });

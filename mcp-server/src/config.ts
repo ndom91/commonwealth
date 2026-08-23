@@ -29,7 +29,7 @@ const boolean = (fallback: boolean) =>
 
 const environment = v.object({
   DATABASE_URL: v.pipe(v.string(), v.url()),
-  OLLAMA_URL: v.pipe(v.string(), v.url()),
+  EMBEDDING_URL: v.pipe(v.string(), v.url()),
   EMBEDDING_MODEL: v.pipe(v.string(), v.minLength(1)),
   /* The task description for an asymmetric embedding model's query side. Unset
      means queries are embedded exactly like documents, which is right for a

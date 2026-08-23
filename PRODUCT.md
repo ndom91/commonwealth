@@ -45,7 +45,7 @@ the current commit.
 
 Three things a neighbouring RAG or docs tool could not truthfully copy at once:
 
-1. **Nothing leaves the host.** Embeddings run locally through Ollama; storage is
+1. **Nothing leaves the host.** Embeddings run locally through llama.cpp; storage is
    local Postgres with pgvector. No vendor to trust, no egress for proprietary
    product knowledge.
 2. **Provenance is a first-class primitive, not metadata.** Authority level,

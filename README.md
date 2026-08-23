@@ -24,8 +24,10 @@ to connect to `http://localhost:3000/mcp` with:
 Authorization: Bearer <your key>
 ```
 
-The default embedding model is a small local baseline. `qwen3-embedding:0.6b`
-is Apache-2.0 licensed and approximately 639 MB. Treat it as a baseline: run
+The default embedding model is a small local baseline. The pinned
+`Qwen3-Embedding-0.6B-Q8_0.gguf` artifact is Apache-2.0 licensed and approximately
+639 MB. It is fetched once into the local `embedding_models` Docker volume and
+verified against its configured SHA-256 before llama.cpp starts. Treat it as a baseline: run
 `pnpm bench` before and after changing it, which scores retrieval against a
 frozen corpus and reads `EMBEDDING_MODEL` from the environment so the two runs
 are comparable. `PLAN.md` records what that measures and what it still does not.
@@ -40,7 +42,7 @@ proxy.
 
 ```sh
 pnpm install --frozen-lockfile
-docker compose up -d postgres ollama app
+docker compose up -d postgres inference app
 docker compose up web-migrate
 pnpm --filter @commonwealth/web dev
 ```
@@ -49,6 +51,13 @@ The development server runs on the host and connects through `DATABASE_URL`, whi
 defaults to loopback Postgres. Containers use `COMPOSE_DATABASE_URL` and keep using
 the Docker network hostname. Do not run the `web` Compose service while using the
 Vite development server; both use port 3001.
+
+The default inference service is CPU-only and supports Linux `amd64` and `arm64`.
+On Linux with NVIDIA Container Toolkit, add `-f compose.cuda.yaml`; on Linux with
+ROCm, add `-f compose.rocm.yaml`. Apple Silicon Docker runs the portable Linux CPU
+image. For Metal acceleration, run a native `llama-server` and point
+`EMBEDDING_URL` at it instead of starting the Compose inference service. See
+[`docs/inference.md`](docs/inference.md) for model and platform details.
 
 ## License
 

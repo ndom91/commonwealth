@@ -1,0 +1,13 @@
+services:
+  inference:
+    build:
+      args:
+        LLAMA_CPP_IMAGE: ghcr.io/ggml-org/llama.cpp:server-cuda@sha256:45047ae940975851c3b195997c91f6bb4add4b941880d94287e5f21ff5a6369a
+    command: ["--n-gpu-layers", "99"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

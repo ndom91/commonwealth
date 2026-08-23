@@ -1,7 +1,7 @@
 import { Embeddings } from '@commonwealth/pipeline';
 
 /* The admin's half of the shared pipeline. Chunking is pure; embedding needs
- * Ollama and must use the same model as the MCP service. */
+ * the local inference service and must use the same model as the MCP service. */
 let cached: Embeddings | undefined;
 
 function required(name: string): string {
@@ -16,7 +16,7 @@ function required(name: string): string {
 
 export function embeddings(): Embeddings {
   cached ??= new Embeddings({
-    ollamaUrl: required('OLLAMA_URL'),
+    embeddingUrl: required('EMBEDDING_URL'),
     model: required('EMBEDDING_MODEL'),
   });
   return cached;

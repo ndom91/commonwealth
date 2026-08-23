@@ -24,7 +24,7 @@ if (!databaseUrl) {
     const corpusPath = '/tmp/commonwealth-corpus-integration-test';
     const config: Config = {
       DATABASE_URL: databaseUrl,
-      OLLAMA_URL: 'http://unused',
+      EMBEDDING_URL: 'http://unused',
       EMBEDDING_MODEL: 'test-embedding-model',
       PORT: 3000,
       CORPUS_PATH: corpusPath,

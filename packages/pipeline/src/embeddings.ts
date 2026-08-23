@@ -5,7 +5,7 @@
 export const EMBEDDING_DIMENSIONS = 1024;
 
 export type EmbeddingOptions = {
-  ollamaUrl: string;
+  embeddingUrl: string;
   model: string;
   /* Asymmetric models want the query side marked. Qwen3-Embedding — the default
      here — is trained to receive `Instruct: {task}\nQuery: {text}` for queries
@@ -29,14 +29,16 @@ export type EmbeddingOptions = {
  * sixteen a batch takes about eleven seconds, comfortably inside the timeout on
  * slow hardware.
  *
- * Batches run in sequence, not in parallel: Ollama here is CPU-bound, so
+ * Batches run in sequence, not in parallel: local inference here is CPU-bound, so
  * concurrent requests would contend for the same cores and push each one closer
  * to its own deadline rather than finishing sooner. */
 const BATCH_SIZE = 16;
 
-type OllamaEmbeddingResponse = {
-  embeddings?: number[][];
-  embedding?: number[];
+type OpenAIEmbeddingResponse = {
+  data?: Array<{
+    embedding?: unknown;
+    index?: unknown;
+  }>;
 };
 
 export class Embeddings {
@@ -71,7 +73,7 @@ export class Embeddings {
    *
    * The batch boundary is deliberately not exported as a number for callers to
    * re-derive their own loop from. It is a property of how this class talks to
-   * Ollama, and a second loop keyed to a copy of it is a second thing to keep
+   * the embedding provider, and a second loop keyed to a copy of it is a second thing to keep
    * in step. `start` is passed so the caller can address the vectors by their
    * position in the original array without counting. */
   async embedInBatches(
@@ -87,10 +89,10 @@ export class Embeddings {
     /* A bare AbortError reads "The operation was aborted due to timeout" and
        names neither the service nor the stage, which is useless when a request
        makes two long network calls in sequence. Say which one gave up. */
-    const response = await fetch(`${this.options.ollamaUrl}/api/embed`, {
+    const response = await fetch(`${this.options.embeddingUrl.replace(/\/$/, '')}/v1/embeddings`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model: this.options.model, input: texts }),
+      body: JSON.stringify({ model: this.options.model, input: texts, encoding_format: 'float' }),
       signal: AbortSignal.timeout(30_000),
     }).catch((cause: unknown) => {
       if (cause instanceof Error && cause.name === 'TimeoutError') {
@@ -98,7 +100,7 @@ export class Embeddings {
           `Embedding ${texts.length} chunk(s) with ${this.options.model} timed out after 30s. The model may be loading, or the host may be slow.`
         );
       }
-      throw new Error(`Could not reach the embedding service at ${this.options.ollamaUrl}`, {
+      throw new Error(`Could not reach the embedding service at ${this.options.embeddingUrl}`, {
         cause,
       });
     });
@@ -107,14 +109,29 @@ export class Embeddings {
       throw new Error(`Embedding request failed with ${response.status}`);
     }
 
-    const payload = (await response.json()) as OllamaEmbeddingResponse;
-    const embeddings = payload.embeddings ?? (payload.embedding ? [payload.embedding] : undefined);
-    if (!embeddings || embeddings.length !== texts.length) {
+    const payload = (await response.json()) as OpenAIEmbeddingResponse;
+    if (!payload.data || payload.data.length !== texts.length) {
       throw new Error('Embedding provider returned an invalid response');
+    }
+    const embeddings: number[][] = Array.from({ length: texts.length });
+    for (const item of payload.data) {
+      const index = item.index;
+      if (
+        typeof index !== 'number' ||
+        !Number.isInteger(index) ||
+        index < 0 ||
+        index >= texts.length ||
+        !Array.isArray(item.embedding) ||
+        embeddings[index]
+      ) {
+        throw new Error('Embedding provider returned an invalid response');
+      }
+      embeddings[index] = item.embedding as number[];
     }
     if (
       embeddings.some(
         (embedding) =>
+          !embedding ||
           embedding.length !== EMBEDDING_DIMENSIONS ||
           embedding.some((value) => !Number.isFinite(value))
       )

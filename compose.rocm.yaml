@@ -1,0 +1,9 @@
+services:
+  inference:
+    build:
+      args:
+        LLAMA_CPP_IMAGE: ghcr.io/ggml-org/llama.cpp:server-rocm@sha256:137b425524e8c7b52b774acaaecacb2f0d23db7cdf1e1403a31fd50c23c6b999
+    command: ["--n-gpu-layers", "99"]
+    devices:
+      - /dev/kfd
+      - /dev/dri

@@ -7,7 +7,7 @@ OpenCode, and Cursor.
 
 - Node.js and the MCP TypeScript SDK
 - PostgreSQL with pgvector
-- Ollama with `qwen3-embedding:0.6b` for local embeddings
+- llama.cpp with `Qwen3-Embedding-0.6B-Q8_0.gguf` for local embeddings
 - MarkItDown for document-to-Markdown conversion
 - Optional Caddy reverse proxy for HTTPS
 
@@ -40,7 +40,7 @@ the evaluation corpus described in `PLAN.md` before changing the default.
 
 ```sh
 pnpm install --frozen-lockfile
-docker compose up -d postgres ollama ollama-init app
+docker compose up -d postgres inference app
 docker compose up admin-migrate
 pnpm --filter @commonwealth/admin dev
 ```

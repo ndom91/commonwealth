@@ -5,8 +5,8 @@ services:
       dockerfile: mcp-server/Dockerfile
     environment:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
-      OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      EMBEDDING_URL: ${COMPOSE_EMBEDDING_URL:-http://inference:8080}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding-0.6b-q8_0-370f27d}
       CORPUS_PATH: ${COMPOSE_CORPUS_PATH:-/app/corpora}
       # Paired with EMBEDDING_MODEL above, and only correct for it.
       # qwen3-embedding is asymmetric: queries want `Instruct: …\nQuery: …`,
@@ -22,7 +22,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      ollama:
+      inference:
         condition: service_healthy
     volumes:
       - corpus_data:/app/corpora
@@ -38,10 +38,10 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       # Editing a source rewrites its chunks, so the web app now embeds too. It
-      # must resolve to the same Ollama and the same model as `app`: chunks from
+      # must resolve to the same embedding service and model as `app`: chunks from
       # two models in one index do not error, they quietly stop matching.
-      OLLAMA_URL: ${COMPOSE_OLLAMA_URL:-http://ollama:11434}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      EMBEDDING_URL: ${COMPOSE_EMBEDDING_URL:-http://inference:8080}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding-0.6b-q8_0-370f27d}
       CORPUS_PATH: ${COMPOSE_CORPUS_PATH:-/app/corpora}
       PORT: 3001
       # This service is bound to loopback with nothing in front of it by default.
@@ -54,7 +54,7 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-      ollama:
+      inference:
         condition: service_healthy
     volumes:
       - corpus_data:/app/corpora
@@ -73,7 +73,7 @@ services:
       BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding-0.6b-q8_0-370f27d}
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,25 +95,31 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  ollama:
-    build: ./ollama
+  inference:
+    build:
+      context: ./inference
+      args:
+        LLAMA_CPP_IMAGE: ghcr.io/ggml-org/llama.cpp:server@sha256:100de626bdc5b7df898c12561eefaf557019d2746d5fc8d3f4d7fd24e15ad384
     environment:
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding-0.6b-q8_0-370f27d}
+      MODEL_FILE: ${MODEL_FILE:-Qwen3-Embedding-0.6B-Q8_0.gguf}
+      MODEL_SHA256: ${MODEL_SHA256:-06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439}
+      MODEL_URL: ${MODEL_URL:-https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/370f27d7550e0def9b39c1f16d3fbaa13aa67728/Qwen3-Embedding-0.6B-Q8_0.gguf}
     healthcheck:
-      test: ["CMD-SHELL", "ollama list | awk 'NR > 1 { print $$1 }' | grep -Fqx \"$$EMBEDDING_MODEL\""]
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 5s
       timeout: 5s
       retries: 24
+      start_period: 10m
     volumes:
-      - ollama_data:/root/.ollama
+      - embedding_models:/models
     # Published on loopback so `pnpm dev` on the host can embed. Without this the
-    # web dev server can only reach Ollama by the compose hostname, which does
-    # not resolve outside the network — so revising a source failed with a bare
-    # "failed to fetch" and nothing to point at.
+    # web dev server can only reach the inference service by the compose hostname,
+    # which does not resolve outside the network.
     ports:
-      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+      - "127.0.0.1:${EMBEDDING_PORT:-8080}:8080"
 
 volumes:
   postgres_data:
-  ollama_data:
+  embedding_models:
   corpus_data:

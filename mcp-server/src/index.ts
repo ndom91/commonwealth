@@ -15,7 +15,7 @@ import { OkfRepository } from './okf-repository.js';
 
 const config = loadConfig();
 const embeddings = new Embeddings({
-  ollamaUrl: config.OLLAMA_URL,
+  embeddingUrl: config.EMBEDDING_URL,
   model: config.EMBEDDING_MODEL,
   queryInstruction: config.EMBEDDING_QUERY_INSTRUCTION,
 });
