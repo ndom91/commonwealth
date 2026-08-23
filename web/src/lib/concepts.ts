@@ -94,6 +94,18 @@ function revisionTime(frontmatter: Record<string, unknown>): string | null {
   return typeof at === 'string' ? at : null;
 }
 
+function documentAuthority(frontmatter: Record<string, unknown>): Authority {
+  const commonwealth = frontmatter.commonwealth;
+  if (commonwealth === null || typeof commonwealth !== 'object') return 'unverified';
+  const authority = (commonwealth as Record<string, unknown>).authority;
+  return AUTHORITIES.includes(authority as Authority) ? (authority as Authority) : 'unverified';
+}
+
+function documentTitle(frontmatter: Record<string, unknown>): string | null {
+  const title = frontmatter.title;
+  return typeof title === 'string' && title.trim() ? title.trim() : null;
+}
+
 function owner(frontmatter: Record<string, unknown>): string | null {
   const generated = frontmatter.generated;
   if (generated === null || typeof generated !== 'object') return null;
@@ -231,9 +243,16 @@ export const getConceptVersion = createServerFn({ method: 'GET' })
       throw new Error('That commit is not in this concept history');
     }
 
+    const markdown = await readFileAtCommit(corpusPath(), membership.slug, data.path, data.commit);
+    const document = parseOkfDocument(markdown);
     return {
+      authority: documentAuthority(document.frontmatter),
       commit: data.commit,
-      markdown: await readFileAtCommit(corpusPath(), membership.slug, data.path, data.commit),
+      last_verified_at: revisionTime(document.frontmatter),
+      markdown,
+      tags: tags(document.frontmatter.tags),
+      title: documentTitle(document.frontmatter),
+      type: document.frontmatter.type as string,
     };
   });
 

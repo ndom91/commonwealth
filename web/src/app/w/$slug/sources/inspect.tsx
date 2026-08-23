@@ -32,6 +32,7 @@ function RetrievalInspector() {
       .filter(Boolean);
     setPending(true);
     setError(undefined);
+    setResults(undefined);
     try {
       setResults(
         (await inspectRetrieval({

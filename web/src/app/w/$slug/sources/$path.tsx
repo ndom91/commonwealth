@@ -30,7 +30,10 @@ type Detail = {
   type: string;
 };
 type History = { commit: string; subject: string; timestamp: string };
-type Version = { commit: string; markdown: string };
+type Version = Pick<Detail, 'authority' | 'last_verified_at' | 'tags' | 'title' | 'type'> & {
+  commit: string;
+  markdown: string;
+};
 
 const AUTHORITIES: Authority[] = ['unverified', 'approved', 'canonical'];
 const ConceptDiff = lazy(() =>
@@ -93,12 +96,12 @@ function ConceptBench() {
   }
 
   async function showRevision(commit: string) {
+    const request = ++revisionRequest.current;
     if (commit === detail?.commit_sha) {
       setHistorical(undefined);
       setComparing(false);
       return;
     }
-    const request = ++revisionRequest.current;
     setPending(true);
     setError(undefined);
     try {
@@ -133,25 +136,26 @@ function ConceptBench() {
 
   const viewedCommit = historical?.commit ?? detail.commit_sha;
   const historicalView = Boolean(historical);
+  const viewed = historical ?? detail;
 
   return (
     <section className="detail" aria-label="Selected concept">
       <div className="bench__head">
         <div>
           <span className="label">
-            {detail.type} · {detail.path} · commit{' '}
+            {viewed.type} · {detail.path} · commit{' '}
             <b className="register">{viewedCommit.slice(0, 12)}</b>
           </span>
-          <h2>{detail.title ?? detail.path}</h2>
+          <h2>{viewed.title ?? detail.path}</h2>
         </div>
         <div className="bench__seal">
-          <SealChip state={authoritySeal(detail.authority)}>{detail.authority}</SealChip>
+          <SealChip state={authoritySeal(viewed.authority)}>{viewed.authority}</SealChip>
         </div>
       </div>
 
-      {detail.tags.length > 0 && (
+      {viewed.tags.length > 0 && (
         <div className="tags">
-          {detail.tags.map((tag) => (
+          {viewed.tags.map((tag) => (
             <span className="tag" key={tag}>
               {tag}
             </span>
@@ -170,9 +174,9 @@ function ConceptBench() {
         <div className="bench__section-head">
           <span className="label">
             Authority{' '}
-            {detail.last_verified_at ? (
+            {viewed.last_verified_at ? (
               <>
-                · last verified <Stamp at={detail.last_verified_at} />
+                · last verified <Stamp at={viewed.last_verified_at} />
               </>
             ) : (
               '· never verified by a human'
