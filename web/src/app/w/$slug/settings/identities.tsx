@@ -1,5 +1,12 @@
-import { createFileRoute, Link, Outlet, useNavigate, useRouter } from '@tanstack/react-router';
-import { useState } from 'react';
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  useMatchRoute,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
 import { AppShell, accessionOf, SealChip, SettingsTabs } from '../../../../components/chrome.js';
 import { CredentialTag, type Identity, type Issued } from '../../../../components/identity.js';
 import { readFailure, writeFailure } from '../../../../lib/failure.js';
@@ -64,6 +71,7 @@ function IdentitiesLayout() {
   const { slug } = Route.useParams();
   const router = useRouter();
   const navigate = useNavigate();
+  const matchRoute = useMatchRoute();
   const viewer = Route.useRouteContext();
   const { page, failure } = Route.useLoaderData();
   const { after, mine } = Route.useSearch();
@@ -90,6 +98,21 @@ function IdentitiesLayout() {
   const [issued, setIssued] = useState<Issued>();
   const [issuing, setIssuing] = useState(false);
 
+  const issuedIdentityIsSelected = issued
+    ? Boolean(
+        matchRoute({
+          to: '/w/$slug/settings/identities/$identityId',
+          params: { slug, identityId: issued.identityId },
+        })
+      )
+    : false;
+
+  /* A credential belongs to exactly one holder. Leaving its bench redacts the
+     one-time reveal instead of allowing it to follow the next selection. */
+  useEffect(() => {
+    if (issued && !issuedIdentityIsSelected) setIssued(undefined);
+  }, [issued, issuedIdentityIsSelected]);
+
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('writer');
   const [keyLabel, setKeyLabel] = useState('');
@@ -105,7 +128,6 @@ function IdentitiesLayout() {
       const result = await createIdentity({
         data: { workspace: slug, name, role, keyLabel, unowned: administers && unowned },
       });
-      setIssued(result);
       setIssuing(false);
       setName('');
       setKeyLabel('');
@@ -115,6 +137,7 @@ function IdentitiesLayout() {
         to: '/w/$slug/settings/identities/$identityId',
         params: { identityId: result.identityId },
       });
+      setIssued(result);
     } catch (cause) {
       setError(
         writeFailure(
@@ -139,7 +162,10 @@ function IdentitiesLayout() {
           type="button"
           className="btn btn--primary"
           disabled={Boolean(failure)}
-          onClick={() => setIssuing(true)}
+          onClick={() => {
+            setIssued(undefined);
+            setIssuing(true);
+          }}
         >
           Issue identity
         </button>
@@ -269,7 +295,9 @@ function IdentitiesLayout() {
             the credential tag can sit above whichever bench is showing. Children
             render their contents, not their own section. */}
         <section className="detail" aria-label="Selected holder">
-          {issued && <CredentialTag issued={issued} onDismiss={() => setIssued(undefined)} />}
+          {issued && issuedIdentityIsSelected && (
+            <CredentialTag issued={issued} onDismiss={() => setIssued(undefined)} />
+          )}
 
           {issuing ? (
             <form onSubmit={submit}>

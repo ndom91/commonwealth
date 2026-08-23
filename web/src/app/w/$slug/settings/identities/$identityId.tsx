@@ -1,5 +1,5 @@
 import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { accessionOf, SealChip } from '../../../../../components/chrome.js';
 import {
   CredentialTag,
@@ -57,6 +57,10 @@ function HolderBench() {
   const [issued, setIssued] = useState<Issued>();
   const [voiding, setVoiding] = useState<string>();
   const [failed, setFailed] = useState<{ id: string; message: string }>();
+
+  /* The route instance persists while only its parameter changes, so redact a
+     credential issued to the previous holder before showing the next bench. */
+  useEffect(() => setIssued(undefined), [identityId]);
 
   if (!identity) {
     /* The register is paginated, so a holder can be real but simply not on the
