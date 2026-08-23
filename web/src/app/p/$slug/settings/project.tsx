@@ -80,7 +80,7 @@ function Corpus({
   failure: string | undefined;
 }) {
   return (
-    <div className="bench__section project-archive">
+    <div className="bench__section">
       <span className="label">This corpus</span>
       {failure ? (
         <p className="notice" role="alert">
@@ -305,7 +305,7 @@ function ArchiveProject() {
   }
 
   return (
-    <div className="bench__section">
+    <div className="bench__section project-archive">
       <span className="label">Archive project</span>
       <p className="line__caption prose">
         Removes this project from the switcher and stops browser and MCP access. Its sources,
