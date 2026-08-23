@@ -1685,6 +1685,22 @@ select {
   gap: var(--s-tight);
 }
 
+.invitation-link {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-register);
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: copy;
+}
+
 .stubs {
   display: grid;
   gap: 1px;

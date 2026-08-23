@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { AppShell, SettingsTabs } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
 import { readFailure, writeFailure } from '../../../../lib/failure.js';
@@ -333,7 +333,17 @@ function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () 
   const [error, setError] = useState<string>();
   const [link, setLink] = useState<string>();
   const [added, setAdded] = useState<string>();
-  const [copied, setCopied] = useState(false);
+  const [copy, setCopy] = useState<'idle' | 'copied' | 'unavailable'>('idle');
+  const linkRef = useRef<HTMLButtonElement>(null);
+
+  async function copyLink() {
+    const ok = await navigator.clipboard
+      ?.writeText(link ?? '')
+      .then(() => true)
+      .catch(() => false);
+    setCopy(ok ? 'copied' : 'unavailable');
+    if (!ok) linkRef.current && getSelection()?.selectAllChildren(linkRef.current);
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -380,26 +390,27 @@ function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () 
     return (
       <div className="bench__inline">
         <span className="label">Invitation link</span>
-        <p className="issued__secret register">{link}</p>
+        <button
+          ref={linkRef}
+          type="button"
+          className="invitation-link"
+          aria-label="Copy invitation link to clipboard"
+          title={link}
+          onClick={copyLink}
+        >
+          {link}
+        </button>
         <div className="bench__controls">
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={async () => {
-              await navigator.clipboard.writeText(link);
-              setCopied(true);
-            }}
-          >
-            {copied ? 'Copied' : 'Copy link'}
-          </button>
           <button type="button" className="btn btn--quiet" onClick={onClose}>
             Done
           </button>
         </div>
         <p className="line__caption">
-          Copy it now — it is not stored and will not be shown again. It works once, expires in
-          seven days, and can be revoked below until it is used. Send it however you already talk to
-          each other; they choose their own password, and you never see it.
+          {copy === 'copied'
+            ? 'Copied to clipboard.'
+            : copy === 'unavailable'
+              ? 'Clipboard unavailable over http. The link is selected, so copy it manually before closing.'
+              : 'Click the link to copy it. It is not stored and will not be shown again. It works once, expires in seven days, and can be revoked below until it is used. Send it however you already talk to each other; they choose their own password, and you never see it.'}
         </p>
       </div>
     );
