@@ -910,10 +910,18 @@ const inviteReads = new FixedWindow({ window: 60, max: 60 });
 const inviteAccepts = new FixedWindow({ window: 600, max: 60 });
 const inviteAcceptsPerToken = new FixedWindow({ window: 600, max: 10 });
 
+function forwardedIpHeader(): string {
+  const configuredHeader = process.env.FORWARDED_IP_HEADER?.trim();
+  if (configuredHeader) return configuredHeader;
+
+  return 'x-forwarded-for';
+}
+
 function invitationCaller(): string {
   return clientIp((name) => getRequest().headers.get(name) ?? undefined, {
-    trustForwarded: process.env.TRUST_FORWARDED_FOR === 'true',
     fallback: 'unproxied',
+    forwardedHeader: forwardedIpHeader(),
+    trustForwarded: process.env.TRUST_FORWARDED_FOR === 'true',
   });
 }
 

@@ -69,6 +69,16 @@ const membership = () =>
     },
   });
 
+const forwardedIpHeaders: string[] = [];
+if (process.env.TRUST_FORWARDED_FOR === 'true') {
+  const configuredHeader = process.env.FORWARDED_IP_HEADER?.trim();
+  if (configuredHeader) {
+    forwardedIpHeaders.push(configuredHeader);
+  } else {
+    forwardedIpHeaders.push('x-forwarded-for');
+  }
+}
+
 const shared = {
   baseURL: process.env.BETTER_AUTH_URL,
   secret: process.env.BETTER_AUTH_SECRET,
@@ -94,11 +104,10 @@ const shared = {
    * server-side `auth.api` calls from the limiter entirely, and that instance
    * is only ever reached that way.
    *
-   * Addresses come from `x-forwarded-for` by default. The shipped compose binds
-   * the admin to loopback with no proxy, so that header is absent and
-   * better-auth falls back on its own. An operator who fronts this with a proxy
-   * should set `advanced.ipAddress.trustedProxies` to it — otherwise a client
-   * can write the header itself and get a fresh bucket per request. */
+   * The shipped compose binds the admin to loopback with no proxy, so address
+   * tracking is disabled until the operator explicitly trusts a proxy. That
+   * proxy must protect the service from direct access before it can safely pass
+   * `X-Forwarded-For` or Cloudflare's `CF-Connecting-IP`. */
   rateLimit: {
     enabled: true,
     window: 60,
@@ -126,7 +135,10 @@ const shared = {
      `Buffer is not defined` at import time, which kills hydration for the whole
      application. The page still renders, so the only symptom is that nothing
      responds to a click. */
-  advanced: { database: { generateId: () => globalThis.crypto.randomUUID() } },
+  advanced: {
+    database: { generateId: () => globalThis.crypto.randomUUID() },
+    ipAddress: { ipAddressHeaders: forwardedIpHeaders },
+  },
 };
 
 /* The instance every request goes through. Sign-up is closed unless the

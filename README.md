@@ -34,7 +34,8 @@ Compose binds the MCP server and web app to loopback. Put your existing
 reverse proxy in front of them for public access; examples are in
 [`docs/proxy/`](docs/proxy/). Set `APP_TRUST_FORWARDED_FOR=true` and/or
 `WEB_TRUST_FORWARDED_FOR=true` only for a service reached through that trusted
-proxy.
+proxy. Cloudflare orange-cloud deployments also set the matching
+`*_FORWARDED_IP_HEADER=cf-connecting-ip` value.
 
 ## License
 

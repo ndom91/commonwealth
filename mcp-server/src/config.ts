@@ -41,8 +41,9 @@ const environment = v.object({
   CORPUS_PATH: v.optional(v.pipe(v.string(), v.minLength(1)), '/app/corpora'),
   MAX_REQUEST_BYTES: positiveInt(15 * 1024 * 1024),
   /* Containers bind to loopback by default, so no proxy is trusted unless the
-     operator explicitly says one is forwarding client addresses. */
+      operator explicitly says one is forwarding client addresses. */
   TRUST_FORWARDED_FOR: boolean(false),
+  FORWARDED_IP_HEADER: v.optional(v.pipe(v.string(), v.minLength(1)), 'x-forwarded-for'),
   /* Per credential. An agent working hard does a handful of calls a second in
      bursts; this is well clear of that and still bounds the scrypt cost of a
      flood carrying a real key prefix. See the note in `index.ts`. */

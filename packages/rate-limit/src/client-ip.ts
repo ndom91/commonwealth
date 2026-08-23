@@ -1,6 +1,11 @@
 /** Reads one header by name, case-insensitively. Node's `IncomingHttpHeaders`
  *  and the web `Headers` both satisfy this with a one-line adapter. */
 export type HeaderReader = (name: string) => string | undefined;
+type ClientIpOptions = {
+  fallback: string;
+  forwardedHeader: string;
+  trustForwarded: boolean;
+};
 
 /* Which address a limiter counts against.
  *
@@ -19,12 +24,8 @@ export type HeaderReader = (name: string) => string | undefined;
  * Compose binds both services to loopback with no proxy, so the defaults leave
  * the header untrusted. An operator with a trusted proxy opts in per service.
  *
- * The *last* entry of the chain is taken, not the first. A forwarded list is
- * appended to as it is relayed, so the rightmost value was written by the hop
- * nearest us — the one we actually trust — while the leftmost is whatever the
- * original client claimed about itself. This assumes a single trusted proxy,
- * which is what the shipped topology has; more hops would need to count in from
- * the right by however many are ours.
+ * `X-Forwarded-For` is a chain, so its last entry is taken. A single-value
+ * header such as Cloudflare's `CF-Connecting-IP` is used directly instead.
  *
  * `fallback` is what to count when there is no usable address: the socket
  * address where the caller can see one, or a constant. A constant means every
@@ -32,11 +33,22 @@ export type HeaderReader = (name: string) => string | undefined;
  * where the surface is not reachable from a network in the first place. */
 export function clientIp(
   header: HeaderReader,
-  { trustForwarded, fallback }: { trustForwarded: boolean; fallback: string }
+  { fallback, forwardedHeader, trustForwarded }: ClientIpOptions
 ): string {
-  if (trustForwarded) {
-    const last = header('x-forwarded-for')?.split(',').pop()?.trim();
+  if (!trustForwarded) return fallback;
+
+  const value = header(forwardedHeader);
+  if (!value) return fallback;
+
+  if (forwardedHeader.toLowerCase() === 'x-forwarded-for') {
+    const last = value.split(',').pop()?.trim();
     if (last) return last;
+
+    return fallback;
   }
-  return fallback;
+
+  const address = value.trim();
+  if (!address) return fallback;
+
+  return address;
 }

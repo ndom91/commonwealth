@@ -167,6 +167,7 @@ if (!databaseUrl) {
           RATE_LIMIT_ADDRESS_WINDOW: 1,
           RATE_LIMIT_KEY_MAX: 1,
           RATE_LIMIT_KEY_WINDOW: 1,
+          FORWARDED_IP_HEADER: 'x-forwarded-for',
           TRUST_FORWARDED_FOR: false,
         },
         { embed: async () => [], embedQuery: async () => Array.from({ length: 1024 }, () => 1) },

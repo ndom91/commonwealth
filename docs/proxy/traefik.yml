@@ -2,8 +2,10 @@
 # yours. This assumes the Traefik installation defines a `websecure` entry point
 # and a `letsencrypt` certificate resolver. Run Traefik on the host so these
 # loopback targets resolve; a containerized Traefik needs reachable host targets
-# instead. Forwarded headers require APP_TRUST_FORWARDED_FOR=true and
-# WEB_TRUST_FORWARDED_FOR=true in the Compose environment.
+# instead. Forwarded headers require APP_TRUST_FORWARDED_FOR=true,
+# WEB_TRUST_FORWARDED_FOR=true, APP_FORWARDED_IP_HEADER=cf-connecting-ip, and
+# WEB_FORWARDED_IP_HEADER=cf-connecting-ip in the Compose environment when
+# Traefik accepts Cloudflare's `CF-Connecting-IP` header.
 
 http:
   routers:

@@ -19,6 +19,7 @@ services:
       # Containers publish only to loopback, so no proxy is assumed by default.
       # Set this true only when a trusted reverse proxy forwards client addresses.
       TRUST_FORWARDED_FOR: ${APP_TRUST_FORWARDED_FOR:-false}
+      FORWARDED_IP_HEADER: ${APP_FORWARDED_IP_HEADER:-x-forwarded-for}
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,6 +51,7 @@ services:
       # you put a proxy here, otherwise the invitation limiter counts every
       # caller in the world as one.
       TRUST_FORWARDED_FOR: ${WEB_TRUST_FORWARDED_FOR:-false}
+      FORWARDED_IP_HEADER: ${WEB_FORWARDED_IP_HEADER:-x-forwarded-for}
     depends_on:
       web-migrate:
         condition: service_completed_successfully

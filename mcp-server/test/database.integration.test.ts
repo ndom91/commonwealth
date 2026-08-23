@@ -30,8 +30,9 @@ if (!databaseUrl) {
       CORPUS_PATH: corpusPath,
       MAX_REQUEST_BYTES: 4096,
       /* Unused here — this test drives the repository directly and never goes
-         through the HTTP surface the limiters guard — but `Config` is the whole
-         environment, so it has to be complete. */
+          through the HTTP surface the limiters guard — but `Config` is the whole
+          environment, so it has to be complete. */
+      FORWARDED_IP_HEADER: 'x-forwarded-for',
       TRUST_FORWARDED_FOR: false,
       RATE_LIMIT_KEY_WINDOW: 60,
       RATE_LIMIT_KEY_MAX: 120,

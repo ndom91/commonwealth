@@ -246,8 +246,9 @@ async function handleMcp(request: IncomingMessage, response: ServerResponse): Pr
     /* A trusted proxy makes the socket address its own, so only deployments
        that explicitly opt in read the forwarded address. */
     const address = clientIp((name) => request.headers[name] as string | undefined, {
-      trustForwarded: config.TRUST_FORWARDED_FOR,
       fallback: request.socket.remoteAddress ?? 'unknown',
+      forwardedHeader: config.FORWARDED_IP_HEADER,
+      trustForwarded: config.TRUST_FORWARDED_FOR,
     });
     const perAddress = byAddress.check(address);
     if (!perAddress.ok) return tooManyRequests(response, perAddress.retryAfter);
