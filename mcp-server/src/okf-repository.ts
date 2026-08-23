@@ -1,4 +1,5 @@
 import { commitFiles, history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
+import { searchWorkspace } from '@commonwealth/corpus/search';
 import {
   type Embeddings,
   parseOkfDocument,
@@ -193,71 +194,19 @@ export class OkfRepository {
     }
   ): Promise<Record<string, unknown>[]> {
     requirePermission(actor, 'read');
-    const embedding = await this.embeddings.embedQuery(input.query);
-    if (!embedding) throw new Error('Embedding provider returned no query embedding');
-    const vectorInput = vector(embedding);
-    const tags = input.tags.length === 0 ? null : input.tags;
-    const candidateLimit = Math.max(input.limit * 10, 50);
-    const rows = await this.sql<Record<string, unknown>[]>`
-      WITH query_terms AS (
-        SELECT array_to_string(
-          tsvector_to_array(to_tsvector('english', ${input.query})), ' | '
-        )::tsquery AS value
-      ), eligible AS NOT MATERIALIZED (
-        SELECT concept_chunks.id, concept_chunks.embedding, concept_chunks.search_vector
-        FROM concept_chunks
-        JOIN concepts ON concepts.workspace_id = concept_chunks.workspace_id
-          AND concepts.path = concept_chunks.concept_path
-          AND concepts.commit_sha = concept_chunks.commit_sha
-        JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id
-          AND workspace_index_state.indexed_commit_sha = concepts.commit_sha
-        WHERE concepts.workspace_id = ${actor.workspaceId} AND concepts.status = 'stable'
-          AND (${tags}::text[] IS NULL OR concepts.tags && ${tags}::text[])
-          AND (${input.type ?? null}::text IS NULL OR concepts.type = ${input.type ?? null})
-          AND (${input.authority ?? null}::text IS NULL OR concepts.authority = ${input.authority ?? null})
-      ), vector_candidates AS (
-        SELECT id, row_number() OVER (ORDER BY distance) AS rank
-        FROM (
-          SELECT id, embedding <=> ${vectorInput}::vector AS distance
-          FROM eligible ORDER BY embedding <=> ${vectorInput}::vector LIMIT ${candidateLimit}
-        ) AS nearest
-      ), lexical_candidates AS (
-        SELECT id, row_number() OVER (ORDER BY score DESC) AS rank
-        FROM (
-          SELECT eligible.id, ts_rank_cd(eligible.search_vector, query_terms.value) AS score
-          FROM eligible CROSS JOIN query_terms
-          WHERE eligible.search_vector @@ query_terms.value
-          ORDER BY score DESC LIMIT ${candidateLimit}
-        ) AS matching
-      ), candidate_ids AS (
-        SELECT id, sum(1.0 / (60 + rank)) AS rrf
-        FROM (
-          SELECT id, rank FROM vector_candidates
-          UNION ALL
-          SELECT id, rank FROM lexical_candidates
-        ) AS ranked
-        GROUP BY id
-      )
-      SELECT concepts.path, concepts.commit_sha, concepts.type, concepts.title, concepts.tags,
-             concepts.authority, concept_chunks.heading, concept_chunks.content,
-             1 - (concept_chunks.embedding <=> ${vectorInput}::vector) AS semantic_score,
-             ts_rank_cd(concept_chunks.search_vector, query_terms.value) AS keyword_score,
-             candidate_ids.rrf AS final_score
-      FROM candidate_ids
-      JOIN concept_chunks ON concept_chunks.id = candidate_ids.id
-      JOIN concepts ON concepts.workspace_id = concept_chunks.workspace_id
-        AND concepts.path = concept_chunks.concept_path AND concepts.commit_sha = concept_chunks.commit_sha
-      CROSS JOIN query_terms
-      ORDER BY candidate_ids.rrf DESC, concepts.path, concept_chunks.id
-      LIMIT ${input.limit}
-    `;
+    const rows = await searchWorkspace({
+      ...input,
+      embeddings: this.embeddings,
+      sql: this.sql,
+      workspaceId: actor.workspaceId,
+    });
     await this.sql`
       INSERT INTO events (workspace_id, actor_id, event_type, metadata)
       VALUES (${actor.workspaceId}, ${actor.id}, 'search',
               ${this.sql.json({ query: input.query, resultCount: rows.length })})
     `;
 
-    return rows.map((row) => searchResult(row, input.explain));
+    return rows.map((row) => (input.explain ? row : withoutScores(row)));
   }
 
   private async commitAndIndex(
@@ -324,29 +273,6 @@ function stringOf(value: unknown): string | null {
   return value;
 }
 
-function searchResult(row: Record<string, unknown>, explain: boolean): Record<string, unknown> {
-  const result = {
-    path: row.path,
-    commit: row.commit_sha,
-    type: row.type,
-    title: row.title,
-    tags: row.tags,
-    authority: row.authority,
-    heading: row.heading,
-    excerpt: row.content,
-  };
-  if (!explain) return result;
-
-  return {
-    ...result,
-    scores: {
-      semanticScore: Number(row.semantic_score),
-      keywordScore: Number(row.keyword_score),
-      finalScore: Number(row.final_score),
-    },
-  };
-}
-
 function uniqueTags(tags: string[]): string[] {
   const unique = new Set<string>();
   for (const tag of tags) {
@@ -357,6 +283,7 @@ function uniqueTags(tags: string[]): string[] {
   return [...unique];
 }
 
-function vector(embedding: number[]): string {
-  return `[${embedding.join(',')}]`;
+function withoutScores(result: { scores: unknown } & Record<string, unknown>) {
+  const { scores: _scores, ...plain } = result;
+  return plain;
 }

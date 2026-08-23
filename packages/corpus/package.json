@@ -16,6 +16,10 @@
     "./indexer": {
       "types": "./src/indexer.ts",
       "default": "./src/indexer.ts"
+    },
+    "./search": {
+      "types": "./src/search.ts",
+      "default": "./src/search.ts"
     }
   }
 }
