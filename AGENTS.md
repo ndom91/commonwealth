@@ -3,6 +3,29 @@
 Notes an agent cannot infer from reading the code, and that cost real debugging
 time when they were discovered.
 
+## Local development
+
+Install dependencies, start the backing services, apply migrations, and run the
+web application from the host:
+
+```bash
+pnpm install --frozen-lockfile
+docker compose up -d postgres inference app
+docker compose up web-migrate
+pnpm --filter @commonwealth/web dev
+```
+
+The host web server reads `DATABASE_URL`, which defaults to loopback Postgres.
+Containers read `COMPOSE_DATABASE_URL` and use the Compose network hostname.
+Do not run the `web` Compose service while running the Vite server: both bind
+port 3001.
+
+The default inference service is CPU-only and supports Linux `amd64` and
+`arm64`. On Linux with NVIDIA Container Toolkit, add
+`-f compose.cuda.yaml`; with ROCm, add `-f compose.rocm.yaml`. Apple Silicon
+Docker runs the portable Linux CPU image. See `docs/inference.md` for model
+replacement and native Metal development.
+
 ## `mcp-server/src/` changes need a container rebuild
 
 The MCP server runs from a built image, not a watcher. Editing anything under
