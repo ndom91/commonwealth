@@ -231,6 +231,17 @@ better-auth uses; `pnpm migrate` applies it and then idempotently seeds the firs
 administrator, workspace, and embedding configuration. Every future migration
 needs a timestamp after `1786702198003`.
 
+Do not add another schema bootstrap script or write to Drizzle's migration ledger
+by hand. Schema belongs in `web/drizzle/`; environment-dependent bootstrap data
+belongs in the post-migration seed in `web/scripts/migrate.ts`. Integration tests
+must apply the Drizzle migration chain too, rather than loading schema SQL directly.
+
+`web/src/db/schema.ts` does not yet declare every live table, extension, generated
+column, or index. Do not run `drizzle-kit generate` for a live migration until it
+does: its snapshot would be incomplete. Until then, add the SQL migration and its
+journal entry by hand. Complete the Drizzle schema before adopting generated
+migrations as the normal workflow.
+
 better-auth issues string ids, so `user.id` is `text`. A `uuid` foreign key
 referencing it cannot be created.
 
