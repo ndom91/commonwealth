@@ -871,6 +871,25 @@ select {
   word-break: break-word;
 }
 
+.source-body__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-base);
+  margin-top: var(--s-tight);
+}
+
+.source-body__footer .line__caption {
+  margin: 0;
+}
+
+.source-body__footer > .label {
+  flex: none;
+  margin-left: auto;
+  text-align: right;
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;
@@ -916,16 +935,19 @@ select {
   color: var(--ink-3);
 }
 
-.authority-summary__latest {
-  margin-inline-start: auto;
+.authority-layout {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-loose);
 }
 
 .authority-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: start;
-  gap: var(--s-loose);
-  margin-top: var(--s-loose);
+  align-items: center;
+  justify-content: flex-end;
+  align-self: flex-end;
+  gap: var(--s-tight);
 }
 
 .authority-control {
@@ -934,7 +956,8 @@ select {
   padding: 0;
   border: 0;
   display: grid;
-  gap: var(--s-base);
+  gap: var(--s-tight);
+  margin-top: var(--s-loose);
 }
 
 .authority-control legend {
@@ -943,19 +966,6 @@ select {
 }
 
 .authority-control__choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-tight);
-}
-
-.authority-retire {
-  display: grid;
-  gap: var(--s-tight);
-  padding-inline-start: var(--s-loose);
-  border-inline-start: 1px solid var(--rule-hair);
-}
-
-.authority-retire__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-tight);
@@ -1522,7 +1532,7 @@ select {
 }
 
 .bench__section {
-  margin-top: var(--s-section);
+  margin-top: var(--s-base);
 }
 
 .bench__section > .label {
@@ -1770,7 +1780,6 @@ select {
 .content-tabs {
   display: flex;
   gap: var(--s-base);
-  margin-left: auto;
 }
 
 .content-tabs__tab {
@@ -2249,6 +2258,14 @@ select {
    Give the measures up and let the action sit under the entry instead — there
    is no column left to line up with. */
 @media (max-width: 560px) {
+  .authority-layout {
+    flex-wrap: wrap;
+  }
+
+  .authority-actions {
+    flex-basis: 100%;
+  }
+
   .retrieval-form {
     grid-template-columns: minmax(0, 1fr);
   }

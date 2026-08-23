@@ -58,13 +58,19 @@ function ConceptBench() {
   const [armDeprecate, setArmDeprecate] = useState(false);
   const [historical, setHistorical] = useState<Version>();
   const [historicalContent, setHistoricalContent] = useState<'body' | 'diff'>('body');
+  const [comparison, setComparison] = useState<Version>();
+  const [preparingComparison, setPreparingComparison] = useState(false);
   const revisionRequest = useRef(0);
+  const comparisonRequest = useRef(0);
   const bodyTab = useRef<HTMLButtonElement>(null);
   const diffTab = useRef<HTMLButtonElement>(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
 
   const load = useEffectEvent(async () => {
+    comparisonRequest.current += 1;
+    setComparison(undefined);
+    setPreparingComparison(false);
     setError(undefined);
     try {
       const [next, nextEntries] = await Promise.all([
@@ -104,6 +110,9 @@ function ConceptBench() {
 
   async function showRevision(commit: string) {
     const request = ++revisionRequest.current;
+    comparisonRequest.current += 1;
+    setComparison(undefined);
+    setPreparingComparison(false);
     if (commit === detail?.commit_sha) {
       setHistorical(undefined);
       setHistoricalContent('body');
@@ -125,6 +134,38 @@ function ConceptBench() {
     }
   }
 
+  function previousRevision(commit: string) {
+    const index = entries.findIndex((entry) => entry.commit === commit);
+    return index >= 0 ? entries[index + 1] : undefined;
+  }
+
+  async function showDiff() {
+    const commit = historical?.commit ?? detail?.commit_sha;
+    if (!commit) return;
+    const previous = previousRevision(commit);
+    if (!previous) return;
+
+    setHistoricalContent('diff');
+    if (comparison?.commit === previous.commit) return;
+
+    const request = ++comparisonRequest.current;
+    setPreparingComparison(true);
+    setError(undefined);
+    try {
+      const version = (await getConceptVersion({
+        data: { project: slug, path, commit: previous.commit },
+      })) as Version;
+      if (request !== comparisonRequest.current) return;
+      setComparison(version);
+    } catch (cause) {
+      if (request === comparisonRequest.current) {
+        setError(writeFailure(cause, 'The preceding revision could not be read.'));
+      }
+    } finally {
+      if (request === comparisonRequest.current) setPreparingComparison(false);
+    }
+  }
+
   function switchHistoricalContent(event: React.KeyboardEvent<HTMLButtonElement>) {
     const next =
       event.key === 'ArrowLeft' || event.key === 'Home'
@@ -134,7 +175,8 @@ function ConceptBench() {
           : undefined;
     if (!next) return;
     event.preventDefault();
-    setHistoricalContent(next);
+    if (next === 'diff') void showDiff();
+    else setHistoricalContent(next);
     (next === 'body' ? bodyTab : diffTab).current?.focus();
   }
 
@@ -157,13 +199,20 @@ function ConceptBench() {
   const viewedCommit = historical?.commit ?? detail.commit_sha;
   const historicalView = Boolean(historical);
   const viewed = historical ?? detail;
+  const hasDiff = Boolean(previousRevision(viewedCommit));
   const sourceBody = (
     <>
       <pre className="source-body">{historical?.markdown ?? detail.markdown}</pre>
-      <p className="line__caption">
-        The complete OKF document is shown as text from the{' '}
-        {historicalView ? 'selected' : 'indexed'} Git commit.
-      </p>
+      <div className="source-body__footer">
+        <p className="line__caption">
+          The complete OKF document is shown as text from the{' '}
+          {historicalView ? 'selected' : 'indexed'} Git commit.
+        </p>
+        <span className="label">
+          Content ·{' '}
+          {historicalView ? viewedCommit.slice(0, 12) : `${detail.content_hash.slice(0, 12)}…`}
+        </span>
+      </div>
     </>
   );
 
@@ -200,94 +249,138 @@ function ConceptBench() {
       )}
 
       <div className="bench__section">
-        <div className="authority-summary">
-          <div className="authority-summary__head">
-            <span className="label">Authority</span>
-            {historicalView && (
+        <div className="authority-layout">
+          <div className="authority-summary">
+            <div className="authority-summary__head">
+              <span className="label">Authority</span>
+            </div>
+            <div className="authority-summary__standing">
+              <span className="authority-summary__value">{viewed.authority}</span>
+              <span className="register authority-summary__verified">
+                {viewed.last_verified_at ? (
+                  <>
+                    Last verified <Stamp at={viewed.last_verified_at} />
+                  </>
+                ) : (
+                  'Never verified by a human'
+                )}
+              </span>
+            </div>
+            {!historicalView && (
+              <fieldset className="authority-control">
+                <legend className="label">Change authority</legend>
+                <div className="authority-control__choices">
+                  {AUTHORITIES.map((authority) => (
+                    <button
+                      key={authority}
+                      type="button"
+                      className={`btn ${authority === detail.authority ? 'btn--current' : 'btn--quiet'}`}
+                      disabled={pending || authority === detail.authority}
+                      onClick={() =>
+                        void act(
+                          () => verifyConcept({ data: { project: slug, path, authority } }),
+                          'The authority could not be changed.'
+                        )
+                      }
+                    >
+                      {authority === detail.authority ? authority : AUTHORITY_ACTIONS[authority]}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+          </div>
+          <div className="authority-actions">
+            {hasDiff && !editing && (
+              <div className="content-tabs" role="tablist" aria-label="Concept content">
+                <button
+                  ref={bodyTab}
+                  className="content-tabs__tab"
+                  id="concept-content-body-tab"
+                  type="button"
+                  role="tab"
+                  aria-controls="concept-content-body-panel"
+                  aria-selected={historicalContent === 'body'}
+                  tabIndex={historicalContent === 'body' ? 0 : -1}
+                  onClick={() => setHistoricalContent('body')}
+                  onKeyDown={switchHistoricalContent}
+                >
+                  Content
+                </button>
+                <button
+                  ref={diffTab}
+                  className="content-tabs__tab"
+                  id="concept-content-diff-tab"
+                  type="button"
+                  role="tab"
+                  aria-controls="concept-content-diff-panel"
+                  aria-selected={historicalContent === 'diff'}
+                  tabIndex={historicalContent === 'diff' ? 0 : -1}
+                  onClick={() => void showDiff()}
+                  onKeyDown={switchHistoricalContent}
+                >
+                  Diff
+                </button>
+              </div>
+            )}
+            {historicalView ? (
               <button
-                className="btn btn--quiet authority-summary__latest"
+                className="btn btn--quiet"
                 type="button"
                 onClick={() => void showRevision(detail.commit_sha)}
               >
                 Back to latest
               </button>
-            )}
-          </div>
-          <div className="authority-summary__standing">
-            <span className="authority-summary__value">{viewed.authority}</span>
-            <span className="register authority-summary__verified">
-              {viewed.last_verified_at ? (
-                <>
-                  Last verified <Stamp at={viewed.last_verified_at} />
-                </>
-              ) : (
-                'Never verified by a human'
-              )}
-            </span>
-          </div>
-        </div>
-        {!historicalView && (
-          <div className="authority-actions">
-            <fieldset className="authority-control">
-              <legend className="label">Change authority</legend>
-              <div className="authority-control__choices">
-                {AUTHORITIES.map((authority) => (
-                  <button
-                    key={authority}
-                    type="button"
-                    className={`btn ${authority === detail.authority ? 'btn--current' : 'btn--quiet'}`}
-                    disabled={pending || authority === detail.authority}
-                    onClick={() =>
-                      void act(
-                        () => verifyConcept({ data: { project: slug, path, authority } }),
-                        'The authority could not be changed.'
-                      )
-                    }
-                  >
-                    {authority === detail.authority ? authority : AUTHORITY_ACTIONS[authority]}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-            <div className="authority-retire">
-              <span className="label">Retire source</span>
-              {armDeprecate ? (
-                <div className="authority-retire__actions">
-                  <button
-                    type="button"
-                    className="btn btn--void"
-                    disabled={pending}
-                    onClick={() =>
-                      void act(
-                        () => deprecateConcept({ data: { project: slug, path } }),
-                        'The concept could not be deprecated.'
-                      )
-                    }
-                  >
-                    {pending ? 'Deprecating…' : 'Confirm deprecate'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--quiet"
-                    disabled={pending}
-                    onClick={() => setArmDeprecate(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
+            ) : armDeprecate ? (
+              <>
                 <button
                   type="button"
                   className="btn btn--void"
                   disabled={pending}
-                  onClick={() => setArmDeprecate(true)}
+                  onClick={() =>
+                    void act(
+                      () => deprecateConcept({ data: { project: slug, path } }),
+                      'The concept could not be deprecated.'
+                    )
+                  }
                 >
-                  Deprecate
+                  {pending ? 'Deprecating…' : 'Confirm deprecate'}
                 </button>
-              )}
-            </div>
+                <button
+                  type="button"
+                  className="btn btn--quiet"
+                  disabled={pending}
+                  onClick={() => setArmDeprecate(false)}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="btn btn--void"
+                disabled={pending}
+                onClick={() => setArmDeprecate(true)}
+              >
+                Deprecate
+              </button>
+            )}
+            {!historicalView && !editing && (
+              <button
+                type="button"
+                className="btn btn--quiet"
+                onClick={() => {
+                  setTitle(detail.title ?? '');
+                  setBody(detail.body);
+                  setHistoricalContent('body');
+                  setEditing(true);
+                }}
+              >
+                Edit
+              </button>
+            )}
           </div>
-        )}
+        </div>
         {!historicalView && armDeprecate && (
           <p className="bench__consequence">
             Deprecating creates a Git commit and removes this concept from the published retrieval
@@ -297,66 +390,19 @@ function ConceptBench() {
       </div>
 
       <div className="bench__section">
-        <div className="bench__section-head">
-          <span className="label">
-            Content ·{' '}
-            {historicalView ? viewedCommit.slice(0, 12) : `${detail.content_hash.slice(0, 12)}…`}
-          </span>
-          {historicalView && (
-            <div className="content-tabs" role="tablist" aria-label="Historical revision content">
-              <button
-                ref={bodyTab}
-                className="content-tabs__tab"
-                id="concept-content-body-tab"
-                type="button"
-                role="tab"
-                aria-controls="concept-content-body-panel"
-                aria-selected={historicalContent === 'body'}
-                tabIndex={historicalContent === 'body' ? 0 : -1}
-                onClick={() => setHistoricalContent('body')}
-                onKeyDown={switchHistoricalContent}
-              >
-                Full body
-              </button>
-              <button
-                ref={diffTab}
-                className="content-tabs__tab"
-                id="concept-content-diff-tab"
-                type="button"
-                role="tab"
-                aria-controls="concept-content-diff-panel"
-                aria-selected={historicalContent === 'diff'}
-                tabIndex={historicalContent === 'diff' ? 0 : -1}
-                onClick={() => setHistoricalContent('diff')}
-                onKeyDown={switchHistoricalContent}
-              >
-                Diff
-              </button>
-            </div>
-          )}
-          {!historicalView && !editing && (
-            <button
-              type="button"
-              className="btn btn--quiet"
-              onClick={() => {
-                setTitle(detail.title ?? '');
-                setBody(detail.body);
-                setEditing(true);
-              }}
-            >
-              Edit
-            </button>
-          )}
-        </div>
-        {historicalView && historicalContent === 'diff' && historical ? (
+        {hasDiff && historicalContent === 'diff' ? (
           <div
             id="concept-content-diff-panel"
             role="tabpanel"
             aria-labelledby="concept-content-diff-tab"
           >
-            <Suspense fallback={<p className="empty">Preparing revision comparison…</p>}>
-              <ConceptDiff newer={detail.markdown} older={historical.markdown} path={path} />
-            </Suspense>
+            {comparison ? (
+              <Suspense fallback={<p className="empty">Preparing revision comparison…</p>}>
+                <ConceptDiff newer={viewed.markdown} older={comparison.markdown} path={path} />
+              </Suspense>
+            ) : preparingComparison ? (
+              <p className="empty">Preparing revision comparison…</p>
+            ) : null}
           </div>
         ) : editing ? (
           <form
@@ -404,7 +450,7 @@ function ConceptBench() {
               </button>
             </div>
           </form>
-        ) : historicalView ? (
+        ) : hasDiff ? (
           <div
             id="concept-content-body-panel"
             role="tabpanel"
