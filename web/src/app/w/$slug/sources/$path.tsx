@@ -213,17 +213,18 @@ function ConceptBench() {
                 'Never verified by a human'
               )}
             </span>
+            {historicalView && (
+              <button
+                className="btn btn--quiet authority-summary__latest"
+                type="button"
+                onClick={() => void showRevision(detail.commit_sha)}
+              >
+                Go to latest
+              </button>
+            )}
           </div>
         </div>
-        {historicalView ? (
-          <button
-            className="btn btn--quiet"
-            type="button"
-            onClick={() => void showRevision(detail.commit_sha)}
-          >
-            Return to published revision
-          </button>
-        ) : (
+        {!historicalView && (
           <div className="authority-actions">
             <fieldset className="authority-control">
               <legend className="label">Change authority</legend>
@@ -434,7 +435,7 @@ function ConceptBench() {
               </button>
               {entry.commit === detail.commit_sha && (
                 <span className="stub__action">
-                  <SealChip state="signed">Published</SealChip>
+                  <SealChip state="signed">Latest</SealChip>
                 </span>
               )}
             </div>

@@ -215,7 +215,9 @@ export const getConceptDetail = createServerFn({ method: 'GET' })
     };
   });
 
-export const getConceptHistory = createServerFn({ method: 'GET' })
+/* A source mutation immediately refreshes this list. POST avoids the browser
+   serving an earlier history response for the same workspace/path URL. */
+export const getConceptHistory = createServerFn({ method: 'POST' })
   .validator(pathInput)
   .handler(async ({ data }) => {
     const membership = await requireMember('read', data.workspace);

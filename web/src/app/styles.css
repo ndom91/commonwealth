@@ -902,6 +902,10 @@ select {
   color: var(--ink-3);
 }
 
+.authority-summary__latest {
+  margin-inline-start: auto;
+}
+
 .authority-actions {
   display: flex;
   flex-wrap: wrap;
@@ -916,7 +920,7 @@ select {
   padding: 0;
   border: 0;
   display: grid;
-  gap: var(--s-tight);
+  gap: var(--s-base);
 }
 
 .authority-control legend {
