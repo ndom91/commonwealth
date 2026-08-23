@@ -9,7 +9,7 @@
     "dev": "pnpm --filter @commonwealth/mcp-server dev",
     "start": "pnpm --filter @commonwealth/mcp-server start",
     "typecheck": "pnpm --filter @commonwealth/mcp-server typecheck && pnpm --filter @commonwealth/web typecheck",
-    "test": "pnpm --filter @commonwealth/mcp-server test && node --import tsx --test 'packages/*/src/**/*.test.ts'",
+    "test": "pnpm --filter @commonwealth/mcp-server test && node --import tsx --test 'web/test/**/*.test.ts' 'packages/*/src/**/*.test.ts'",
     "lint": "pnpm biome check",
     "lint:fix": "pnpm run lint --write",
     "format": "biome check .",

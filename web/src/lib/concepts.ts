@@ -1,9 +1,9 @@
 import { commitFiles, history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
 import { indexWorkspace } from '@commonwealth/corpus/indexer';
-import { searchWorkspace } from '@commonwealth/corpus/search';
 import { parseOkfDocument, serializeOkfDocument, validateOkfPath } from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateScope, validateWorkspace } from './authorize.js';
+import { conceptVersion, inspectWorkspace } from './concept-inspection.js';
 import { client } from './db.js';
 import { embeddingModel, embeddings } from './pipeline.js';
 
@@ -92,18 +92,6 @@ function revisionTime(frontmatter: Record<string, unknown>): string | null {
   if (latest === null || typeof latest !== 'object') return null;
   const at = (latest as Record<string, unknown>).at;
   return typeof at === 'string' ? at : null;
-}
-
-function documentAuthority(frontmatter: Record<string, unknown>): Authority {
-  const commonwealth = frontmatter.commonwealth;
-  if (commonwealth === null || typeof commonwealth !== 'object') return 'unverified';
-  const authority = (commonwealth as Record<string, unknown>).authority;
-  return AUTHORITIES.includes(authority as Authority) ? (authority as Authority) : 'unverified';
-}
-
-function documentTitle(frontmatter: Record<string, unknown>): string | null {
-  const title = frontmatter.title;
-  return typeof title === 'string' && title.trim() ? title.trim() : null;
 }
 
 function owner(frontmatter: Record<string, unknown>): string | null {
@@ -238,29 +226,14 @@ export const getConceptVersion = createServerFn({ method: 'GET' })
   .validator(versionInput)
   .handler(async ({ data }) => {
     const membership = await requireMember('read', data.workspace);
-    const entries = await history(corpusPath(), membership.slug, data.path);
-    if (!entries.some((entry) => entry.commit === data.commit)) {
-      throw new Error('That commit is not in this concept history');
-    }
-
-    const markdown = await readFileAtCommit(corpusPath(), membership.slug, data.path, data.commit);
-    const document = parseOkfDocument(markdown);
-    return {
-      authority: documentAuthority(document.frontmatter),
-      commit: data.commit,
-      last_verified_at: revisionTime(document.frontmatter),
-      markdown,
-      tags: tags(document.frontmatter.tags),
-      title: documentTitle(document.frontmatter),
-      type: document.frontmatter.type as string,
-    };
+    return conceptVersion({ ...data, corpusPath: corpusPath(), workspace: membership.slug });
   });
 
 export const inspectRetrieval = createServerFn({ method: 'GET' })
   .validator(retrievalInput)
   .handler(async ({ data }) => {
     const { workspaceId } = await requireMember('read', data.workspace);
-    return searchWorkspace({
+    return inspectWorkspace({
       authority: data.authority ?? undefined,
       embeddings: embeddings(),
       limit: data.limit,
