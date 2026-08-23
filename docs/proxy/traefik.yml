@@ -1,0 +1,35 @@
+# Dynamic configuration for Traefik's file provider. Replace the hostnames with
+# yours. This assumes the Traefik installation defines a `websecure` entry point
+# and a `letsencrypt` certificate resolver. Run Traefik on the host so these
+# loopback targets resolve; a containerized Traefik needs reachable host targets
+# instead. Forwarded headers require APP_TRUST_FORWARDED_FOR=true and
+# WEB_TRUST_FORWARDED_FOR=true in the Compose environment.
+
+http:
+  routers:
+    mcp:
+      entryPoints:
+        - websecure
+      rule: Host(`mcp.example.com`)
+      service: mcp
+      tls:
+        certResolver: letsencrypt
+
+    admin:
+      entryPoints:
+        - websecure
+      rule: Host(`admin.example.com`)
+      service: admin
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    mcp:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:3000
+
+    admin:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:3001
