@@ -28,6 +28,7 @@ import { Route as WSlugSettingsPeopleRouteImport } from './app/w/$slug/settings/
 import { Route as WSlugSettingsWorkspaceRouteImport } from './app/w/$slug/settings/workspace'
 import { Route as WSlugSourcesIndexRouteImport } from './app/w/$slug/sources/index'
 import { Route as WSlugSourcesPathRouteImport } from './app/w/$slug/sources/$path'
+import { Route as WSlugSourcesInspectRouteImport } from './app/w/$slug/sources/inspect'
 import { Route as WSlugSourcesNewRouteImport } from './app/w/$slug/sources/new'
 import { Route as WSlugSettingsIdentitiesIndexRouteImport } from './app/w/$slug/settings/identities/index'
 import { Route as WSlugSettingsIdentitiesIdentityIdRouteImport } from './app/w/$slug/settings/identities/$identityId'
@@ -127,6 +128,11 @@ const WSlugSourcesPathRoute = WSlugSourcesPathRouteImport.update({
   path: '/$path',
   getParentRoute: () => WSlugSourcesRoute,
 } as any)
+const WSlugSourcesInspectRoute = WSlugSourcesInspectRouteImport.update({
+  id: '/inspect',
+  path: '/inspect',
+  getParentRoute: () => WSlugSourcesRoute,
+} as any)
 const WSlugSourcesNewRoute = WSlugSourcesNewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/w/$slug/settings/people': typeof WSlugSettingsPeopleRoute
   '/w/$slug/settings/workspace': typeof WSlugSettingsWorkspaceRoute
   '/w/$slug/sources/$path': typeof WSlugSourcesPathRoute
+  '/w/$slug/sources/inspect': typeof WSlugSourcesInspectRoute
   '/w/$slug/sources/new': typeof WSlugSourcesNewRoute
   '/w/$slug/settings/': typeof WSlugSettingsIndexRoute
   '/w/$slug/sources/': typeof WSlugSourcesIndexRoute
@@ -184,6 +191,7 @@ export interface FileRoutesByTo {
   '/w/$slug/settings/people': typeof WSlugSettingsPeopleRoute
   '/w/$slug/settings/workspace': typeof WSlugSettingsWorkspaceRoute
   '/w/$slug/sources/$path': typeof WSlugSourcesPathRoute
+  '/w/$slug/sources/inspect': typeof WSlugSourcesInspectRoute
   '/w/$slug/sources/new': typeof WSlugSourcesNewRoute
   '/w/$slug/settings': typeof WSlugSettingsIndexRoute
   '/w/$slug/sources': typeof WSlugSourcesIndexRoute
@@ -209,6 +217,7 @@ export interface FileRoutesById {
   '/w/$slug/settings/people': typeof WSlugSettingsPeopleRoute
   '/w/$slug/settings/workspace': typeof WSlugSettingsWorkspaceRoute
   '/w/$slug/sources/$path': typeof WSlugSourcesPathRoute
+  '/w/$slug/sources/inspect': typeof WSlugSourcesInspectRoute
   '/w/$slug/sources/new': typeof WSlugSourcesNewRoute
   '/w/$slug/settings/': typeof WSlugSettingsIndexRoute
   '/w/$slug/sources/': typeof WSlugSourcesIndexRoute
@@ -235,6 +244,7 @@ export interface FileRouteTypes {
     | '/w/$slug/settings/people'
     | '/w/$slug/settings/workspace'
     | '/w/$slug/sources/$path'
+    | '/w/$slug/sources/inspect'
     | '/w/$slug/sources/new'
     | '/w/$slug/settings/'
     | '/w/$slug/sources/'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/w/$slug/settings/people'
     | '/w/$slug/settings/workspace'
     | '/w/$slug/sources/$path'
+    | '/w/$slug/sources/inspect'
     | '/w/$slug/sources/new'
     | '/w/$slug/settings'
     | '/w/$slug/sources'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/w/$slug/settings/people'
     | '/w/$slug/settings/workspace'
     | '/w/$slug/sources/$path'
+    | '/w/$slug/sources/inspect'
     | '/w/$slug/sources/new'
     | '/w/$slug/settings/'
     | '/w/$slug/sources/'
@@ -433,6 +445,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WSlugSourcesPathRouteImport
       parentRoute: typeof WSlugSourcesRoute
     }
+    '/w/$slug/sources/inspect': {
+      id: '/w/$slug/sources/inspect'
+      path: '/inspect'
+      fullPath: '/w/$slug/sources/inspect'
+      preLoaderRoute: typeof WSlugSourcesInspectRouteImport
+      parentRoute: typeof WSlugSourcesRoute
+    }
     '/w/$slug/sources/new': {
       id: '/w/$slug/sources/new'
       path: '/new'
@@ -494,12 +513,14 @@ const WSlugSettingsRouteWithChildren = WSlugSettingsRoute._addFileChildren(
 
 interface WSlugSourcesRouteChildren {
   WSlugSourcesPathRoute: typeof WSlugSourcesPathRoute
+  WSlugSourcesInspectRoute: typeof WSlugSourcesInspectRoute
   WSlugSourcesNewRoute: typeof WSlugSourcesNewRoute
   WSlugSourcesIndexRoute: typeof WSlugSourcesIndexRoute
 }
 
 const WSlugSourcesRouteChildren: WSlugSourcesRouteChildren = {
   WSlugSourcesPathRoute: WSlugSourcesPathRoute,
+  WSlugSourcesInspectRoute: WSlugSourcesInspectRoute,
   WSlugSourcesNewRoute: WSlugSourcesNewRoute,
   WSlugSourcesIndexRoute: WSlugSourcesIndexRoute,
 }

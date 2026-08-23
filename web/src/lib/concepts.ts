@@ -1,5 +1,6 @@
 import { commitFiles, history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
 import { indexWorkspace } from '@commonwealth/corpus/indexer';
+import { searchWorkspace } from '@commonwealth/corpus/search';
 import { parseOkfDocument, serializeOkfDocument, validateOkfPath } from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateScope, validateWorkspace } from './authorize.js';
@@ -39,6 +40,49 @@ function pathInput(value: unknown): Scoped<{ path: string }> {
   const path = (value as { path?: string })?.path;
   if (typeof path !== 'string') throw new Error('Invalid concept path');
   return { workspace: validateWorkspace(value), path: validateOkfPath(path) };
+}
+
+function versionInput(value: unknown): Scoped<{ commit: string; path: string }> {
+  const input = value as { commit?: string };
+  const commit = input?.commit;
+  if (typeof commit !== 'string' || !/^[0-9a-f]{40}$/.test(commit)) {
+    throw new Error('Invalid concept commit');
+  }
+
+  return { ...pathInput(value), commit };
+}
+
+function retrievalInput(value: unknown): Scoped<{
+  authority: Authority | null;
+  limit: number;
+  query: string;
+  tags: string[];
+  type: string | null;
+}> {
+  const input = (value ?? {}) as Record<string, unknown>;
+  const query = optionalText(input.query, 'search');
+  if (!query) throw new Error('Invalid search');
+  if (
+    !Number.isInteger(input.limit) ||
+    (input.limit as number) < 1 ||
+    (input.limit as number) > 20
+  ) {
+    throw new Error('Invalid result limit');
+  }
+  if (input.tags !== undefined && !Array.isArray(input.tags)) throw new Error('Invalid tags');
+  const selectedTags = input.tags ?? [];
+  if (!selectedTags.every((tag) => typeof tag === 'string' && tag.trim().length > 0)) {
+    throw new Error('Invalid tags');
+  }
+
+  return {
+    workspace: validateWorkspace(value),
+    authority: optionalAuthority(input.authority),
+    limit: input.limit as number,
+    query,
+    tags: selectedTags.map((tag) => tag.trim()),
+    type: optionalText(input.type, 'type'),
+  };
 }
 
 function revisionTime(frontmatter: Record<string, unknown>): string | null {
@@ -176,6 +220,37 @@ export const getConceptHistory = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const membership = await requireMember('read', data.workspace);
     return history(corpusPath(), membership.slug, data.path);
+  });
+
+export const getConceptVersion = createServerFn({ method: 'GET' })
+  .validator(versionInput)
+  .handler(async ({ data }) => {
+    const membership = await requireMember('read', data.workspace);
+    const entries = await history(corpusPath(), membership.slug, data.path);
+    if (!entries.some((entry) => entry.commit === data.commit)) {
+      throw new Error('That commit is not in this concept history');
+    }
+
+    return {
+      commit: data.commit,
+      markdown: await readFileAtCommit(corpusPath(), membership.slug, data.path, data.commit),
+    };
+  });
+
+export const inspectRetrieval = createServerFn({ method: 'GET' })
+  .validator(retrievalInput)
+  .handler(async ({ data }) => {
+    const { workspaceId } = await requireMember('read', data.workspace);
+    return searchWorkspace({
+      authority: data.authority ?? undefined,
+      embeddings: embeddings(),
+      limit: data.limit,
+      query: data.query,
+      sql: client,
+      tags: data.tags,
+      type: data.type ?? undefined,
+      workspaceId,
+    });
   });
 
 export const listReviewQueue = createServerFn({ method: 'GET' })

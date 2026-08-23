@@ -1659,6 +1659,107 @@ select {
   font-weight: 600;
 }
 
+.stub__revision {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stub__revision:hover .stub__label {
+  color: var(--mark);
+}
+
+.concept-diff {
+  overflow: hidden;
+  border: 1px solid var(--rule-hair);
+}
+
+.retrieval-form {
+  display: grid;
+  grid-template-columns: minmax(14rem, 2fr) repeat(3, minmax(8rem, 1fr)) 5rem auto;
+  align-items: end;
+  gap: var(--s-base);
+  margin-top: var(--s-loose);
+}
+
+.retrieval-results {
+  display: grid;
+  gap: 1px;
+  margin: var(--s-snug) 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--rule-hair);
+  border-block: 1px solid var(--rule-hair);
+}
+
+.retrieval-results > li {
+  padding: var(--s-base);
+  background: var(--slate-bench);
+}
+
+.retrieval-results__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-snug);
+}
+
+.retrieval-results__head > a {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retrieval-results__head > .chip {
+  margin-left: auto;
+}
+
+.retrieval-results__meta {
+  margin: var(--s-tight) 0 0;
+  color: var(--ink-3);
+}
+
+.retrieval-results__excerpt {
+  margin: var(--s-snug) 0 0;
+  padding: var(--s-snug);
+  overflow: auto;
+  background: var(--slate-ground);
+  color: var(--ink-2);
+  font-family: var(--font-register);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.retrieval-results__scores {
+  display: flex;
+  gap: var(--s-base);
+  margin: var(--s-snug) 0 0;
+}
+
+.retrieval-results__scores div {
+  display: flex;
+  gap: var(--s-tight);
+}
+
+.retrieval-results__scores dt {
+  color: var(--ink-3);
+}
+
+.retrieval-results__scores dd {
+  margin: 0;
+  color: var(--ink);
+}
+
 .stub__meta {
   grid-column: 1;
   color: var(--ink-3);
@@ -2035,6 +2136,10 @@ select {
    Give the measures up and let the action sit under the entry instead — there
    is no column left to line up with. */
 @media (max-width: 560px) {
+  .retrieval-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .stub__role,
   .stub__slot {
     flex: 0 1 auto;

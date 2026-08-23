@@ -86,9 +86,14 @@ function Sources() {
       accession="Knowledge register"
       {...viewer}
       actions={
-        <Link to="/w/$slug/sources/new" search={{}} className="btn btn--primary">
-          New concept
-        </Link>
+        <>
+          <Link to="/w/$slug/sources/inspect" search={{}} className="btn btn--quiet">
+            Inspect retrieval
+          </Link>
+          <Link to="/w/$slug/sources/new" search={{}} className="btn btn--primary">
+            New concept
+          </Link>
+        </>
       }
     >
       <div className="panes">

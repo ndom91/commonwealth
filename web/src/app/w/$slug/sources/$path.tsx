@@ -1,11 +1,12 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
-import { useEffect, useEffectEvent, useState } from 'react';
+import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { authoritySeal, SealChip } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
 import {
   deprecateConcept,
   getConceptDetail,
   getConceptHistory,
+  getConceptVersion,
   reviseConcept,
   verifyConcept,
 } from '../../../../lib/concepts.js';
@@ -29,8 +30,14 @@ type Detail = {
   type: string;
 };
 type History = { commit: string; subject: string; timestamp: string };
+type Version = { commit: string; markdown: string };
 
 const AUTHORITIES: Authority[] = ['unverified', 'approved', 'canonical'];
+const ConceptDiff = lazy(() =>
+  import('../../../../components/concept-diff.js').then(({ ConceptDiff }) => ({
+    default: ConceptDiff,
+  }))
+);
 
 function ConceptBench() {
   const { slug, path } = Route.useParams();
@@ -41,6 +48,9 @@ function ConceptBench() {
   const [pending, setPending] = useState(false);
   const [editing, setEditing] = useState(false);
   const [armDeprecate, setArmDeprecate] = useState(false);
+  const [historical, setHistorical] = useState<Version>();
+  const [comparing, setComparing] = useState(false);
+  const revisionRequest = useRef(0);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
 
@@ -53,12 +63,15 @@ function ConceptBench() {
       ]);
       setDetail(next as Detail);
       setEntries(nextEntries as History[]);
+      setHistorical(undefined);
+      setComparing(false);
     } catch (cause) {
       setError(writeFailure(cause, 'This concept could not be read.'));
     }
   });
 
   useEffect(() => {
+    revisionRequest.current += 1;
     setDetail(undefined);
     void load();
   }, [path]);
@@ -79,6 +92,29 @@ function ConceptBench() {
     }
   }
 
+  async function showRevision(commit: string) {
+    if (commit === detail?.commit_sha) {
+      setHistorical(undefined);
+      setComparing(false);
+      return;
+    }
+    const request = ++revisionRequest.current;
+    setPending(true);
+    setError(undefined);
+    try {
+      const version = (await getConceptVersion({
+        data: { workspace: slug, path, commit },
+      })) as Version;
+      if (request !== revisionRequest.current) return;
+      setHistorical(version);
+      setComparing(false);
+    } catch (cause) {
+      setError(writeFailure(cause, 'That revision could not be read.'));
+    } finally {
+      if (request === revisionRequest.current) setPending(false);
+    }
+  }
+
   if (error && !detail) {
     return (
       <section className="detail" aria-label="Selected concept">
@@ -95,13 +131,16 @@ function ConceptBench() {
       </section>
     );
 
+  const viewedCommit = historical?.commit ?? detail.commit_sha;
+  const historicalView = Boolean(historical);
+
   return (
     <section className="detail" aria-label="Selected concept">
       <div className="bench__head">
         <div>
           <span className="label">
             {detail.type} · {detail.path} · commit{' '}
-            <b className="register">{detail.commit_sha.slice(0, 12)}</b>
+            <b className="register">{viewedCommit.slice(0, 12)}</b>
           </span>
           <h2>{detail.title ?? detail.path}</h2>
         </div>
@@ -120,6 +159,13 @@ function ConceptBench() {
         </div>
       )}
 
+      {historicalView && (
+        <p className="bench__note">
+          Viewing a historical Git revision. It remains in the concept history but is not the
+          published retrieval snapshot.
+        </p>
+      )}
+
       <div className="bench__section">
         <div className="bench__section-head">
           <span className="label">
@@ -133,64 +179,74 @@ function ConceptBench() {
             )}
           </span>
         </div>
-        <div className="authority-set">
-          <fieldset className="authority-control">
-            <legend className="label">Set authority to</legend>
-            <div className="authority-control__choices">
-              {AUTHORITIES.map((authority) => (
+        {historicalView ? (
+          <button
+            className="btn btn--quiet"
+            type="button"
+            onClick={() => void showRevision(detail.commit_sha)}
+          >
+            Return to published revision
+          </button>
+        ) : (
+          <div className="authority-set">
+            <fieldset className="authority-control">
+              <legend className="label">Set authority to</legend>
+              <div className="authority-control__choices">
+                {AUTHORITIES.map((authority) => (
+                  <button
+                    key={authority}
+                    type="button"
+                    className={`btn ${authority === detail.authority ? 'btn--current' : 'btn--quiet'}`}
+                    disabled={pending || authority === detail.authority}
+                    onClick={() =>
+                      void act(
+                        () => verifyConcept({ data: { workspace: slug, path, authority } }),
+                        'The authority could not be changed.'
+                      )
+                    }
+                  >
+                    {authority}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            {armDeprecate ? (
+              <>
                 <button
-                  key={authority}
                   type="button"
-                  className={`btn ${authority === detail.authority ? 'btn--current' : 'btn--quiet'}`}
-                  disabled={pending || authority === detail.authority}
+                  className="btn btn--void"
+                  disabled={pending}
                   onClick={() =>
                     void act(
-                      () => verifyConcept({ data: { workspace: slug, path, authority } }),
-                      'The authority could not be changed.'
+                      () => deprecateConcept({ data: { workspace: slug, path } }),
+                      'The concept could not be deprecated.'
                     )
                   }
                 >
-                  {authority}
+                  {pending ? 'Deprecating…' : 'Confirm deprecate'}
                 </button>
-              ))}
-            </div>
-          </fieldset>
-          {armDeprecate ? (
-            <>
+                <button
+                  type="button"
+                  className="btn btn--quiet"
+                  disabled={pending}
+                  onClick={() => setArmDeprecate(false)}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
                 className="btn btn--void"
                 disabled={pending}
-                onClick={() =>
-                  void act(
-                    () => deprecateConcept({ data: { workspace: slug, path } }),
-                    'The concept could not be deprecated.'
-                  )
-                }
+                onClick={() => setArmDeprecate(true)}
               >
-                {pending ? 'Deprecating…' : 'Confirm deprecate'}
+                Deprecate
               </button>
-              <button
-                type="button"
-                className="btn btn--quiet"
-                disabled={pending}
-                onClick={() => setArmDeprecate(false)}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn btn--void"
-              disabled={pending}
-              onClick={() => setArmDeprecate(true)}
-            >
-              Deprecate
-            </button>
-          )}
-        </div>
-        {armDeprecate && (
+            )}
+          </div>
+        )}
+        {!historicalView && armDeprecate && (
           <p className="bench__consequence">
             Deprecating creates a Git commit and removes this concept from the published retrieval
             snapshot. Its Git history remains intact.
@@ -200,8 +256,21 @@ function ConceptBench() {
 
       <div className="bench__section">
         <div className="bench__section-head">
-          <span className="label">Content · {detail.content_hash.slice(0, 12)}…</span>
-          {!editing && (
+          <span className="label">
+            Content ·{' '}
+            {historicalView ? viewedCommit.slice(0, 12) : `${detail.content_hash.slice(0, 12)}…`}
+          </span>
+          {historicalView && !comparing && (
+            <button className="btn btn--quiet" type="button" onClick={() => setComparing(true)}>
+              Compare with published
+            </button>
+          )}
+          {historicalView && comparing && (
+            <button className="btn btn--quiet" type="button" onClick={() => setComparing(false)}>
+              Show revision
+            </button>
+          )}
+          {!historicalView && !editing && (
             <button
               type="button"
               className="btn btn--quiet"
@@ -215,7 +284,11 @@ function ConceptBench() {
             </button>
           )}
         </div>
-        {editing ? (
+        {comparing && historical ? (
+          <Suspense fallback={<p className="empty">Preparing revision comparison…</p>}>
+            <ConceptDiff newer={detail.markdown} older={historical.markdown} path={path} />
+          </Suspense>
+        ) : editing ? (
           <form
             className="revise"
             onSubmit={(event) => {
@@ -263,9 +336,10 @@ function ConceptBench() {
           </form>
         ) : (
           <>
-            <pre className="source-body">{detail.markdown}</pre>
+            <pre className="source-body">{historical?.markdown ?? detail.markdown}</pre>
             <p className="line__caption">
-              The complete OKF document is shown as text from the indexed Git commit.
+              The complete OKF document is shown as text from the{' '}
+              {historicalView ? 'selected' : 'indexed'} Git commit.
             </p>
           </>
         )}
@@ -276,11 +350,19 @@ function ConceptBench() {
         <div className="stubs">
           {entries.map((entry) => (
             <div className="stub" key={entry.commit}>
-              <span className="stub__label">{entry.subject}</span>
-              <span className="stub__meta register">
-                <b>{entry.commit.slice(0, 12)}</b> ·{' '}
-                <Stamp at={entry.timestamp} precision="datetime" />
-              </span>
+              <button
+                className="stub__revision"
+                disabled={pending}
+                onClick={() => void showRevision(entry.commit)}
+                aria-pressed={entry.commit === viewedCommit}
+                type="button"
+              >
+                <span className="stub__label">{entry.subject}</span>
+                <span className="stub__meta register">
+                  <b>{entry.commit.slice(0, 12)}</b> ·{' '}
+                  <Stamp at={entry.timestamp} precision="datetime" />
+                </span>
+              </button>
               {entry.commit === detail.commit_sha && (
                 <span className="stub__action">
                   <SealChip state="signed">Published</SealChip>
