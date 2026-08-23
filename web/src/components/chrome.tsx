@@ -3,7 +3,7 @@ import { Link, useRouter } from '@tanstack/react-router';
 import { Group, type LucideIcon, Moon, Sun, UserRoundCog } from 'lucide-react';
 import { type ComponentPropsWithoutRef, type ReactNode, useEffect, useState } from 'react';
 import { authClient } from '../lib/auth-client.js';
-import { can, type Role, type WorkspaceRef } from '../lib/roles.js';
+import { can, type ProjectRef, type Role } from '../lib/roles.js';
 import { pinTheme } from '../lib/session.js';
 import { DEFAULT_THEME, other, parseTheme, type Theme } from '../lib/theme.js';
 
@@ -123,7 +123,7 @@ export type NavCounts = {
  * links calls `requireMember(permission, slug)` — see `lib/authorize.ts` — and
  * refuses regardless of what the rail happens to be showing.
  *
- * The role is the caller's role *in this workspace*. Someone may be an admin in
+ * The role is the caller's role *in this project*. Someone may be an admin in
  * one and a reader in another, and the rail changes when they switch.
  *
  * Sections the MCP server already supports but the browser cannot reach yet
@@ -134,13 +134,13 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
     {
       label: 'Knowledge',
       items: [
-        { mark: 'sources', label: 'Sources', to: '/w/$slug/sources', count: counts?.sources },
+        { mark: 'sources', label: 'Sources', to: '/p/$slug/sources', count: counts?.sources },
         ...(can(role, 'review')
           ? [
               {
                 mark: 'review' as const,
                 label: 'Review queue',
-                to: '/w/$slug/review',
+                to: '/p/$slug/review',
                 count: counts?.review,
               },
             ]
@@ -156,29 +156,29 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
      stated exactly once in the navigation that owns it. */
   if (can(role, 'admin')) {
     groups.push({
-      label: 'Workspace',
-      items: [{ mark: 'settings', label: 'Settings', to: '/w/$slug/settings/workspace' }],
+      label: 'Project',
+      items: [{ mark: 'settings', label: 'Settings', to: '/p/$slug/settings/project' }],
     });
   } else if (can(role, 'write')) {
     /* Writers can start a project and mint credentials for their own agents.
         The identity count is deliberately absent: it counts every holder in the
-        workspace, while this link leads to a register showing only theirs. */
+        project, while this link leads to a register showing only theirs. */
     groups.push({
-      label: 'Workspace',
+      label: 'Project',
       items: [
-        { mark: 'settings', label: 'Start workspace', to: '/w/$slug/settings/workspace' },
-        { mark: 'settings', label: 'Your identities', to: '/w/$slug/settings/identities' },
+        { mark: 'settings', label: 'Start project', to: '/p/$slug/settings/project' },
+        { mark: 'settings', label: 'Your identities', to: '/p/$slug/settings/identities' },
       ],
     });
   } else {
     groups.push({
-      label: 'Workspace',
-      items: [{ mark: 'settings', label: 'Start workspace', to: '/w/$slug/settings/workspace' }],
+      label: 'Project',
+      items: [{ mark: 'settings', label: 'Start project', to: '/p/$slug/settings/project' }],
     });
   }
   groups.push({
     label: 'Custody',
-    items: [{ mark: 'activity', label: 'Activity', to: '/w/$slug/activity' }],
+    items: [{ mark: 'activity', label: 'Activity', to: '/p/$slug/activity' }],
   });
   return groups;
 }
@@ -186,7 +186,7 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
 /* The plate names the corpus you are in, and is how you leave it.
  *
  * It used to read the product name over "Custody bench" on every screen, which
- * was true and told you nothing. With more than one workspace the single most
+ * was true and told you nothing. With more than one project the single most
  * important fact on the page is *which* one you are looking at — every count,
  * every register and every search below is scoped to it — so the plate says so
  * and the product name steps down to the sub-line.
@@ -198,21 +198,21 @@ function drawerGroups(role: Role, counts: NavCounts | undefined): DrawerGroup[] 
  * stylesheet for why that is survivable here and would not be for a menu that
  * floated over the rail.
  *
- * Switching only. Creating a workspace used to hang off the bottom of this menu
- * and deep-link into a form on the People page; it lives in Settings now, which
+ * Switching only. Creating a project used to hang off the bottom of this menu
+ * and deep-link into a form on the People page; it lives on the Project settings page now, which
  * has a drawer of its own. So the plate is a disclosure exactly when there is
  * somewhere to go, and a plain plate otherwise — no arrow promising a menu that
  * would open onto a list of one. */
-function WorkspacePlate({
+function ProjectPlate({
   slug,
   name,
-  workspaces,
+  projects,
 }: {
   slug: string;
   name: string;
-  workspaces: WorkspaceRef[];
+  projects: ProjectRef[];
 }) {
-  const others = workspaces.filter((entry) => entry.slug !== slug);
+  const others = projects.filter((entry) => entry.slug !== slug);
   if (others.length === 0) {
     return (
       <div className="cabinet__plate">
@@ -225,9 +225,9 @@ function WorkspacePlate({
     <details className="cabinet__switch">
       {/* A tooltip that *describes* rather than names, so unlike `Hint` its
           content is not `aria-hidden`. The plate already carries a visible name
-          — the workspace — and a screen reader announces that; what it cannot
+          — the project — and a screen reader announces that; what it cannot
           announce is that the name is also a control. Radix points the
-          trigger's `aria-describedby` here, which adds "Switch workspace" to
+          trigger's `aria-describedby` here, which adds "Switch project" to
           the name instead of replacing it. Overriding the name with an
           `aria-label` would break Label in Name (WCAG 2.5.3) for anyone driving
           this by voice: they say the words they can see.
@@ -242,7 +242,7 @@ function WorkspacePlate({
             <small>Commonwealth</small>
             {/* The one thing on the plate that says it is a control. Doctrine
                 refuses a disclosure triangle here — that reads as a form widget
-                stuck to a label — but this is not one: it names *workspaces*
+                stuck to a label — but this is not one: it names *projects*
                 rather than announcing a menu, and it does not rotate on open.
                 Lucide rather than a drawn mark for the same reason Account and
                 the scheme toggle are: the rail's hand-drawn grammar belongs to
@@ -257,23 +257,23 @@ function WorkspacePlate({
         </Tooltip.Trigger>
         <Tooltip.Portal>
           <Tooltip.Content className="tip tip--label" sideOffset={6} collisionPadding={8}>
-            Switch workspace
+            Switch project
             <Tooltip.Arrow className="tip__arrow" width={9} height={4} />
           </Tooltip.Content>
         </Tooltip.Portal>
       </Tooltip.Root>
-      <div className="cabinet__workspaces">
+      <div className="cabinet__projects">
         <span className="label">Switch to</span>
         {others.map((entry) => (
           <Link
             key={entry.slug}
-            to="/w/$slug/sources"
+            to="/p/$slug/sources"
             params={{ slug: entry.slug }}
             search={{}}
-            className="cabinet__workspace"
+            className="cabinet__project"
           >
             {entry.name}
-            <span className="cabinet__workspace-role register">{entry.role}</span>
+            <span className="cabinet__project-role register">{entry.role}</span>
           </Link>
         ))}
       </div>
@@ -359,8 +359,8 @@ export function AppShell({
   holder,
   role,
   slug,
-  workspaceName,
-  workspaces,
+  projectName,
+  projects,
   counts,
   children,
 }: {
@@ -368,18 +368,18 @@ export function AppShell({
   accession?: string;
   actions?: ReactNode;
   holder?: string;
-  /* Shapes the rail, and is the caller's role *in this workspace*. Supplied by
-     the `/w/$slug` layout's `beforeLoad` alongside the holder name and the
-     workspace list, so one round trip covers the whole shell. */
+  /* Shapes the rail, and is the caller's role *in this project*. Supplied by
+     the `/p/$slug` layout's `beforeLoad` alongside the holder name and the
+     project list, so one round trip covers the whole shell. */
   role: Role;
-  /* The workspace this page is showing. Every drawer link carries it, so
+  /* The project this page is showing. Every drawer link carries it, so
      switching section never silently changes corpus. */
   slug: string;
-  workspaceName: string;
-  workspaces: WorkspaceRef[];
-  /* Read once by the `/w/$slug` layout and spread in with the rest of the
+  projectName: string;
+  projects: ProjectRef[];
+  /* Read once by the `/p/$slug` layout and spread in with the rest of the
      viewer, not fetched here. Two reasons it is not component-local: the counts
-     describe the workspace rather than the open page, and a fetch inside this
+     describe the project rather than the open page, and a fetch inside this
      component could not be reached by the bench that changes a source's
      authority — `router.invalidate()` re-runs the layout, so the rail moves
      with the pane that caused it. */
@@ -410,7 +410,7 @@ export function AppShell({
       </a>
 
       <aside className="cabinet">
-        <WorkspacePlate slug={slug} name={workspaceName} workspaces={workspaces} />
+        <ProjectPlate slug={slug} name={projectName} projects={projects} />
 
         <nav className="drawers" aria-label="Sections">
           {drawerGroups(role, counts).map((group) => (
@@ -461,7 +461,7 @@ export function AppShell({
               </div>
               {/* Your account sits with the signed-in name rather than in a
                   drawer: it is a preference, not a section of the corpus. The
-                  workspace's own settings are a drawer, because they are.
+                  project's own settings are a drawer, because they are.
                  *
                   A Lucide glyph, like the other icon-only controls — the
                   hand-drawn marks are the drawer vocabulary, not this one.
@@ -472,7 +472,7 @@ export function AppShell({
                   the Icon Button rule. */}
               <Hint label="Account">
                 <Link
-                  to="/w/$slug/account"
+                  to="/p/$slug/account"
                   params={{ slug }}
                   className="icon-btn"
                   aria-label="Account"
@@ -519,20 +519,20 @@ export function AppShell({
  * The two registers state their size here. That rule — a size appears once, in
  * the navigation that owns the register — used to name the rail, because the
  * rail was the only navigation there was. These two left it, so this bar is
- * their navigation and the numbers came along. Workspace gets none: it is not a
+ * their navigation and the numbers came along. Project gets none: it is not a
  * register. Nor does either page repeat its own count in a head.
  *
  * `activeOptions.exact` is off for Identities on purpose: a selected holder
  * lives at `settings/identities/$id`, and the tab has to stay lit while you are
  * reading one.
  *
- * Workspace is available to every member because anyone may start a project;
+ * Project is available to every member because anyone may start a project;
  * its administrative controls remain hidden from non-administrators. People is
  * administrators' work and is omitted for everyone else. Writers can choose
- * between Workspace and their own Identities; readers see Workspace without a
+ * between Project and their own Identities; readers see Project without a
  * redundant one-item tab bar.
  *
- * The identity count goes with it. It counts every holder in the workspace, and
+ * The identity count goes with it. It counts every holder in the project, and
  * a non-administrator's register shows only their own; a number that disagrees
  * with the list beneath it is worse than no number. */
 export function SettingsTabs({
@@ -548,16 +548,16 @@ export function SettingsTabs({
   return (
     <nav className="tabs" aria-label="Settings sections">
       <Link
-        to="/w/$slug/settings/workspace"
+        to="/p/$slug/settings/project"
         params={{ slug }}
         className="tabs__link"
         activeProps={{ 'aria-current': 'page' }}
       >
-        Workspace
+        Project
       </Link>
       {can(role, 'admin') && (
         <Link
-          to="/w/$slug/settings/people"
+          to="/p/$slug/settings/people"
           params={{ slug }}
           className="tabs__link"
           activeProps={{ 'aria-current': 'page' }}
@@ -567,7 +567,7 @@ export function SettingsTabs({
         </Link>
       )}
       <Link
-        to="/w/$slug/settings/identities"
+        to="/p/$slug/settings/identities"
         params={{ slug }}
         search={{}}
         className="tabs__link"

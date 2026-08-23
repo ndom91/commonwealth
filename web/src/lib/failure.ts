@@ -6,7 +6,7 @@
    the gate says "Administrator access is required." — so the branch never
    fired, and its wording had gone stale besides: it called administrator a
    property of the *instance*, which stopped being true when roles became
-   per-workspace. Nobody was reading it either way, because the routes that
+   per-project. Nobody was reading it either way, because the routes that
    could refuse a reader are gated by `requireRole('admin')` before their
    loaders run, and every other loader needs only `read`. */
 export function readFailure(subject: string): string {

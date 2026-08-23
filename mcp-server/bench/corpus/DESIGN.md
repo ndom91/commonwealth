@@ -398,7 +398,7 @@ A tab whose page is a register carries that register's size, set in register fac
 at the rail count's weight. This does not compete with the rail: a register's
 size is stated once, in the navigation that owns it, and for People and
 Identities that navigation *is* this row. A tab whose page is not a register —
-the Workspace tab — carries nothing.
+the Project tab — carries nothing.
 
 An unknown count is **omitted, not dashed**, here and in the rail alike: a label
 reading *People —* invites the reader to wonder what the dash says about the
@@ -469,7 +469,7 @@ would make the line rewrite itself every time an agent presented a key, so it
 lives on the credential stub instead.
 
 ### Activity log
-The workspace-wide custody line: one ruled row per event, newest first, in four
+The project-wide custody line: one ruled row per event, newest first, in four
 columns — when, what, which source, who. Event types are rendered as the
 sentence a person would say ("Voided a credential"), with an unmapped type
 falling back to its raw name so a new writer shows up legibly without a code
@@ -494,9 +494,9 @@ problem and the recovery. Selects carry a drawn chevron in hairline stroke.
 
 ### Navigation
 The **plate** at the head of the rail names the corpus you are in and is how
-you leave it: a `<details>` disclosure listing the other workspaces you belong
+you leave it: a `<details>` disclosure listing the other projects you belong
 to, or a plain plate when there is nowhere to go. It switches and nothing else —
-creating a workspace lives in Settings, which has a drawer. A disclosure has no
+creating a project lives in Settings, which has a drawer. A disclosure has no
 Escape and no outside-click; that is survivable here because the panel displaces
 nothing and covers nothing, and it is the trade a floating menu could not make.
 
@@ -510,7 +510,7 @@ drawer routes somewhere, so that branch is currently unexercised and kept only
 as the pattern for the next unbuilt section.
 
 **The rail is cut to the holder's role.** A reader sees Knowledge and Custody;
-Review queue appears at `reviewer`, the Workspace group — Settings — at `admin`.
+Review queue appears at `reviewer`, the Project group — Settings — at `admin`.
 Omitted, not
 disabled — a `PENDING` mark says *nobody can open this yet*, which is a
 different sentence from *this is not yours to open*, and showing a drawer that
@@ -537,7 +537,7 @@ them is administration, and administration has one door.
 **A register's size is stated exactly once, in the navigation that owns it.**
 For Sources and the review queue that is the rail. For People and Identities it
 is the Settings tab bar, which took the counts with it when the drawers went —
-so the rule survived the move instead of being quietly dropped. The Workspace
+so the rule survived the move instead of being quietly dropped. The Project
 tab carries no number, because it is not a register.
 
 A register never repeats its own count in a head above itself: the number is

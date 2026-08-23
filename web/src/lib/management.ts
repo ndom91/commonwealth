@@ -8,8 +8,8 @@ import {
   requireMember,
   type Scoped,
   SLUG,
+  validateProject,
   validateScope,
-  validateWorkspace,
 } from './authorize.js';
 import { PAGE_SIZE } from './concepts.js';
 import { client } from './db.js';
@@ -26,7 +26,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * It was `tkb_` before the rename. Changing it is not a migration and not a
  * break: lookup goes through the *stored* prefix, never a literal, so keys
  * already in agents' configs keep authenticating. They also cannot be rewritten
- * — the secret exists only where the holder put it — so a workspace that
+ * — the secret exists only where the holder put it — so a project that
  * predates the rename will show both markings in its register indefinitely.
  * That is the honest cost of the change, and it is cosmetic. */
 const KEY_PREFIX = 'cw_';
@@ -44,7 +44,7 @@ type IdentityAmendment = {
 };
 
 /* Everything in this module manages who may act — agent credentials and the
- * people who hold accounts — so it is behind `admin` *in the workspace named by
+ * people who hold accounts — so it is behind `admin` *in the project named by
  * the caller*, with two deliberate exceptions.
  *
  * The first is redeeming an invitation, where the token is the authorisation
@@ -58,8 +58,8 @@ type IdentityAmendment = {
  * trusted one. Amending, disabling, voiding and issuing against an existing
  * holder all remain `admin` — those reach holders you may not own.
  *
- * Both halves are per-workspace. Agent identities carry `users.workspace_id`
- * and members carry `member.workspace_id`, so an administrator of one workspace
+ * Both halves are per-project. Agent identities carry `users.project_id`
+ * and members carry `member.project_id`, so an administrator of one project
  * can neither see nor void the credentials of another. */
 /* Keyset paginated on (created_at DESC, id DESC), the same ordering the source
    register and the event log use.
@@ -80,20 +80,20 @@ export const listIdentities = createServerFn({ method: 'GET' })
         cursor?: { createdAt?: string; id?: string };
         mine?: boolean;
       };
-      const workspace = validateWorkspace(value);
+      const project = validateProject(value);
       const mine = input.mine === true;
-      if (!input.cursor) return { workspace, cursor: null, mine };
+      if (!input.cursor) return { project, cursor: null, mine };
       if (!input.cursor.createdAt || !input.cursor.id) throw new Error('Invalid cursor');
       return {
-        workspace,
+        project,
         cursor: { createdAt: input.cursor.createdAt, id: input.cursor.id },
         mine,
       };
     }
   )
   .handler(async ({ data }) => {
-    const { userId, workspaceId, role } = await requireMember('write', data.workspace);
-    /* An administrator sees every holder in the workspace and may narrow to
+    const { userId, projectId, role } = await requireMember('write', data.project);
+    /* An administrator sees every holder in the project and may narrow to
        their own. Anyone else sees only their own, whatever they asked for — so
        `mine` is a convenience at the top of the register and the boundary
        underneath it, and the two cannot disagree. */
@@ -113,7 +113,7 @@ export const listIdentities = createServerFn({ method: 'GET' })
       LEFT JOIN api_keys ON api_keys.user_id = users.id
       LEFT JOIN managed_api_key ON managed_api_key.id = api_keys.id
       LEFT JOIN "user" AS owner_account ON owner_account.id = users.owner_admin_id
-      WHERE users.workspace_id = ${workspaceId}
+      WHERE users.project_id = ${projectId}
         AND (${mine} = false OR users.owner_admin_id = ${userId})
         AND (
           ${data.cursor?.createdAt ?? null}::timestamptz IS NULL
@@ -142,7 +142,7 @@ export const createIdentity = createServerFn({ method: 'POST' })
     )
       throw new Error('Invalid identity details');
     return {
-      workspace: validateWorkspace(value),
+      project: validateProject(value),
       name: input.name.trim(),
       keyLabel: input.keyLabel.trim(),
       role: input.role as IdentityInput['role'],
@@ -152,9 +152,9 @@ export const createIdentity = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const {
       userId: createdByAdminId,
-      workspaceId,
+      projectId,
       role,
-    } = await requireMember('write', data.workspace);
+    } = await requireMember('write', data.project);
     /* Nobody mints a credential that can do more than they can. Checked here
        rather than in the form, because the form is a drawing of the rule and
        this is the rule — the route is a plain HTTP endpoint and a `reader` role
@@ -177,13 +177,13 @@ export const createIdentity = createServerFn({ method: 'POST' })
     const keyId = randomUUID();
     let identityId: string | undefined;
     await client.begin(async (transaction) => {
-      /* Filed under the workspace the caller is looking at. An agent belongs to
-         exactly one workspace — `mcp-server/src/access-service.ts` reads
-         `users.workspace_id` off the key and scopes everything to it — so this
+      /* Filed under the project the caller is looking at. An agent belongs to
+         exactly one project — `mcp-server/src/access-service.ts` reads
+         `users.project_id` off the key and scopes everything to it — so this
          is also the decision about which corpus the credential can reach. */
       const [identity] = await transaction<{ id: string }[]>`
-        INSERT INTO users (workspace_id, display_name, role, owner_admin_id)
-        VALUES (${workspaceId}, ${data.name}, ${data.role}, ${owner})
+        INSERT INTO users (project_id, display_name, role, owner_admin_id)
+        VALUES (${projectId}, ${data.name}, ${data.role}, ${owner})
         RETURNING id
       `;
       if (!identity) throw new Error('Unable to create identity');
@@ -197,7 +197,7 @@ export const createIdentity = createServerFn({ method: 'POST' })
         VALUES (${keyId}, ${identity.id}, ${data.keyLabel}, ${createdByAdminId})
       `;
       await fileEvent(transaction, {
-        workspaceId,
+        projectId,
         actor: createdByAdminId,
         type: 'api_key_created',
         metadata: { identityId: identity.id, keyId, label: data.keyLabel },
@@ -225,7 +225,7 @@ export const updateIdentity = createServerFn({ method: 'POST' })
       throw new Error('Invalid role');
     if (typeof input.autoApprove !== 'boolean') throw new Error('Invalid trusted-holder setting');
     return {
-      workspace: validateWorkspace(value),
+      project: validateProject(value),
       identityId: input.identityId.trim(),
       name: input.name.trim(),
       role: input.role as IdentityAmendment['role'],
@@ -234,26 +234,26 @@ export const updateIdentity = createServerFn({ method: 'POST' })
     };
   })
   .handler(async ({ data }) => {
-    const { userId: administrator, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: administrator, projectId } = await requireMember('admin', data.project);
     await client.begin(async (transaction) => {
       const [before] = await transaction<
         {
-          workspace_id: string;
+          project_id: string;
           display_name: string;
           role: string;
           description: string | null;
           auto_approve: boolean;
         }[]
       >`
-        SELECT workspace_id, display_name, role, description, auto_approve
-        FROM users WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
+        SELECT project_id, display_name, role, description, auto_approve
+        FROM users WHERE id = ${data.identityId} AND project_id = ${projectId}
       `;
       if (!before) throw new Error('That identity no longer exists');
       await transaction`
         UPDATE users
         SET display_name = ${data.name}, role = ${data.role}, description = ${data.description},
             auto_approve = ${data.autoApprove}
-        WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
+        WHERE id = ${data.identityId} AND project_id = ${projectId}
       `;
       /* Values are narrowed to what jsonb can carry rather than `unknown`, so
          the compiler — not a runtime surprise — catches a field that cannot be
@@ -273,7 +273,7 @@ export const updateIdentity = createServerFn({ method: 'POST' })
         changed.autoApprove = { from: before.auto_approve, to: data.autoApprove };
       if (Object.keys(changed).length > 0) {
         await fileEvent(transaction, {
-          workspaceId: before.workspace_id,
+          projectId: before.project_id,
           actor: administrator,
           type: 'identity_amended',
           metadata: { identityId: data.identityId, changed },
@@ -293,17 +293,17 @@ export const setIdentityDisabled = createServerFn({ method: 'POST' })
     if (!input.identityId?.trim()) throw new Error('Invalid identity');
     if (typeof input.disabled !== 'boolean') throw new Error('Invalid state');
     return {
-      workspace: validateWorkspace(value),
+      project: validateProject(value),
       identityId: input.identityId.trim(),
       disabled: input.disabled,
     };
   })
   .handler(async ({ data }) => {
-    const { userId: administrator, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: administrator, projectId } = await requireMember('admin', data.project);
     await client.begin(async (transaction) => {
-      const [identity] = await transaction<{ workspace_id: string; disabled_at: string | null }[]>`
-        SELECT workspace_id, disabled_at FROM users
-        WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
+      const [identity] = await transaction<{ project_id: string; disabled_at: string | null }[]>`
+        SELECT project_id, disabled_at FROM users
+        WHERE id = ${data.identityId} AND project_id = ${projectId}
       `;
       if (!identity) throw new Error('That identity no longer exists');
       if (data.disabled === Boolean(identity.disabled_at)) return;
@@ -313,16 +313,16 @@ export const setIdentityDisabled = createServerFn({ method: 'POST' })
       if (data.disabled) {
         await transaction`
           UPDATE users SET disabled_at = now()
-          WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
+          WHERE id = ${data.identityId} AND project_id = ${projectId}
         `;
       } else {
         await transaction`
           UPDATE users SET disabled_at = NULL
-          WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
+          WHERE id = ${data.identityId} AND project_id = ${projectId}
         `;
       }
       await fileEvent(transaction, {
-        workspaceId: identity.workspace_id,
+        projectId: identity.project_id,
         actor: administrator,
         type: data.disabled ? 'identity_disabled' : 'identity_enabled',
         metadata: { identityId: data.identityId },
@@ -340,21 +340,21 @@ export const issueCredential = createServerFn({ method: 'POST' })
     if (!input.identityId?.trim() || !input.keyLabel?.trim())
       throw new Error('Invalid credential details');
     return {
-      workspace: validateWorkspace(value),
+      project: validateProject(value),
       identityId: input.identityId.trim(),
       keyLabel: input.keyLabel.trim(),
     };
   })
   .handler(async ({ data }) => {
-    const { userId: createdByAdminId, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: createdByAdminId, projectId } = await requireMember('admin', data.project);
     const secret = mintSecret();
     const salt = randomBytes(16).toString('hex');
     const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
     const keyId = randomUUID();
     await client.begin(async (transaction) => {
-      const [identity] = await transaction<{ id: string; workspace_id: string }[]>`
-        SELECT id, workspace_id FROM users
-        WHERE id = ${data.identityId} AND workspace_id = ${workspaceId}
+      const [identity] = await transaction<{ id: string; project_id: string }[]>`
+        SELECT id, project_id FROM users
+        WHERE id = ${data.identityId} AND project_id = ${projectId}
       `;
       if (!identity) throw new Error('That identity no longer exists');
       await transaction`
@@ -366,7 +366,7 @@ export const issueCredential = createServerFn({ method: 'POST' })
         VALUES (${keyId}, ${identity.id}, ${data.keyLabel}, ${createdByAdminId})
       `;
       await fileEvent(transaction, {
-        workspaceId: identity.workspace_id,
+        projectId: identity.project_id,
         actor: createdByAdminId,
         type: 'api_key_created',
         metadata: { identityId: identity.id, keyId, label: data.keyLabel },
@@ -379,33 +379,33 @@ export const revokeKey = createServerFn({ method: 'POST' })
   .validator((value: unknown): Scoped<{ keyId: string }> => {
     const keyId = (value as { keyId?: string }).keyId;
     if (!keyId) throw new Error('Invalid key');
-    return { workspace: validateWorkspace(value), keyId };
+    return { project: validateProject(value), keyId };
   })
   .handler(async ({ data }) => {
-    const { userId: administrator, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: administrator, projectId } = await requireMember('admin', data.project);
     await client.begin(async (transaction) => {
       /* Only the first revoke is an event. Voiding an already-void key is a
          no-op, and RETURNING lets the write itself decide that rather than a
          separate read that could race another administrator. */
-      /* `api_keys` has no workspace of its own, so the scope rides in through
+      /* `api_keys` has no project of its own, so the scope rides in through
          its holder — in the same statement, so a key belonging to another
-         workspace is never voided and then discovered to be foreign. */
+         project is never voided and then discovered to be foreign. */
       const [revoked] = await transaction<{ user_id: string; key_prefix: string }[]>`
         UPDATE api_keys SET revoked_at = now()
         WHERE id = ${data.keyId} AND revoked_at IS NULL
-          AND user_id IN (SELECT id FROM users WHERE workspace_id = ${workspaceId})
+          AND user_id IN (SELECT id FROM users WHERE project_id = ${projectId})
         RETURNING user_id, key_prefix
       `;
       if (!revoked) return;
-      const [identity] = await transaction<{ workspace_id: string }[]>`
-        SELECT workspace_id FROM users WHERE id = ${revoked.user_id}
+      const [identity] = await transaction<{ project_id: string }[]>`
+        SELECT project_id FROM users WHERE id = ${revoked.user_id}
       `;
       if (!identity) return;
       const [managed] = await transaction<{ label: string }[]>`
         SELECT label FROM managed_api_key WHERE id = ${data.keyId}
       `;
       await fileEvent(transaction, {
-        workspaceId: identity.workspace_id,
+        projectId: identity.project_id,
         actor: administrator,
         type: 'api_key_revoked',
         metadata: {
@@ -451,7 +451,7 @@ export type Person = {
 export const listPeople = createServerFn({ method: 'GET' })
   .validator(validateScope)
   .handler(async ({ data }): Promise<Person[]> => {
-    const { userId: you, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: you, projectId } = await requireMember('admin', data.project);
     /* `created_at` comes back as a string, not a Date. `drizzle()` mutates the
      client it is handed (see `db.ts`) and that extends to its date parsers, so
      this client hands back raw Postgres timestamps while a bare postgres.js
@@ -470,17 +470,17 @@ export const listPeople = createServerFn({ method: 'GET' })
     >`
     SELECT "user".id, "user".name, "user".email, member.role, member.created_at,
       (SELECT count(*) FROM users
-        WHERE users.workspace_id = member.workspace_id
+        WHERE users.project_id = member.project_id
           AND users.owner_admin_id = "user".id
           AND users.disabled_at IS NULL) AS holders,
       (SELECT count(*) FROM api_keys
         JOIN users ON users.id = api_keys.user_id
-        WHERE users.workspace_id = member.workspace_id
+        WHERE users.project_id = member.project_id
           AND users.owner_admin_id = "user".id
           AND api_keys.revoked_at IS NULL) AS live_credentials
     FROM member
     JOIN "user" ON "user".id = member.user_id
-    WHERE member.workspace_id = ${workspaceId}
+    WHERE member.project_id = ${projectId}
     ORDER BY member.created_at ASC, "user".email ASC
   `;
     return rows.map((row) => ({
@@ -511,14 +511,14 @@ export const updatePersonRole = createServerFn({ method: 'POST' })
     const userId = input.userId?.trim();
     if (!userId) throw new Error('Invalid person');
     if (!isRole(input.role)) throw new Error('Invalid role');
-    return { workspace: validateWorkspace(value), userId, role: input.role };
+    return { project: validateProject(value), userId, role: input.role };
   })
   .handler(async ({ data }) => {
-    const { userId: actor, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: actor, projectId } = await requireMember('admin', data.project);
     await client.begin(async (transaction) => {
       const [before] = await transaction<{ role: string }[]>`
         SELECT role FROM member
-        WHERE workspace_id = ${workspaceId} AND user_id = ${data.userId}
+        WHERE project_id = ${projectId} AND user_id = ${data.userId}
         FOR UPDATE
       `;
       if (!before) throw new Error('That person is no longer a member.');
@@ -526,7 +526,7 @@ export const updatePersonRole = createServerFn({ method: 'POST' })
       if (before.role === 'admin' && data.role !== 'admin') {
         const [{ count }] = await transaction<{ count: string }[]>`
           SELECT count(*) FROM member
-          WHERE workspace_id = ${workspaceId} AND role = 'admin'
+          WHERE project_id = ${projectId} AND role = 'admin'
         `;
         if (Number(count) <= 1) {
           throw new Error('This is the only administrator. Promote someone else first.');
@@ -534,10 +534,10 @@ export const updatePersonRole = createServerFn({ method: 'POST' })
       }
       await transaction`
         UPDATE member SET role = ${data.role}
-        WHERE workspace_id = ${workspaceId} AND user_id = ${data.userId}
+        WHERE project_id = ${projectId} AND user_id = ${data.userId}
       `;
       await fileEvent(transaction, {
-        workspaceId,
+        projectId,
         actor,
         type: 'member_role_changed',
         metadata: { userId: data.userId, from: before.role, to: data.role },
@@ -568,38 +568,38 @@ export const removePerson = createServerFn({ method: 'POST' })
   .validator((value: unknown): Scoped<{ userId: string }> => {
     const userId = (value as { userId?: string })?.userId?.trim();
     if (!userId) throw new Error('Invalid person');
-    return { workspace: validateWorkspace(value), userId };
+    return { project: validateProject(value), userId };
   })
   .handler(async ({ data }) => {
-    const { userId: actor, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: actor, projectId } = await requireMember('admin', data.project);
     if (data.userId === actor) throw new Error('You cannot remove your own access.');
     let retired = { holders: 0, credentials: 0 };
     await client.begin(async (transaction) => {
       const [removed] = await transaction<{ role: string }[]>`
         DELETE FROM member
-        WHERE workspace_id = ${workspaceId} AND user_id = ${data.userId}
+        WHERE project_id = ${projectId} AND user_id = ${data.userId}
         RETURNING role
       `;
       /* Already gone. The register reloads without them and there is nothing
          for the administrator to correct. */
       if (!removed) return;
       await fileEvent(transaction, {
-        workspaceId,
+        projectId,
         actor,
         type: 'member_removed',
         metadata: { userId: data.userId, role: removed.role },
       });
 
-      /* Scoped to the workspace being left, so holders this person owns in a
-         workspace they are still a member of keep working. The scope rides in
+      /* Scoped to the project being left, so holders this person owns in a
+         project they are still a member of keep working. The scope rides in
          through the holder in the same statement as the void, so a key in
-         another workspace is never voided and then found to be foreign. */
+         another project is never voided and then found to be foreign. */
       const voided = await transaction<{ id: string; user_id: string; key_prefix: string }[]>`
         UPDATE api_keys SET revoked_at = now()
         WHERE revoked_at IS NULL
           AND user_id IN (
             SELECT id FROM users
-            WHERE workspace_id = ${workspaceId} AND owner_admin_id = ${data.userId}
+            WHERE project_id = ${projectId} AND owner_admin_id = ${data.userId}
           )
         RETURNING id, user_id, key_prefix
       `;
@@ -609,7 +609,7 @@ export const removePerson = createServerFn({ method: 'POST' })
          noticing. */
       const disabled = await transaction<{ id: string }[]>`
         UPDATE users SET disabled_at = now()
-        WHERE workspace_id = ${workspaceId} AND owner_admin_id = ${data.userId}
+        WHERE project_id = ${projectId} AND owner_admin_id = ${data.userId}
           AND disabled_at IS NULL
         RETURNING id
       `;
@@ -620,7 +620,7 @@ export const removePerson = createServerFn({ method: 'POST' })
           SELECT label FROM managed_api_key WHERE id = ${key.id}
         `;
         await fileEvent(transaction, {
-          workspaceId,
+          projectId,
           actor,
           type: 'api_key_revoked',
           metadata: {
@@ -634,11 +634,11 @@ export const removePerson = createServerFn({ method: 'POST' })
       /* Filed per holder and marked `offboarded`, which is what tells the
          activity log to treat this disable as notable. An administrator
          disabling a holder by hand is reversible and stays quiet; this one is
-         not, and a log that under-reports it is describing a workspace that did
+         not, and a log that under-reports it is describing a project that did
          not happen. */
       for (const holder of disabled) {
         await fileEvent(transaction, {
-          workspaceId,
+          projectId,
           actor,
           type: 'identity_disabled',
           metadata: { identityId: holder.id, reason: 'offboarded', ownerId: data.userId },
@@ -694,10 +694,10 @@ export const invitePerson = createServerFn({ method: 'POST' })
     /* No default. The inviter decides what this person may do, every time —
        a role that arrives by omission is one nobody chose. */
     if (!isRole(input.role)) throw new Error('Choose a role for this person.');
-    return { workspace: validateWorkspace(value), name, email, role: input.role };
+    return { project: validateProject(value), name, email, role: input.role };
   })
   .handler(async ({ data }) => {
-    const { userId: invitedBy, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: invitedBy, projectId } = await requireMember('admin', data.project);
 
     const [existing] = await client<
       { id: string }[]
@@ -705,17 +705,17 @@ export const invitePerson = createServerFn({ method: 'POST' })
     if (existing) {
       const [already] = await client<{ role: string }[]>`
         SELECT role FROM member
-        WHERE workspace_id = ${workspaceId} AND user_id = ${existing.id}
+        WHERE project_id = ${projectId} AND user_id = ${existing.id}
       `;
-      if (already) throw new Error(`${data.email} is already a member of this workspace.`);
+      if (already) throw new Error(`${data.email} is already a member of this project.`);
       await client.begin(async (transaction) => {
         await transaction`
-          INSERT INTO member (workspace_id, user_id, role)
-          VALUES (${workspaceId}, ${existing.id}, ${data.role})
-          ON CONFLICT (workspace_id, user_id) DO NOTHING
+          INSERT INTO member (project_id, user_id, role)
+          VALUES (${projectId}, ${existing.id}, ${data.role})
+          ON CONFLICT (project_id, user_id) DO NOTHING
         `;
         await fileEvent(transaction, {
-          workspaceId,
+          projectId,
           actor: invitedBy,
           type: 'member_added',
           metadata: { email: data.email, role: data.role },
@@ -726,26 +726,26 @@ export const invitePerson = createServerFn({ method: 'POST' })
 
     const token = `inv_${randomBytes(32).toString('base64url')}`;
     await client.begin(async (transaction) => {
-      /* Supersede this workspace's outstanding link for the address rather
+      /* Supersede this project's outstanding link for the address rather
          than collide with the partial unique index. Re-inviting should mean
          "here is a fresh link", not an error about one they never used.
 
          Scoped, and the index is scoped with it (0009): superseding every live
-         invitation for the address would let one workspace cancel another's,
+         invitation for the address would let one project cancel another's,
          which is the same person's invitation to a corpus this admin cannot
          even see. */
       await transaction`
         UPDATE member_invitation SET revoked_at = now()
-        WHERE workspace_id = ${workspaceId} AND lower(email) = ${data.email}
+        WHERE project_id = ${projectId} AND lower(email) = ${data.email}
           AND accepted_at IS NULL AND revoked_at IS NULL
       `;
       await transaction`
-        INSERT INTO member_invitation (email, name, token_hash, workspace_id, role, invited_by, expires_at)
-        VALUES (${data.email}, ${data.name}, ${tokenDigest(token)}, ${workspaceId}, ${data.role},
+        INSERT INTO member_invitation (email, name, token_hash, project_id, role, invited_by, expires_at)
+        VALUES (${data.email}, ${data.name}, ${tokenDigest(token)}, ${projectId}, ${data.role},
                 ${invitedBy}, now() + ${`${INVITATION_DAYS} days`}::interval)
       `;
       await fileEvent(transaction, {
-        workspaceId,
+        projectId,
         actor: invitedBy,
         type: 'member_invited',
         metadata: { email: data.email, role: data.role },
@@ -761,7 +761,7 @@ export const invitePerson = createServerFn({ method: 'POST' })
 export const listInvitations = createServerFn({ method: 'GET' })
   .validator(validateScope)
   .handler(async ({ data }): Promise<Invitation[]> => {
-    const { workspaceId } = await requireMember('admin', data.workspace);
+    const { projectId } = await requireMember('admin', data.project);
     const rows = await client<
       {
         id: string;
@@ -780,7 +780,7 @@ export const listInvitations = createServerFn({ method: 'GET' })
              invitation.expires_at <= now() AS expired
       FROM member_invitation AS invitation
       LEFT JOIN "user" AS inviter ON inviter.id = invitation.invited_by
-      WHERE invitation.workspace_id = ${workspaceId}
+      WHERE invitation.project_id = ${projectId}
         AND invitation.accepted_at IS NULL AND invitation.revoked_at IS NULL
       ORDER BY invitation.created_at DESC
     `;
@@ -800,14 +800,14 @@ export const revokeInvitation = createServerFn({ method: 'POST' })
   .validator((value: unknown): Scoped<{ invitationId: string }> => {
     const id = (value as { invitationId?: string })?.invitationId?.trim();
     if (!id || !UUID.test(id)) throw new Error('Invalid invitation');
-    return { workspace: validateWorkspace(value), invitationId: id };
+    return { project: validateProject(value), invitationId: id };
   })
   .handler(async ({ data }) => {
-    const { userId: revokedBy, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: revokedBy, projectId } = await requireMember('admin', data.project);
     await client.begin(async (transaction) => {
       const [revoked] = await transaction<{ email: string }[]>`
         UPDATE member_invitation SET revoked_at = now()
-        WHERE id = ${data.invitationId} AND workspace_id = ${workspaceId}
+        WHERE id = ${data.invitationId} AND project_id = ${projectId}
           AND accepted_at IS NULL AND revoked_at IS NULL
         RETURNING email
       `;
@@ -815,7 +815,7 @@ export const revokeInvitation = createServerFn({ method: 'POST' })
          nothing for the administrator to correct. */
       if (!revoked) return;
       await fileEvent(transaction, {
-        workspaceId,
+        projectId,
         actor: revokedBy,
         type: 'member_invitation_revoked',
         metadata: { email: revoked.email },
@@ -841,8 +841,8 @@ async function inspectInvitation(token: string) {
       email: string;
       name: string;
       role: string;
-      workspace_id: string;
-      workspace_name: string;
+      project_id: string;
+      project_name: string;
       invited_by: string;
       expired: boolean;
       accepted: boolean;
@@ -850,13 +850,13 @@ async function inspectInvitation(token: string) {
     }[]
   >`
     SELECT invitation.id, invitation.email, invitation.name, invitation.role,
-           invitation.workspace_id, workspace.name AS workspace_name,
+           invitation.project_id, project.name AS project_name,
            COALESCE(NULLIF(inviter.name, ''), inviter.email, 'an administrator') AS invited_by,
            invitation.expires_at <= now() AS expired,
            invitation.accepted_at IS NOT NULL AS accepted,
            invitation.revoked_at IS NOT NULL AS revoked
     FROM member_invitation AS invitation
-    JOIN workspaces AS workspace ON workspace.id = invitation.workspace_id
+    JOIN projects AS project ON project.id = invitation.project_id
     LEFT JOIN "user" AS inviter ON inviter.id = invitation.invited_by
     WHERE invitation.token_hash = ${tokenDigest(token)}
   `;
@@ -954,7 +954,7 @@ export const readInvitation = createServerFn({ method: 'GET' })
       /* Named on the page for the same reason the role is: an instance holds
          several corpora now, and which one you are being let into is the part
          that varies. */
-      workspace: invitation.workspace_name,
+      project: invitation.project_name,
     };
   });
 
@@ -991,9 +991,9 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
     const role = isRole(invitation.role) ? invitation.role : ('reader' as Role);
 
     await client.begin(async (transaction) => {
-      /* The one write in `web/src/lib` with no workspace predicate, and the
+      /* The one write in `web/src/lib` with no project predicate, and the
          only one that should not have: the row was found by token digest, so
-         its workspace came from the invitation rather than from a caller. */
+         its project came from the invitation rather than from a caller. */
       const [claimed] = await transaction<{ id: string }[]>`
         UPDATE member_invitation SET accepted_at = now()
         WHERE id = ${invitation.id} AND accepted_at IS NULL AND revoked_at IS NULL
@@ -1009,19 +1009,19 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
       `;
       if (!created) throw new Error('The account could not be created. Nothing was changed.');
       await transaction`
-        INSERT INTO member (workspace_id, user_id, role)
-        VALUES (${invitation.workspace_id}, ${created.id}, ${role})
-        ON CONFLICT (workspace_id, user_id) DO NOTHING
+        INSERT INTO member (project_id, user_id, role)
+        VALUES (${invitation.project_id}, ${created.id}, ${role})
+        ON CONFLICT (project_id, user_id) DO NOTHING
       `;
       await fileEvent(transaction, {
-        workspaceId: invitation.workspace_id,
+        projectId: invitation.project_id,
         actor: created.id,
         type: 'member_joined',
         metadata: { email: invitation.email, role },
       });
     });
 
-    return { email: invitation.email, role, workspace: invitation.workspace_name };
+    return { email: invitation.email, role, project: invitation.project_name };
   });
 
 /* A second corpus on one instance.
@@ -1029,88 +1029,88 @@ export const acceptInvitation = createServerFn({ method: 'POST' })
  * Four things have to happen together, which is why this is a transaction and
  * why `allowUserToCreateOrganization` stays `false` on the plugin: its own
  * `organization/create` endpoint would do the first and leave the rest, giving
- * you a workspace with no members and no index configuration — reachable by
+ * you a project with no members and no index configuration — reachable by
  * nobody and unable to accept a source.
  *
- * The index configuration is copied from the workspace you are standing in
+ * The index configuration is copied from the project you are standing in
  * rather than read from the environment. `concept_chunks.embedding` is
  * `vector(1024)` for the whole table and `EMBEDDING_MODEL` is one process-wide variable, so
- * every workspace on an instance necessarily shares a model; copying makes that
+ * every project on an instance necessarily shares a model; copying makes that
  * explicit and keeps `index_configuration`'s existing job — refusing a silent
- * model change — working per workspace.
+ * model change — working per project.
  *
- * Any signed-in member may start another workspace. The current workspace only
+ * Any signed-in member may start another project. The current project only
  * supplies the instance-wide embedding configuration; it does not delegate
  * authority to create a project. */
-export const createWorkspace = createServerFn({ method: 'POST' })
+export const createProject = createServerFn({ method: 'POST' })
   .validator((value: unknown): Scoped<{ name: string; slug: string }> => {
     const input = (value ?? {}) as Partial<{ name: string; slug: string }>;
     const name = input.name?.trim();
-    if (!name) throw new Error('A workspace needs a name.');
+    if (!name) throw new Error('A project needs a name.');
     if (name.length > 120) throw new Error('That name is too long.');
     const slug = input.slug?.trim().toLowerCase();
     if (!slug || !SLUG.test(slug)) {
       throw new Error('A slug may hold lowercase letters, numbers and single hyphens.');
     }
     if (slug.length > 60) throw new Error('That slug is too long.');
-    return { workspace: validateWorkspace(value), name, slug };
+    return { project: validateProject(value), name, slug };
   })
   .handler(async ({ data }) => {
-    const { userId: creator, workspaceId: from } = await requireMember('read', data.workspace);
+    const { userId: creator, projectId: from } = await requireMember('read', data.project);
 
     /* Both columns are unique, so both are checked here. Without the name
        check the insert still refuses — with a raw `23505` naming a constraint,
        which is not a sentence to put in front of someone who mistyped. */
     const [taken] = await client<{ slug: string; name: string }[]>`
-      SELECT slug, name FROM workspaces
+      SELECT slug, name FROM projects
       WHERE slug = ${data.slug} OR lower(name) = ${data.name.toLowerCase()}
     `;
     if (taken?.slug === data.slug) {
       throw new Error(`The slug “${data.slug}” is already in use.`);
     }
-    if (taken) throw new Error(`A workspace called “${taken.name}” already exists.`);
+    if (taken) throw new Error(`A project called “${taken.name}” already exists.`);
 
     let created: string | undefined;
     await client.begin(async (transaction) => {
-      const [workspace] = await transaction<{ id: string }[]>`
-        INSERT INTO workspaces (name, slug) VALUES (${data.name}, ${data.slug})
+      const [project] = await transaction<{ id: string }[]>`
+        INSERT INTO projects (name, slug) VALUES (${data.name}, ${data.slug})
         RETURNING id
       `;
-      if (!workspace) throw new Error('That workspace could not be created.');
-      created = workspace.id;
+      if (!project) throw new Error('That project could not be created.');
+      created = project.id;
       await transaction`
-        INSERT INTO member (workspace_id, user_id, role)
-        VALUES (${workspace.id}, ${creator}, 'admin')
+        INSERT INTO member (project_id, user_id, role)
+        VALUES (${project.id}, ${creator}, 'admin')
       `;
       /* `INSERT … SELECT` inserts nothing when the source row is missing, and
          says nothing about it. That cannot happen today — the bootstrap seeds
-         `default` and every workspace since is a copy of one that has a row —
-         so the check is here to keep it that way. A workspace with no index
+         `default` and every project since is a copy of one that has a row —
+         so the check is here to keep it that way. A project with no index
          configuration would accept sources and lose the one guard that refuses
          a silent model change. */
-      const [configured] = await transaction<{ workspace_id: string }[]>`
-        INSERT INTO index_configuration (workspace_id, embedding_model, embedding_dimensions)
-        SELECT ${workspace.id}, embedding_model, embedding_dimensions
-        FROM index_configuration WHERE workspace_id = ${from}
-        RETURNING workspace_id
+      const [configured] = await transaction<{ project_id: string }[]>`
+        INSERT INTO index_configuration (project_id, embedding_model, embedding_dimensions)
+        SELECT ${project.id}, embedding_model, embedding_dimensions
+        FROM index_configuration WHERE project_id = ${from}
+        RETURNING project_id
       `;
       if (!configured) {
-        throw new Error('This workspace has no index configuration to copy from.');
+        throw new Error('This project has no index configuration to copy from.');
       }
-      /* Filed in the new workspace's own log, not the one it was created from.
+      /* Filed in the new project's own log, not the one it was created from.
          The custody line of a corpus should start with its creation. */
       await fileEvent(transaction, {
-        workspaceId: workspace.id,
+        projectId: project.id,
         actor: creator,
-        type: 'workspace_created',
+        type: 'project_created',
         metadata: { name: data.name, slug: data.slug },
       });
     });
-    if (!created) throw new Error('That workspace could not be created.');
+    if (!created) throw new Error('That project could not be created.');
     return { id: created, name: data.name, slug: data.slug };
   });
 
-/* What this workspace is, for the Workspace tab to state.
+/* What this project is, for the Project tab to state.
  *
  * Read-only, and gated at `read` rather than `admin`: nothing here is a
  * credential. The tab that renders it is admin-only, but the facts themselves
@@ -1118,24 +1118,24 @@ export const createWorkspace = createServerFn({ method: 'POST' })
  * and gating a query harder than its contents need is how a permission stops
  * meaning anything.
  *
- * `index_configuration` is joined rather than left-joined: a workspace without
+ * `index_configuration` is joined rather than left-joined: a project without
  * one cannot accept a source, so its absence is a fault to surface and not a
  * row to render blank. */
-export const getWorkspaceFacts = createServerFn({ method: 'GET' })
+export const getProjectFacts = createServerFn({ method: 'GET' })
   .validator(validateScope)
   .handler(async ({ data }) => {
-    const { workspaceId } = await requireMember('read', data.workspace);
+    const { projectId } = await requireMember('read', data.project);
     const [row] = await client<
       { slug: string; created_at: string; model: string; dimensions: number }[]
     >`
-      SELECT workspaces.slug, workspaces.created_at,
+      SELECT projects.slug, projects.created_at,
              configuration.embedding_model AS model,
              configuration.embedding_dimensions AS dimensions
-      FROM workspaces
-      JOIN index_configuration AS configuration ON configuration.workspace_id = workspaces.id
-      WHERE workspaces.id = ${workspaceId}
+      FROM projects
+      JOIN index_configuration AS configuration ON configuration.project_id = projects.id
+      WHERE projects.id = ${projectId}
     `;
-    if (!row) throw new Error('This workspace has no index configuration.');
+    if (!row) throw new Error('This project has no index configuration.');
     return {
       slug: row.slug,
       createdAt: row.created_at,
@@ -1144,7 +1144,7 @@ export const getWorkspaceFacts = createServerFn({ method: 'GET' })
     };
   });
 
-/* Renaming a workspace. The name only — never the slug.
+/* Renaming a project. The name only — never the slug.
  *
  * The slug is what every link anyone has sent contains, and permanence is the
  * property the URL scheme was chosen for; changing it would break history
@@ -1152,82 +1152,82 @@ export const getWorkspaceFacts = createServerFn({ method: 'GET' })
  * a label: it appears on the plate, in the switcher and on an invitation, and
  * it should be correctable without a migration.
  *
- * This exists because the bootstrap workspace is called `default`, which nobody
+ * This exists because the bootstrap project is called `default`, which nobody
  * chose and which every self-hosted instance now reads on its own rail. */
-export const renameWorkspace = createServerFn({ method: 'POST' })
+export const renameProject = createServerFn({ method: 'POST' })
   .validator((value: unknown): Scoped<{ name: string }> => {
     const name = (value as { name?: string } | undefined)?.name?.trim();
-    if (!name) throw new Error('A workspace needs a name.');
+    if (!name) throw new Error('A project needs a name.');
     if (name.length > 120) throw new Error('That name is too long.');
-    return { workspace: validateWorkspace(value), name };
+    return { project: validateProject(value), name };
   })
   .handler(async ({ data }) => {
-    const { userId: actor, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: actor, projectId } = await requireMember('admin', data.project);
 
-    /* Same unique column, same courtesy as `createWorkspace` — and excluding
-       this workspace, so re-saving an unchanged name is not an error. */
+    /* Same unique column, same courtesy as `createProject` — and excluding
+       this project, so re-saving an unchanged name is not an error. */
     const [taken] = await client<{ name: string }[]>`
-      SELECT name FROM workspaces
-      WHERE lower(name) = ${data.name.toLowerCase()} AND id <> ${workspaceId}
+      SELECT name FROM projects
+      WHERE lower(name) = ${data.name.toLowerCase()} AND id <> ${projectId}
     `;
-    if (taken) throw new Error(`A workspace called “${taken.name}” already exists.`);
+    if (taken) throw new Error(`A project called “${taken.name}” already exists.`);
 
     await client.begin(async (transaction) => {
       const [before] = await transaction<{ name: string }[]>`
-        SELECT name FROM workspaces WHERE id = ${workspaceId} FOR UPDATE
+        SELECT name FROM projects WHERE id = ${projectId} FOR UPDATE
       `;
-      if (!before) throw new Error('That workspace no longer exists.');
+      if (!before) throw new Error('That project no longer exists.');
       if (before.name === data.name) return;
       await transaction`
-        UPDATE workspaces SET name = ${data.name} WHERE id = ${workspaceId}
+        UPDATE projects SET name = ${data.name} WHERE id = ${projectId}
       `;
       await fileEvent(transaction, {
-        workspaceId,
+        projectId,
         actor,
-        type: 'workspace_renamed',
+        type: 'project_renamed',
         metadata: { from: before.name, to: data.name },
       });
     });
     return { name: data.name };
   });
 
-/* Archiving removes a workspace from normal browser and MCP access without
+/* Archiving removes a project from normal browser and MCP access without
  * deleting its Git bundle, index, identities, keys, or membership. An
- * administrator can restore it from the archived-workspaces register. */
-export const archiveWorkspace = createServerFn({ method: 'POST' })
+ * administrator can restore it from the archived-projects register. */
+export const archiveProject = createServerFn({ method: 'POST' })
   .validator(validateScope)
   .handler(async ({ data }) => {
-    const { userId: actor, workspaceId } = await requireMember('admin', data.workspace);
+    const { userId: actor, projectId } = await requireMember('admin', data.project);
     await client.begin(async (transaction) => {
       const [archived] = await transaction<{ id: string }[]>`
-        UPDATE workspaces SET archived_at = now()
-        WHERE id = ${workspaceId} AND archived_at IS NULL
+        UPDATE projects SET archived_at = now()
+        WHERE id = ${projectId} AND archived_at IS NULL
         RETURNING id
       `;
-      if (!archived) throw new Error('That workspace is no longer available.');
+      if (!archived) throw new Error('That project is no longer available.');
       await fileEvent(transaction, {
-        workspaceId,
+        projectId,
         actor,
-        type: 'workspace_archived',
+        type: 'project_archived',
       });
     });
   });
 
-export const restoreWorkspace = createServerFn({ method: 'POST' })
+export const restoreProject = createServerFn({ method: 'POST' })
   .validator(validateScope)
   .handler(async ({ data }) => {
-    const { userId: actor, workspaceId } = await requireArchivedAdmin(data.workspace);
+    const { userId: actor, projectId } = await requireArchivedAdmin(data.project);
     await client.begin(async (transaction) => {
       const [restored] = await transaction<{ id: string }[]>`
-        UPDATE workspaces SET archived_at = NULL
-        WHERE id = ${workspaceId} AND archived_at IS NOT NULL
+        UPDATE projects SET archived_at = NULL
+        WHERE id = ${projectId} AND archived_at IS NOT NULL
         RETURNING id
       `;
-      if (!restored) throw new Error('That workspace is no longer archived.');
+      if (!restored) throw new Error('That project is no longer archived.');
       await fileEvent(transaction, {
-        workspaceId,
+        projectId,
         actor,
-        type: 'workspace_restored',
+        type: 'project_restored',
       });
     });
   });

@@ -6,11 +6,11 @@ import { readFailure } from '../../../lib/failure.js';
 import { requireRole } from '../../../lib/route-guards.js';
 import { documentTitle } from '../../../lib/title.js';
 
-export const Route = createFileRoute('/w/$slug/review')({
+export const Route = createFileRoute('/p/$slug/review')({
   head: ({ match }) => ({
-    meta: [{ title: documentTitle('Review queue', match.context.workspaceName) }],
+    meta: [{ title: documentTitle('Review queue', match.context.projectName) }],
   }),
-  /* The `/w/$slug` layout has already resolved the workspace and confirmed
+  /* The `/p/$slug` layout has already resolved the project and confirmed
      membership; this only narrows by role. Approving what the corpus vouches
      for is a reviewer's job; a writer landing here would see a queue of buttons
      that all refuse.
@@ -19,7 +19,7 @@ export const Route = createFileRoute('/w/$slug/review')({
   loader: async ({ params }) => {
     try {
       return {
-        rows: await listReviewQueue({ data: { workspace: params.slug } }),
+        rows: await listReviewQueue({ data: { project: params.slug } }),
         failure: undefined,
       };
     } catch {
@@ -102,7 +102,7 @@ function QueueGroup({ label, note, rows }: { label: string; note: string; rows: 
         {rows.map((row) => (
           <li key={row.path}>
             <Link
-              to="/w/$slug/sources/$path"
+              to="/p/$slug/sources/$path"
               params={{ slug, path: row.path }}
               search={{}}
               className="entry"

@@ -18,7 +18,7 @@ export type CommitInput = {
   corpusPath: string;
   files: CommitFile[];
   subject: string;
-  workspace: string;
+  project: string;
 };
 
 export type HistoryEntry = {
@@ -27,12 +27,12 @@ export type HistoryEntry = {
   timestamp: string;
 };
 
-// commitFiles writes concept files in an isolated worktree and advances the workspace main branch.
+// commitFiles writes concept files in an isolated worktree and advances the project main branch.
 export async function commitFiles(input: CommitInput): Promise<string> {
-  const repository = repositoryPath(input.corpusPath, input.workspace);
+  const repository = repositoryPath(input.corpusPath, input.project);
 
   return withLock(repository, async () => {
-    await ensureRepository(input.corpusPath, input.workspace);
+    await ensureRepository(input.corpusPath, input.project);
     const worktree = await mkdtemp(join(tmpdir(), 'commonwealth-corpus-'));
     try {
       await git(repository, ['worktree', 'add', '--detach', worktree, 'main']);
@@ -63,9 +63,9 @@ export async function commitFiles(input: CommitInput): Promise<string> {
   });
 }
 
-// ensureRepository initializes a workspace's local OKF Git repository when it does not exist.
-export async function ensureRepository(corpusPath: string, workspace: string): Promise<string> {
-  const repository = repositoryPath(corpusPath, workspace);
+// ensureRepository initializes a project's local OKF Git repository when it does not exist.
+export async function ensureRepository(corpusPath: string, project: string): Promise<string> {
+  const repository = repositoryPath(corpusPath, project);
   try {
     await git(repository, ['rev-parse', '--git-dir']);
 
@@ -87,9 +87,9 @@ export async function ensureRepository(corpusPath: string, workspace: string): P
   }
 }
 
-// head returns the current main commit for a workspace bundle.
-export async function head(corpusPath: string, workspace: string): Promise<string> {
-  const repository = await ensureRepository(corpusPath, workspace);
+// head returns the current main commit for a project bundle.
+export async function head(corpusPath: string, project: string): Promise<string> {
+  const repository = await ensureRepository(corpusPath, project);
 
   return (await git(repository, ['rev-parse', 'main'])).trim();
 }
@@ -97,10 +97,10 @@ export async function head(corpusPath: string, workspace: string): Promise<strin
 // history returns commits that changed a concept, newest first.
 export async function history(
   corpusPath: string,
-  workspace: string,
+  project: string,
   path: string
 ): Promise<HistoryEntry[]> {
-  const repository = await ensureRepository(corpusPath, workspace);
+  const repository = await ensureRepository(corpusPath, project);
   const safePath = validateOkfPath(path);
   const output = await git(repository, ['log', '--format=%H%x09%aI%x09%s', '--', safePath]);
   const entries: HistoryEntry[] = [];
@@ -114,14 +114,14 @@ export async function history(
   return entries;
 }
 
-// commitInfo returns the recorded metadata for one commit, including a workspace
+// commitInfo returns the recorded metadata for one commit, including a project
 // snapshot that may not have directly changed the source being viewed.
 export async function commitInfo(
   corpusPath: string,
-  workspace: string,
+  project: string,
   commit: string
 ): Promise<HistoryEntry> {
-  const repository = await ensureRepository(corpusPath, workspace);
+  const repository = await ensureRepository(corpusPath, project);
   const output = (await git(repository, ['show', '-s', '--format=%H%x09%aI%x09%s', commit])).trim();
   const [id, timestamp, subject] = output.split('\t');
   if (!id || !timestamp || subject === undefined) throw new Error('Git commit could not be read');
@@ -131,10 +131,10 @@ export async function commitInfo(
 // listConceptPaths returns every non-reserved Markdown concept at a commit.
 export async function listConceptPaths(
   corpusPath: string,
-  workspace: string,
+  project: string,
   commit = 'main'
 ): Promise<string[]> {
-  const repository = await ensureRepository(corpusPath, workspace);
+  const repository = await ensureRepository(corpusPath, project);
   const output = await git(repository, ['ls-tree', '-r', '--name-only', commit]);
   const paths: string[] = [];
   for (const path of output.split('\n')) {
@@ -147,14 +147,14 @@ export async function listConceptPaths(
   return paths;
 }
 
-// readFileAtCommit reads an exact concept version from a workspace repository.
+// readFileAtCommit reads an exact concept version from a project repository.
 export async function readFileAtCommit(
   corpusPath: string,
-  workspace: string,
+  project: string,
   path: string,
   commit = 'main'
 ): Promise<string> {
-  const repository = await ensureRepository(corpusPath, workspace);
+  const repository = await ensureRepository(corpusPath, project);
   const safePath = validateOkfPath(path);
 
   return git(repository, ['show', `${commit}:${safePath}`]);
@@ -164,18 +164,18 @@ function git(cwd: string, args: string[]): Promise<string> {
   return execute('git', args, { cwd, encoding: 'utf8' }).then(({ stdout }) => stdout);
 }
 
-function repositoryPath(corpusPath: string, workspace: string): string {
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(workspace)) {
-    throw new Error('Workspace slug is invalid');
+function repositoryPath(corpusPath: string, project: string): string {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(project)) {
+    throw new Error('Project slug is invalid');
   }
 
-  return join(resolve(corpusPath), workspace);
+  return join(resolve(corpusPath), project);
 }
 
 function within(root: string, path: string): string {
   const target = resolve(root, path);
   if (dirname(target) !== root && !dirname(target).startsWith(`${root}/`)) {
-    throw new Error('OKF concept path escapes the workspace');
+    throw new Error('OKF concept path escapes the project');
   }
 
   return target;

@@ -44,14 +44,14 @@ export const verification = pgTable('verification', {
   updatedAt: timestamp('updated_at'),
 });
 
-/* better-auth's `organization`, remapped onto the workspace table the knowledge
+/* better-auth's `organization`, remapped onto the project table the knowledge
    side already scopes everything to (`concepts`, `concept_chunks`, `users`,
-   `events` and `index_configuration` all carry `workspace_id`). Declared here so the drizzle
+   `events` and `index_configuration` all carry `project_id`). Declared here so the drizzle
    adapter can reach it; the remapping itself is in `lib/auth.ts`.
 
    `slug`, `logo` and `metadata` are the plugin's, not ours. Only `slug` is
    required by it. */
-export const workspaces = pgTable('workspaces', {
+export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
@@ -69,9 +69,9 @@ export const workspaces = pgTable('workspaces', {
    means `reader | writer | reviewer | admin` has a single definition. */
 export const member = pgTable('member', {
   id: uuid('id').primaryKey().defaultRandom(),
-  organizationId: uuid('workspace_id')
+  organizationId: uuid('project_id')
     .notNull()
-    .references(() => workspaces.id, { onDelete: 'cascade' }),
+    .references(() => projects.id, { onDelete: 'cascade' }),
   userId: text('user_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
@@ -80,14 +80,14 @@ export const member = pgTable('member', {
 });
 
 /* better-auth's invitation: adding someone who **already has an account** to a
-   workspace. Unused so far — see `memberInvitation` for the flow that runs
+   project. Unused so far — see `memberInvitation` for the flow that runs
    today — but its endpoints are live routes, so the table has to exist for a
    permission refusal not to arrive as a 500. */
 export const invitation = pgTable('invitation', {
   id: uuid('id').primaryKey().defaultRandom(),
-  organizationId: uuid('workspace_id')
+  organizationId: uuid('project_id')
     .notNull()
-    .references(() => workspaces.id, { onDelete: 'cascade' }),
+    .references(() => projects.id, { onDelete: 'cascade' }),
   email: text('email').notNull(),
   role: text('role'),
   status: text('status').notNull().default('pending'),
@@ -109,9 +109,9 @@ export const memberInvitation = pgTable('member_invitation', {
   email: text('email').notNull(),
   name: text('name').notNull(),
   tokenHash: text('token_hash').notNull().unique(),
-  workspaceId: uuid('workspace_id')
+  projectId: uuid('project_id')
     .notNull()
-    .references(() => workspaces.id, { onDelete: 'cascade' }),
+    .references(() => projects.id, { onDelete: 'cascade' }),
   role: text('role').notNull(),
   invitedBy: text('invited_by')
     .notNull()

@@ -7,7 +7,7 @@ import { documentTitle } from '../../../lib/title.js';
 
 type ActivityFilters = { type?: string };
 
-export const Route = createFileRoute('/w/$slug/activity')({
+export const Route = createFileRoute('/p/$slug/activity')({
   validateSearch: (search: Record<string, unknown>): ActivityFilters => ({
     type:
       typeof search.type === 'string' && /^[a-z_]{1,64}$/.test(search.type)
@@ -18,8 +18,8 @@ export const Route = createFileRoute('/w/$slug/activity')({
   loader: async ({ deps, params }) => {
     try {
       const [log, types] = await Promise.all([
-        listEvents({ data: { workspace: params.slug, eventType: deps.type } }),
-        listEventTypes({ data: { workspace: params.slug } }),
+        listEvents({ data: { project: params.slug, eventType: deps.type } }),
+        listEventTypes({ data: { project: params.slug } }),
       ]);
       return { log, types, failure: undefined };
     } catch {
@@ -29,7 +29,7 @@ export const Route = createFileRoute('/w/$slug/activity')({
   },
   /* After `validateSearch` — see the note in `sources.tsx`. */
   head: ({ match }) => ({
-    meta: [{ title: documentTitle('Activity', match.context.workspaceName) }],
+    meta: [{ title: documentTitle('Activity', match.context.projectName) }],
   }),
   component: Activity,
 });
@@ -56,7 +56,7 @@ type EventRow = {
  * unconditionally. Disabling a holder by hand is reversible suspension, and the
  * seal vocabulary is careful to keep that distinct from a void. The same event
  * filed by `removePerson` is not reversible — it accompanies voided credentials
- * and the owner losing the workspace — so it carries `reason: 'offboarded'` and
+ * and the owner losing the project — so it carries `reason: 'offboarded'` and
  * is marked. A log that phrased the two identically would be describing a
  * suspension somebody could undo.
  *
@@ -92,14 +92,14 @@ const PHRASING: Record<string, string> = {
   identity_enabled: 'Enabled a holder',
   member_invited: 'Invited someone',
   member_invitation_revoked: 'Revoked an invitation',
-  member_joined: 'Joined the workspace',
-  member_added: 'Added someone to the workspace',
+  member_joined: 'Joined the project',
+  member_added: 'Added someone to the project',
   member_role_changed: 'Changed a role',
   member_removed: 'Removed someone',
-  workspace_created: 'Created this workspace',
-  workspace_renamed: 'Renamed the workspace',
-  workspace_archived: 'Archived this workspace',
-  workspace_restored: 'Restored this workspace',
+  project_created: 'Created this project',
+  project_renamed: 'Renamed the project',
+  project_archived: 'Archived this project',
+  project_restored: 'Restored this project',
   search: 'Searched',
 };
 
@@ -129,7 +129,7 @@ function detailOf(event: EventRow): string | null {
   }
   /* The pair that carry a `from` and a `to`, like an authority change — a
      rename is only legible as the two names together. */
-  if (event.event_type === 'workspace_renamed') {
+  if (event.event_type === 'project_renamed') {
     const from = text('from');
     const to = text('to');
     return from && to ? `${from} → ${to}` : to;
@@ -146,9 +146,9 @@ function detailOf(event: EventRow): string | null {
     return text('label');
   }
   /* Why this holder went out of service. Without it the log shows a disable
-     nobody in the workspace performed, next to voids nobody ordered. */
+     nobody in the project performed, next to voids nobody ordered. */
   if (isOffboardingDisable(event)) {
-    return 'owner removed from the workspace';
+    return 'owner removed from the project';
   }
   /* Who, and at what. A role change is the one event here where the old value
      matters as much as the new one — "reviewer → reader" is a withdrawal of
@@ -227,7 +227,7 @@ function isOffboardingDisable(event: EventRow): boolean {
 
 function Activity() {
   const { slug } = Route.useParams();
-  const navigate = useNavigate({ from: '/w/$slug/activity' });
+  const navigate = useNavigate({ from: '/p/$slug/activity' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
   const { log, types, failure } = Route.useLoaderData();
@@ -293,7 +293,7 @@ function Activity() {
                     {event.concept_path && (
                       <span className="log__subject">
                         <Link
-                          to="/w/$slug/sources/$path"
+                          to="/p/$slug/sources/$path"
                           params={{ slug, path: event.concept_path }}
                           search={{}}
                         >

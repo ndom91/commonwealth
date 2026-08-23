@@ -1,5 +1,5 @@
 import { history, readFileAtCommit } from '@commonwealth/corpus';
-import { type SearchWorkspaceInput, searchWorkspace } from '@commonwealth/corpus/search';
+import { type SearchProjectInput, searchProject } from '@commonwealth/corpus/search';
 import { parseOkfDocument } from '@commonwealth/pipeline';
 
 const AUTHORITIES = ['unverified', 'approved', 'canonical'] as const;
@@ -37,16 +37,16 @@ export async function conceptVersion(input: {
   commit: string;
   corpusPath: string;
   path: string;
-  workspace: string;
+  project: string;
 }) {
-  const entries = await history(input.corpusPath, input.workspace, input.path);
+  const entries = await history(input.corpusPath, input.project, input.path);
   if (!entries.some((entry) => entry.commit === input.commit)) {
     throw new Error('That commit is not in this concept history');
   }
 
   const markdown = await readFileAtCommit(
     input.corpusPath,
-    input.workspace,
+    input.project,
     input.path,
     input.commit
   );
@@ -62,6 +62,6 @@ export async function conceptVersion(input: {
   };
 }
 
-export function inspectWorkspace(input: SearchWorkspaceInput) {
-  return searchWorkspace(input);
+export function inspectProject(input: SearchProjectInput) {
+  return searchProject(input);
 }

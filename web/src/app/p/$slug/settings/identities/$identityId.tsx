@@ -18,7 +18,7 @@ import {
 } from '../../../../../lib/management.js';
 import { ROLES, type Role } from '../../../../../lib/roles.js';
 
-export const Route = createFileRoute('/w/$slug/settings/identities/$identityId')({
+export const Route = createFileRoute('/p/$slug/settings/identities/$identityId')({
   component: HolderBench,
 });
 
@@ -38,7 +38,7 @@ function HolderBench() {
      already holds every holder, and one `router.invalidate()` after a mutation
      refreshes the register, this bench and the rail count from a single
      round trip. */
-  const { page } = useLoaderData({ from: '/w/$slug/settings/identities' }) as {
+  const { page } = useLoaderData({ from: '/p/$slug/settings/identities' }) as {
     page: { identities: Identity[] } | undefined;
   };
   const identity = (page?.identities ?? []).find((entry) => entry.id === identityId);
@@ -82,7 +82,7 @@ function HolderBench() {
     setVoiding(keyId);
     setFailed(undefined);
     try {
-      await revokeKey({ data: { workspace: slug, keyId } });
+      await revokeKey({ data: { project: slug, keyId } });
       setArming(undefined);
       await router.invalidate();
     } catch {
@@ -100,9 +100,7 @@ function HolderBench() {
     setIssuePending(true);
     setIssueError(undefined);
     try {
-      setIssued(
-        await issueCredential({ data: { workspace: slug, identityId, keyLabel: newLabel } })
-      );
+      setIssued(await issueCredential({ data: { project: slug, identityId, keyLabel: newLabel } }));
       setNewLabel('');
       setAdding(false);
       await router.invalidate();
@@ -125,7 +123,7 @@ function HolderBench() {
     setAmendPending(true);
     setAmendError(undefined);
     try {
-      await updateIdentity({ data: { workspace: slug, identityId, ...amend } });
+      await updateIdentity({ data: { project: slug, identityId, ...amend } });
       setAmend(undefined);
       await router.invalidate();
     } catch (cause) {
@@ -145,7 +143,7 @@ function HolderBench() {
     setTogglePending(true);
     setToggleError(undefined);
     try {
-      await setIdentityDisabled({ data: { workspace: slug, identityId, disabled: next } });
+      await setIdentityDisabled({ data: { project: slug, identityId, disabled: next } });
       setArmDisable(false);
       await router.invalidate();
     } catch (cause) {

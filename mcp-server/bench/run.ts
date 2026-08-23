@@ -1,4 +1,4 @@
-/* Retrieval benchmark against a disposable Git-native workspace.
+/* Retrieval benchmark against a disposable Git-native project.
  *
  *   pnpm bench            commit the fixture corpus and score it
  *   pnpm bench --no-seed  score the published fixture commit
@@ -8,7 +8,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { commitFiles } from '@commonwealth/corpus';
-import { indexWorkspace } from '@commonwealth/corpus/indexer';
+import { indexProject } from '@commonwealth/corpus/indexer';
 import { Embeddings, serializeOkfDocument } from '@commonwealth/pipeline';
 import postgres from 'postgres';
 import type { Actor } from '../src/domain.js';
@@ -49,30 +49,30 @@ const embeddings = new Embeddings({
   queryInstruction: config.EMBEDDING_QUERY_INSTRUCTION,
 });
 
-const [workspace] = await sql<{ id: string }[]>`
-  INSERT INTO workspaces (name, slug) VALUES ('Benchmark', ${slug})
+const [project] = await sql<{ id: string }[]>`
+  INSERT INTO projects (name, slug) VALUES ('Benchmark', ${slug})
   ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name RETURNING id
 `;
-if (!workspace) throw new Error('Could not create benchmark workspace');
+if (!project) throw new Error('Could not create benchmark project');
 await sql`
-  INSERT INTO index_configuration (workspace_id, embedding_model, embedding_dimensions)
-  VALUES (${workspace.id}, ${config.EMBEDDING_MODEL}, 1024)
-  ON CONFLICT (workspace_id) DO NOTHING
+  INSERT INTO index_configuration (project_id, embedding_model, embedding_dimensions)
+  VALUES (${project.id}, ${config.EMBEDDING_MODEL}, 1024)
+  ON CONFLICT (project_id) DO NOTHING
 `;
 let [user] = await sql<{ id: string }[]>`
-  SELECT id FROM users WHERE workspace_id = ${workspace.id} AND display_name = 'Benchmark'
+  SELECT id FROM users WHERE project_id = ${project.id} AND display_name = 'Benchmark'
 `;
 if (!user) {
   [user] = await sql<{ id: string }[]>`
-    INSERT INTO users (workspace_id, display_name, role, auto_approve)
-    VALUES (${workspace.id}, 'Benchmark', 'admin', true) RETURNING id
+    INSERT INTO users (project_id, display_name, role, auto_approve)
+    VALUES (${project.id}, 'Benchmark', 'admin', true) RETURNING id
   `;
 }
 if (!user) throw new Error('Could not create benchmark identity');
 const actor: Actor = {
   id: user.id,
-  workspaceId: workspace.id,
-  workspaceSlug: slug,
+  projectId: project.id,
+  projectSlug: slug,
   name: 'Benchmark',
   role: 'admin',
   autoApprove: true,
@@ -83,7 +83,7 @@ if (!process.argv.includes('--no-seed')) {
   const committed = await commitFiles({
     actor: `commonwealth/${actor.id}`,
     corpusPath,
-    workspace: slug,
+    project: slug,
     subject: 'Seed benchmark corpus',
     files: await Promise.all(
       files.map(async (name) => ({
@@ -100,13 +100,13 @@ if (!process.argv.includes('--no-seed')) {
       }))
     ),
   });
-  const indexed = await indexWorkspace({
+  const indexed = await indexProject({
     corpusPath,
     embeddingModel: config.EMBEDDING_MODEL,
     embeddings,
     sql,
-    workspaceId: workspace.id,
-    workspaceSlug: slug,
+    projectId: project.id,
+    projectSlug: slug,
   });
   if (!indexed.indexed || indexed.commit !== committed)
     throw new Error('Benchmark commit was not published');

@@ -22,22 +22,22 @@ import { documentTitle } from '../../../../lib/title.js';
  * that keeps the headcount visible in the rail, the tab is where this sits
  * among the other administrative faces. Identities beside it are the agent
  * holders; these are the human ones. Your *own* name and password are at
- * `/w/:slug/account`, behind the signed-in name, because that is a preference
+ * `/p/:slug/account`, behind the signed-in name, because that is a preference
  * rather than a grant.
  *
  * A single bench, not the register/bench split Sources and Identities use.
  * There is nothing here to browse — a team is a handful of people, listed in
  * full, and a pending invitation is a live credential that has to be visible
  * next to them. */
-export const Route = createFileRoute('/w/$slug/settings/people')({
+export const Route = createFileRoute('/p/$slug/settings/people')({
   head: ({ match }) => ({
-    meta: [{ title: documentTitle('People', match.context.workspaceName) }],
+    meta: [{ title: documentTitle('People', match.context.projectName) }],
   }),
   loader: async ({ params }) => {
     try {
       const [people, invitations] = await Promise.all([
-        listPeople({ data: { workspace: params.slug } }),
-        listInvitations({ data: { workspace: params.slug } }),
+        listPeople({ data: { project: params.slug } }),
+        listInvitations({ data: { project: params.slug } }),
       ]);
       return { people, invitations, failure: undefined };
     } catch {
@@ -168,7 +168,7 @@ function PersonRow({ person }: { person: Person }) {
               act(
                 () =>
                   updatePersonRole({
-                    data: { workspace: slug, userId: person.id, role: event.target.value as Role },
+                    data: { project: slug, userId: person.id, role: event.target.value as Role },
                   }),
                 'That role could not be changed.'
               )
@@ -196,7 +196,7 @@ function PersonRow({ person }: { person: Person }) {
                   disabled={pending}
                   onClick={() =>
                     act(
-                      () => removePerson({ data: { workspace: slug, userId: person.id } }),
+                      () => removePerson({ data: { project: slug, userId: person.id } }),
                       'That person could not be removed.'
                     )
                   }
@@ -285,7 +285,7 @@ function Invitations({ invitations }: { invitations: Invitation[] }) {
                   setError(undefined);
                   try {
                     await revokeInvitation({
-                      data: { workspace: slug, invitationId: invitation.id },
+                      data: { project: slug, invitationId: invitation.id },
                     });
                     await router.invalidate();
                   } catch (cause) {
@@ -325,7 +325,7 @@ function Invitations({ invitations }: { invitations: Invitation[] }) {
  * corpus by omission. */
 function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () => void }) {
   const { slug } = Route.useParams();
-  const { workspaceName } = Route.useRouteContext();
+  const { projectName } = Route.useRouteContext();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role | ''>('');
@@ -351,7 +351,7 @@ function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () 
     setError(undefined);
     try {
       const result = await invitePerson({
-        data: { workspace: slug, name, email, role: role as Role },
+        data: { project: slug, name, email, role: role as Role },
       });
       if (result.added) {
         setAdded(result.email);
@@ -379,9 +379,9 @@ function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () 
   if (added) {
     return (
       <p className="bench__consequence">
-        {added} already had an account, so they were added to {workspaceName} directly. No
-        invitation was needed and no password changed. Nothing tells them — there is no mailer here,
-        so say so yourself.
+        {added} already had an account, so they were added to {projectName} directly. No invitation
+        was needed and no password changed. Nothing tells them — there is no mailer here, so say so
+        yourself.
       </p>
     );
   }
@@ -459,7 +459,7 @@ function Invite({ onDone, onClose }: { onDone: () => Promise<void>; onClose: () 
       </label>
       <p className="line__caption">
         Produces a single-use link to pass on. An address that already has an account is added to
-        this workspace instead — that needs no link and no password.
+        this project instead — that needs no link and no password.
       </p>
       {error && (
         <p className="notice" role="alert">

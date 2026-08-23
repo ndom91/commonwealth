@@ -2,10 +2,10 @@ import { createServerFn } from '@tanstack/react-start';
 import { getCookie, getRequest, setCookie } from '@tanstack/react-start/server';
 import { auth } from './auth.js';
 import {
-  readArchivedWorkspaces,
+  readArchivedProjects,
   readMembership,
-  readWorkspaces,
-  validateWorkspace,
+  readProjects,
+  validateProject,
 } from './authorize.js';
 import { parseTheme, THEME_COOKIE, THEME_MAX_AGE } from './theme.js';
 
@@ -18,44 +18,44 @@ export const getSession = createServerFn({ method: 'GET' }).handler(async () => 
   return auth.api.getSession({ headers: getRequest().headers });
 });
 
-/* Where an unscoped route sends you: the workspaces you belong to, oldest
+/* Where an unscoped route sends you: the projects you belong to, oldest
    first. `/` redirects to the first; the switcher lists them all.
 
    Empty means "sign in" — either there is no session, or there is one with no
    membership behind it. The second is rare but real: an account whose last
    membership was removed while it was signed in. Treating it as signed out is
    the honest answer, since there is nothing it can reach. */
-export const getWorkspaces = createServerFn({ method: 'GET' }).handler(async () => {
-  return readWorkspaces();
+export const getProjects = createServerFn({ method: 'GET' }).handler(async () => {
+  return readProjects();
 });
 
-export const getArchivedWorkspaces = createServerFn({ method: 'GET' }).handler(async () => {
-  return readArchivedWorkspaces();
+export const getArchivedProjects = createServerFn({ method: 'GET' }).handler(async () => {
+  return readArchivedProjects();
 });
 
-/* Everything the shell needs for one workspace, in one round trip: who is
-   signed in, what they may do *here*, and the other workspaces the switcher
+/* Everything the shell needs for one project, in one round trip: who is
+   signed in, what they may do *here*, and the other projects the switcher
    offers. `null` when the slug is unknown or they are not a member — the
    layout route turns that into a refusal. */
-export const getWorkspaceViewer = createServerFn({ method: 'GET' })
-  .validator((value: unknown) => ({ workspace: validateWorkspace(value) }))
+export const getProjectViewer = createServerFn({ method: 'GET' })
+  .validator((value: unknown) => ({ project: validateProject(value) }))
   .handler(async ({ data }) => {
     const session = await auth.api.getSession({ headers: getRequest().headers });
     if (!session) return null;
     /* The id is passed down rather than re-derived. Both of these would
        otherwise read the session again, making three reads of the same cookie
        to answer one question. */
-    const membership = await readMembership(data.workspace, session.user.id);
+    const membership = await readMembership(data.project, session.user.id);
     if (!membership) return null;
-    const workspaces = await readWorkspaces(session.user.id);
-    const current = workspaces.find((entry) => entry.slug === membership.slug);
+    const projects = await readProjects(session.user.id);
+    const current = projects.find((entry) => entry.slug === membership.slug);
     return {
       holder: session.user.name || session.user.email || undefined,
       role: membership.role,
-      workspaceId: membership.workspaceId,
+      projectId: membership.projectId,
       slug: membership.slug,
-      workspaceName: current?.name ?? membership.slug,
-      workspaces,
+      projectName: current?.name ?? membership.slug,
+      projects,
     };
   });
 

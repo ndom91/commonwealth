@@ -40,11 +40,11 @@ export type Identity = {
   auto_approve: boolean;
   /* The person whose agent this is, and their display name. Both null for a
      shared holder — the bootstrap identity, a CI runner — which is a real state
-     and not a missing value. Removing the owner from the workspace voids this
+     and not a missing value. Removing the owner from the project voids this
      holder's credentials and disables it; an unowned one survives.
    *
    * Never read by the MCP layer. `access-service.ts` resolves a key to a
-   * workspace, a role and a trust flag, and ownership is none of those. */
+   * project, a role and a trust flag, and ownership is none of those. */
   owner_admin_id: string | null;
   owner: string | null;
   keys: Credential[];

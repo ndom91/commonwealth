@@ -1,7 +1,7 @@
 import { getRequest } from '@tanstack/react-start/server';
 import { auth } from './auth.js';
 import { client } from './db.js';
-import { can, isRole, type Permission, type Role, type WorkspaceRef } from './roles.js';
+import { can, isRole, type Permission, type ProjectRef, type Role } from './roles.js';
 
 /* The authorisation gate, kept in its own module for a build reason worth
  * knowing before moving it back.
@@ -23,15 +23,15 @@ import { can, isRole, type Permission, type Role, type WorkspaceRef } from './ro
  * `concepts.ts`, `management.ts` and `session.ts` — modules whose own exports
  * are all server functions or plain data, and which are therefore stripped. */
 
-export type Membership = { userId: string; workspaceId: string; slug: string; role: Role };
+export type Membership = { userId: string; projectId: string; slug: string; role: Role };
 
 /* Slugs are the URL segment, so they are shape-checked before reaching SQL and
-   the same expression validates one on the way in at `createWorkspace`. */
+   the same expression validates one on the way in at `createProject`. */
 export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /* Both readers take an optional pre-resolved id so a caller that has already
- * established who is asking does not establish it again. `getWorkspaceViewer`
- * needs the session, the membership *and* the workspace list, and used to read
+ * established who is asking does not establish it again. `getProjectViewer`
+ * needs the session, the membership *and* the project list, and used to read
  * the session three times to get them — once itself and once inside each of
  * these. `session.cookieCache` makes those reads cheap, but cheap is not the
  * same as sensible, and a cache would only have hidden the duplication.
@@ -43,57 +43,57 @@ export async function signedInUser(): Promise<string | null> {
   return session?.user.id ?? null;
 }
 
-/* Membership in one named workspace.
+/* Membership in one named project.
  *
  * Resolving the slug and checking membership are a single query on purpose.
- * Two queries — "does this workspace exist" then "am I in it" — invite a caller
+ * Two queries — "does this project exist" then "am I in it" — invite a caller
  * to be told which slugs are real, and invite a future edit to use the
- * workspace from the first without the answer from the second. */
+ * project from the first without the answer from the second. */
 export async function readMembership(
   slug: string,
   knownUserId?: string
 ): Promise<Membership | null> {
   const userId = knownUserId ?? (await signedInUser());
   if (!userId || !SLUG.test(slug)) return null;
-  const [row] = await client<{ workspace_id: string; role: string }[]>`
-    SELECT member.workspace_id, member.role
+  const [row] = await client<{ project_id: string; role: string }[]>`
+    SELECT member.project_id, member.role
     FROM member
-    JOIN workspaces ON workspaces.id = member.workspace_id
-    WHERE member.user_id = ${userId} AND workspaces.slug = ${slug}
-      AND workspaces.archived_at IS NULL
+    JOIN projects ON projects.id = member.project_id
+    WHERE member.user_id = ${userId} AND projects.slug = ${slug}
+      AND projects.archived_at IS NULL
   `;
   if (!row || !isRole(row.role)) return null;
-  return { userId, workspaceId: row.workspace_id, slug, role: row.role };
+  return { userId, projectId: row.project_id, slug, role: row.role };
 }
 
-/* Every workspace the caller belongs to, oldest membership first — which makes
+/* Every project the caller belongs to, oldest membership first — which makes
    the first entry the one `/` lands on and the order the switcher lists. */
-export async function readWorkspaces(knownUserId?: string): Promise<WorkspaceRef[]> {
+export async function readProjects(knownUserId?: string): Promise<ProjectRef[]> {
   const userId = knownUserId ?? (await signedInUser());
   if (!userId) return [];
   const rows = await client<{ id: string; name: string; slug: string; role: string }[]>`
-    SELECT workspaces.id, workspaces.name, workspaces.slug, member.role
+    SELECT projects.id, projects.name, projects.slug, member.role
     FROM member
-    JOIN workspaces ON workspaces.id = member.workspace_id
-    WHERE member.user_id = ${userId} AND workspaces.archived_at IS NULL
-    ORDER BY member.created_at ASC, workspaces.name ASC
+    JOIN projects ON projects.id = member.project_id
+    WHERE member.user_id = ${userId} AND projects.archived_at IS NULL
+    ORDER BY member.created_at ASC, projects.name ASC
   `;
   return rows
     .filter((row) => isRole(row.role))
     .map((row) => ({ id: row.id, name: row.name, slug: row.slug, role: row.role as Role }));
 }
 
-export async function readArchivedWorkspaces(knownUserId?: string) {
+export async function readArchivedProjects(knownUserId?: string) {
   const userId = knownUserId ?? (await signedInUser());
   if (!userId) return [];
   const rows = await client<
     { id: string; name: string; slug: string; role: string; archived_at: string }[]
   >`
-    SELECT workspaces.id, workspaces.name, workspaces.slug, member.role, workspaces.archived_at
+    SELECT projects.id, projects.name, projects.slug, member.role, projects.archived_at
     FROM member
-    JOIN workspaces ON workspaces.id = member.workspace_id
-    WHERE member.user_id = ${userId} AND workspaces.archived_at IS NOT NULL
-    ORDER BY workspaces.archived_at DESC, workspaces.name ASC
+    JOIN projects ON projects.id = member.project_id
+    WHERE member.user_id = ${userId} AND projects.archived_at IS NOT NULL
+    ORDER BY projects.archived_at DESC, projects.name ASC
   `;
   return rows
     .filter((row) => isRole(row.role))
@@ -108,31 +108,31 @@ export async function readArchivedWorkspaces(knownUserId?: string) {
 
 async function requireArchivedAdmin(slug: string): Promise<Membership> {
   const userId = await signedInUser();
-  if (!userId || !SLUG.test(slug)) throw new Error('That workspace is not available to you.');
-  const [row] = await client<{ workspace_id: string; role: string }[]>`
-    SELECT member.workspace_id, member.role
+  if (!userId || !SLUG.test(slug)) throw new Error('That project is not available to you.');
+  const [row] = await client<{ project_id: string; role: string }[]>`
+    SELECT member.project_id, member.role
     FROM member
-    JOIN workspaces ON workspaces.id = member.workspace_id
-    WHERE member.user_id = ${userId} AND workspaces.slug = ${slug}
-      AND workspaces.archived_at IS NOT NULL
+    JOIN projects ON projects.id = member.project_id
+    WHERE member.user_id = ${userId} AND projects.slug = ${slug}
+      AND projects.archived_at IS NOT NULL
   `;
   if (!row || !isRole(row.role) || !can(row.role as Role, 'admin')) {
-    throw new Error('That workspace is not available to you.');
+    throw new Error('That project is not available to you.');
   }
-  return { userId, workspaceId: row.workspace_id, slug, role: row.role as Role };
+  return { userId, projectId: row.project_id, slug, role: row.role as Role };
 }
 
 export { requireArchivedAdmin };
 
-/* The gate. Every server function that touches a workspace's contents calls
- * this first, naming the permission it needs *and the workspace it is acting
+/* The gate. Every server function that touches a project's contents calls
+ * this first, naming the permission it needs *and the project it is acting
  * in* — which the caller supplies from the URL.
  *
- * Taking the workspace as an argument rather than inferring it is the whole
+ * Taking the project as an argument rather than inferring it is the whole
  * security model of this wave. A gate that only asked "are you a member of
- * something" would let a member of one workspace hand a server function another
- * workspace's source id; because authorisation and scope come from this one
- * lookup, the id and the permission are always about the same workspace.
+ * something" would let a member of one project hand a server function another
+ * project's source id; because authorisation and scope come from this one
+ * lookup, the id and the permission are always about the same project.
  *
  * This is also the only enforcement. The drawer and the benches hide controls a
  * role cannot use, but that is courtesy — these are plain HTTP endpoints and
@@ -144,10 +144,10 @@ export { requireArchivedAdmin };
  * `mcp-server/src/access-service.ts` so people and agents are granted alike. */
 export async function requireMember(permission: Permission, slug: string): Promise<Membership> {
   const membership = await readMembership(slug);
-  /* One sentence for "no session", "no such workspace" and "not a member of
+  /* One sentence for "no session", "no such project" and "not a member of
      it". The last two are the same fact from the caller's side, and telling
      them apart would confirm which slugs exist to someone who cannot enter. */
-  if (!membership) throw new Error('That workspace is not available to you.');
+  if (!membership) throw new Error('That project is not available to you.');
   if (!can(membership.role, permission)) throw new Error(refusal(permission));
   return membership;
 }
@@ -156,14 +156,14 @@ function refusal(permission: Permission): string {
   if (permission === 'write') return 'Writer access or above is required.';
   if (permission === 'review') return 'Reviewer access or above is required.';
   if (permission === 'admin') return 'Administrator access is required.';
-  return 'Membership of this workspace is required.';
+  return 'Membership of this project is required.';
 }
 
-/* Server-function validators all need the workspace out of the payload, and all
+/* Server-function validators all need the project out of the payload, and all
    need to reject the same shapes. */
-export function validateWorkspace(value: unknown): string {
-  const slug = (value as { workspace?: string } | undefined)?.workspace?.trim();
-  if (!slug || !SLUG.test(slug)) throw new Error('Invalid workspace');
+export function validateProject(value: unknown): string {
+  const slug = (value as { project?: string } | undefined)?.project?.trim();
+  if (!slug || !SLUG.test(slug)) throw new Error('Invalid project');
   return slug;
 }
 
@@ -171,8 +171,8 @@ export function validateWorkspace(value: unknown): string {
    takes nothing else. Both live here rather than in `concepts.ts` and
    `management.ts` because they belong to the gate, not to either subject — and
    because two identical copies is how the two drift. */
-export type Scoped<T> = T & { workspace: string };
+export type Scoped<T> = T & { project: string };
 
-export function validateScope(value: unknown): { workspace: string } {
-  return { workspace: validateWorkspace(value) };
+export function validateScope(value: unknown): { project: string } {
+  return { project: validateProject(value) };
 }

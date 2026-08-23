@@ -19,10 +19,10 @@ import { readFailure } from '../../../../lib/failure.js';
  *
  * Every count here is one the rail does *not* carry. The register's own size is
  * stated once, in the navigation that owns it. */
-export const Route = createFileRoute('/w/$slug/sources/')({
+export const Route = createFileRoute('/p/$slug/sources/')({
   loader: async ({ params }) => {
     try {
-      return { standing: await getRegisterSummary({ data: { workspace: params.slug } }) };
+      return { standing: await getRegisterSummary({ data: { project: params.slug } }) };
     } catch {
       return { standing: undefined, failure: readFailure('The corpus') };
     }
@@ -102,7 +102,7 @@ function Standing() {
         {attention && (
           <p className="standing__owed">
             {attention}{' '}
-            <Link to="/w/$slug/review" params={{ slug }}>
+            <Link to="/p/$slug/review" params={{ slug }}>
               Work the queue
             </Link>
           </p>

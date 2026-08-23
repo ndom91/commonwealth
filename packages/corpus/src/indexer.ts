@@ -10,48 +10,48 @@ import { head, listConceptPaths, readFileAtCommit } from './corpus.js';
 
 export type IndexResult = { chunks: number; commit: string; concepts: number; indexed: boolean };
 
-export type IndexWorkspaceInput = {
+export type IndexProjectInput = {
   corpusPath: string;
   embeddingModel: string;
   embeddings: Pick<Embeddings, 'embed'>;
   sql: Sql;
-  workspaceId: string;
-  workspaceSlug: string;
+  projectId: string;
+  projectSlug: string;
 };
 
-// indexWorkspace publishes one complete Git commit as the workspace retrieval snapshot.
-export async function indexWorkspace(input: IndexWorkspaceInput): Promise<IndexResult> {
-  const commit = await head(input.corpusPath, input.workspaceSlug);
+// indexProject publishes one complete Git commit as the project retrieval snapshot.
+export async function indexProject(input: IndexProjectInput): Promise<IndexResult> {
+  const commit = await head(input.corpusPath, input.projectSlug);
   await input.sql`
-    INSERT INTO workspace_index_state (workspace_id, indexing_commit_sha, status, failure)
-    VALUES (${input.workspaceId}, ${commit}, 'indexing', NULL)
-    ON CONFLICT (workspace_id) DO UPDATE
+    INSERT INTO project_index_state (project_id, indexing_commit_sha, status, failure)
+    VALUES (${input.projectId}, ${commit}, 'indexing', NULL)
+    ON CONFLICT (project_id) DO UPDATE
     SET indexing_commit_sha = EXCLUDED.indexing_commit_sha, status = 'indexing', failure = NULL,
         updated_at = now()
   `;
 
   try {
-    const concepts = await conceptsAtCommit(input.corpusPath, input.workspaceSlug, commit);
+    const concepts = await conceptsAtCommit(input.corpusPath, input.projectSlug, commit);
     const prepared = await prepareChunks(concepts, input.embeddings);
     const indexed = await input.sql.begin(async (transaction) => {
       const [state] = await transaction<{ indexing_commit_sha: string | null }[]>`
-        SELECT indexing_commit_sha FROM workspace_index_state
-        WHERE workspace_id = ${input.workspaceId} FOR UPDATE
+        SELECT indexing_commit_sha FROM project_index_state
+        WHERE project_id = ${input.projectId} FOR UPDATE
       `;
       if (!state || state.indexing_commit_sha !== commit) return false;
 
       await transaction`
-        DELETE FROM concepts WHERE workspace_id = ${input.workspaceId} AND commit_sha = ${commit}
+        DELETE FROM concepts WHERE project_id = ${input.projectId} AND commit_sha = ${commit}
       `;
       for (const concept of concepts) {
         const chunks = prepared.get(concept.path);
         if (!chunks) throw new Error(`Concept ${concept.path} was not prepared`);
         await transaction`
           INSERT INTO concepts (
-            workspace_id, path, commit_sha, content_hash, type, title, description, tags,
+            project_id, path, commit_sha, content_hash, type, title, description, tags,
             frontmatter, status, authority, generated_by, generated_at, expected_chunks
           ) VALUES (
-            ${input.workspaceId}, ${concept.path}, ${commit}, ${concept.contentHash}, ${concept.type},
+            ${input.projectId}, ${concept.path}, ${commit}, ${concept.contentHash}, ${concept.type},
             ${concept.title}, ${concept.description}, ${concept.tags},
             ${transaction.json(concept.frontmatter as JSONValue)},
             ${concept.status}, ${concept.authority}, ${concept.generatedBy}, ${concept.generatedAt}, ${chunks.length}
@@ -60,10 +60,10 @@ export async function indexWorkspace(input: IndexWorkspaceInput): Promise<IndexR
         for (const [ordinal, chunk] of chunks.entries()) {
           await transaction`
             INSERT INTO concept_chunks (
-              workspace_id, concept_path, commit_sha, ordinal, heading, content, token_count,
+              project_id, concept_path, commit_sha, ordinal, heading, content, token_count,
               embedding, embedding_model
             ) VALUES (
-              ${input.workspaceId}, ${concept.path}, ${commit}, ${ordinal}, ${chunk.heading},
+              ${input.projectId}, ${concept.path}, ${commit}, ${ordinal}, ${chunk.heading},
               ${chunk.content}, ${chunk.tokenCount}, ${vector(chunk.embedding)}::vector,
               ${input.embeddingModel}
             )
@@ -71,10 +71,10 @@ export async function indexWorkspace(input: IndexWorkspaceInput): Promise<IndexR
         }
       }
       await transaction`
-        UPDATE workspace_index_state
+        UPDATE project_index_state
         SET indexed_commit_sha = ${commit}, indexing_commit_sha = NULL, status = 'idle', failure = NULL,
             updated_at = now()
-        WHERE workspace_id = ${input.workspaceId} AND indexing_commit_sha = ${commit}
+        WHERE project_id = ${input.projectId} AND indexing_commit_sha = ${commit}
       `;
 
       return true;
@@ -85,9 +85,9 @@ export async function indexWorkspace(input: IndexWorkspaceInput): Promise<IndexR
   } catch (error) {
     const failure = error instanceof Error ? error.message : String(error);
     await input.sql`
-      UPDATE workspace_index_state
+      UPDATE project_index_state
       SET status = 'failed', failure = ${failure}, updated_at = now()
-      WHERE workspace_id = ${input.workspaceId} AND indexing_commit_sha = ${commit}
+      WHERE project_id = ${input.projectId} AND indexing_commit_sha = ${commit}
     `;
     throw error;
   }
@@ -110,13 +110,13 @@ type Concept = {
 
 async function conceptsAtCommit(
   corpusPath: string,
-  workspace: string,
+  project: string,
   commit: string
 ): Promise<Concept[]> {
-  const paths = await listConceptPaths(corpusPath, workspace, commit);
+  const paths = await listConceptPaths(corpusPath, project, commit);
   const concepts: Concept[] = [];
   for (const path of paths) {
-    const text = await readFileAtCommit(corpusPath, workspace, path, commit);
+    const text = await readFileAtCommit(corpusPath, project, path, commit);
     const document = parseOkfDocument(text);
     const status = statusOf(document.frontmatter.status);
     if (status === 'deprecated') continue;

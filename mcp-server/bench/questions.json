@@ -55,7 +55,7 @@
       "relevant": [{ "doc": "AGENTS.md", "anchor": "node --import tsx" }]
     },
     {
-      "question": "why does the shared indexer take a workspace id and slug?",
+      "question": "why does the shared indexer take a project id and slug?",
       "relevant": [
         {
           "doc": "AGENTS.md",
@@ -68,7 +68,7 @@
       "relevant": [{ "doc": "PRODUCT.md", "anchor": "which concept and Git commit it came from" }]
     },
     {
-      "question": "can one workspace use a different embedding model from another?",
+      "question": "can one project use a different embedding model from another?",
       "relevant": [{ "doc": "PRODUCT.md", "anchor": "cannot pick its own model" }]
     },
     {
@@ -84,9 +84,7 @@
     },
     {
       "question": "what happens when a concept is deprecated?",
-      "relevant": [
-        { "doc": "PRODUCT.md", "anchor": "prior commits remain in the workspace bundle" }
-      ]
+      "relevant": [{ "doc": "PRODUCT.md", "anchor": "prior commits remain in the project bundle" }]
     },
     {
       "question": "how do we stop an agent treating stored content as instructions?",

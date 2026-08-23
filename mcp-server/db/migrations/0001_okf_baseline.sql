@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE TABLE workspaces (
+CREATE TABLE projects (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL UNIQUE,
   slug text NOT NULL UNIQUE,
@@ -9,7 +9,7 @@ CREATE TABLE workspaces (
 );
 
 CREATE TABLE index_configuration (
-  workspace_id uuid PRIMARY KEY REFERENCES workspaces(id),
+  project_id uuid PRIMARY KEY REFERENCES projects(id),
   embedding_model text NOT NULL,
   embedding_dimensions integer NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -17,7 +17,7 @@ CREATE TABLE index_configuration (
 
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id uuid NOT NULL REFERENCES workspaces(id),
+  project_id uuid NOT NULL REFERENCES projects(id),
   display_name text NOT NULL,
   role text NOT NULL CHECK (role IN ('reader', 'writer', 'reviewer', 'admin')),
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -37,15 +37,15 @@ CREATE TABLE api_keys (
 
 CREATE TABLE events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id uuid NOT NULL REFERENCES workspaces(id),
+  project_id uuid NOT NULL REFERENCES projects(id),
   actor_id uuid REFERENCES users(id),
   event_type text NOT NULL,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE workspace_index_state (
-  workspace_id uuid PRIMARY KEY REFERENCES workspaces(id),
+CREATE TABLE project_index_state (
+  project_id uuid PRIMARY KEY REFERENCES projects(id),
   indexed_commit_sha text,
   indexing_commit_sha text,
   status text NOT NULL DEFAULT 'idle' CHECK (status IN ('idle', 'indexing', 'failed')),
@@ -54,7 +54,7 @@ CREATE TABLE workspace_index_state (
 );
 
 CREATE TABLE concepts (
-  workspace_id uuid NOT NULL REFERENCES workspaces(id),
+  project_id uuid NOT NULL REFERENCES projects(id),
   path text NOT NULL,
   commit_sha text NOT NULL,
   content_hash text NOT NULL,
@@ -69,12 +69,12 @@ CREATE TABLE concepts (
   generated_at timestamptz,
   expected_chunks integer NOT NULL,
   indexed_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (workspace_id, path, commit_sha)
+  PRIMARY KEY (project_id, path, commit_sha)
 );
 
 CREATE TABLE concept_chunks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id uuid NOT NULL,
+  project_id uuid NOT NULL,
   concept_path text NOT NULL,
   commit_sha text NOT NULL,
   ordinal integer NOT NULL,
@@ -85,12 +85,12 @@ CREATE TABLE concept_chunks (
   embedding vector(1024) NOT NULL,
   embedding_model text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (workspace_id, concept_path, commit_sha, ordinal),
-  FOREIGN KEY (workspace_id, concept_path, commit_sha)
-    REFERENCES concepts(workspace_id, path, commit_sha) ON DELETE CASCADE
+  UNIQUE (project_id, concept_path, commit_sha, ordinal),
+  FOREIGN KEY (project_id, concept_path, commit_sha)
+    REFERENCES concepts(project_id, path, commit_sha) ON DELETE CASCADE
 );
 
 CREATE INDEX events_created_at_idx ON events (created_at DESC);
-CREATE INDEX concepts_workspace_commit_path_idx ON concepts (workspace_id, commit_sha, path);
+CREATE INDEX concepts_project_commit_path_idx ON concepts (project_id, commit_sha, path);
 CREATE INDEX concept_chunks_search_vector_idx ON concept_chunks USING gin(search_vector);
 CREATE INDEX concept_chunks_embedding_idx ON concept_chunks USING hnsw (embedding vector_cosine_ops);

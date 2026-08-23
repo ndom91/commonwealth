@@ -61,17 +61,17 @@ export const Route = createRootRoute({
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       ...themeColor(loaderData),
       /* The fallback, and deliberately bare. Every signed-in page overrides it
-         with the workspace it is in — see the `head` on `w/$slug.tsx` — so what
-         is left here is what the routes outside a workspace show: sign-in, an
-         invitation, the workspace picker.
+         with the project it is in — see the `head` on `w/$slug.tsx` — so what
+         is left here is what the routes outside a project show: sign-in, an
+         invitation, the project picker.
        *
-         Those must not name a workspace. Nothing about the instance is knowable
+         Those must not name a project. Nothing about the instance is knowable
          before authentication and none of it is anybody's business until then,
          which is the same rule the sign-in copy already follows.
        *
          It read "Custody bench — Commonwealth" until now. That is the design
          system's north star, and it stays that — but it was the same eleven
-         characters on every page of every workspace, which is the one thing a
+         characters on every page of every project, which is the one thing a
          tab title cannot afford to be. */
       { title: 'Commonwealth' },
     ],

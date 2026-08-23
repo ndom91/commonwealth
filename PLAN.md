@@ -18,9 +18,9 @@ query latency, RAM usage, image size, and cold-start time on CPU-only hardware.
 hand-written gold set in `mcp-server/bench/questions.json`, reports indexing throughput in
 chunks/sec and query latency at p50 and p95, and prints the model and query-hint
 settings alongside them so a number can never be read without knowing what
-produced it. It seeds its own `benchmark` workspace from `mcp-server/bench/corpus/` — frozen
+produced it. It seeds its own `benchmark` project from `mcp-server/bench/corpus/` — frozen
 copies of this repo's own docs, taken so that editing a doc cannot move the
-numbers underneath a comparison — and never touches a live workspace. Misses are
+numbers underneath a comparison — and never touches a live project. Misses are
 named rather than counted, because a miss is a question to read: either the
 retrieval is wrong or the gold label is, and only looking tells you which.
 

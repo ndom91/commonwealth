@@ -6,9 +6,9 @@ import { can, type Permission, type Role } from './roles.js';
  * Three routes need this — Review, Identities, People — and before this helper
  * each restated the answer, which meant the answer was written down nowhere.
  * It is a product decision, not a formality: a refused reader goes to the
- * *sources* of the workspace they asked for, because the thing they were denied
+ * *sources* of the project they asked for, because the thing they were denied
  * was a section and not the corpus. Sending them to `/` would drop them into
- * whichever workspace happens to be oldest, which is a different refusal.
+ * whichever project happens to be oldest, which is a different refusal.
  *
  * Presentation only, twice over. The rail already omits these drawers for a
  * role that cannot use them, and every server function behind them calls
@@ -25,7 +25,7 @@ import { can, type Permission, type Role } from './roles.js';
 export function requireRole(permission: Permission) {
   return ({ context }: { context: { role: Role; slug: string } }) => {
     if (!can(context.role, permission)) {
-      throw redirect({ to: '/w/$slug/sources', params: { slug: context.slug }, search: {} });
+      throw redirect({ to: '/p/$slug/sources', params: { slug: context.slug }, search: {} });
     }
   };
 }

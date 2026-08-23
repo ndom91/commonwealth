@@ -4,15 +4,15 @@ import { AppShell, SettingsTabs } from '../../../../components/chrome.js';
 import { Stamp } from '../../../../components/stamp.js';
 import { readFailure, writeFailure } from '../../../../lib/failure.js';
 import {
-  archiveWorkspace,
-  createWorkspace,
-  getWorkspaceFacts,
-  renameWorkspace,
+  archiveProject,
+  createProject,
+  getProjectFacts,
+  renameProject,
 } from '../../../../lib/management.js';
 import { can } from '../../../../lib/roles.js';
 import { documentTitle } from '../../../../lib/title.js';
 
-/* The workspace as an object: what it is called, what it is made of, and how to
+/* The project as an object: what it is called, what it is made of, and how to
  * start another one.
  *
  * These two forms spent a day at the foot of the People register, which was
@@ -26,51 +26,51 @@ import { documentTitle } from '../../../../lib/title.js';
  * with. Answering that is not the same as offering to change it: changing it
  * means reindexing every chunk, which is an operator's job with the service
  * stopped, not a select on a settings page. */
-export const Route = createFileRoute('/w/$slug/settings/workspace')({
-  /* "Settings", not the "Workspace" the masthead shows. On the page that word
+export const Route = createFileRoute('/p/$slug/settings/project')({
+  /* "Settings", not the "Project" the masthead shows. On the page that word
      sits under an accession already reading Settings; in a tab strip there is no
-     accession, and "Workspace · Core Team" would name the corpus twice. Its two
+     accession, and "Project · Core Team" would name the corpus twice. Its two
      sibling tabs name themselves — People, Identities — so this one takes the
      section. */
   head: ({ match }) => ({
-    meta: [{ title: documentTitle('Settings', match.context.workspaceName) }],
+    meta: [{ title: documentTitle('Settings', match.context.projectName) }],
   }),
   loader: async ({ params }) => {
     try {
       return {
-        facts: await getWorkspaceFacts({ data: { workspace: params.slug } }),
+        facts: await getProjectFacts({ data: { project: params.slug } }),
         failure: undefined,
       };
     } catch {
-      return { facts: undefined, failure: readFailure('This workspace') };
+      return { facts: undefined, failure: readFailure('This project') };
     }
   },
-  component: Workspace,
+  component: Project,
 });
 
-function Workspace() {
+function Project() {
   const { slug } = Route.useParams();
   const viewer = Route.useRouteContext();
   const { facts, failure } = Route.useLoaderData();
 
   return (
     <AppShell
-      title="Workspace"
+      title="Project"
       accession="Settings"
       tabs={<SettingsTabs slug={slug} counts={viewer.counts} role={viewer.role} />}
       {...viewer}
     >
-      <section className="detail" aria-label="This workspace">
-        {can(viewer.role, 'admin') && <ThisWorkspace />}
+      <section className="detail" aria-label="This project">
+        {can(viewer.role, 'admin') && <ThisProject />}
         <Corpus facts={facts} failure={failure} />
-        <NewWorkspace />
-        {can(viewer.role, 'admin') && <ArchiveWorkspace />}
+        <NewProject />
+        {can(viewer.role, 'admin') && <ArchiveProject />}
       </section>
     </AppShell>
   );
 }
 
-/* What this workspace is made of, stated once. Register face throughout: these
+/* What this project is made of, stated once. Register face throughout: these
    are values a person reads off and quotes back, not prose. */
 function Corpus({
   facts,
@@ -111,26 +111,26 @@ function Corpus({
         )
       )}
       <p className="line__caption prose">
-        Every chunk in this workspace was embedded by that model, and retrieval only compares
-        vectors it produced. One model serves the whole instance; changing it means reindexing every
-        source, so it is set by <code>EMBEDDING_MODEL</code> and checked at migration rather than
-        offered here.
+        Every chunk in this project was embedded by that model, and retrieval only compares vectors
+        it produced. One model serves the whole instance; changing it means reindexing every source,
+        so it is set by <code>EMBEDDING_MODEL</code> and checked at migration rather than offered
+        here.
       </p>
     </div>
   );
 }
 
-/* The name on the plate, and the only part of a workspace's identity that can
+/* The name on the plate, and the only part of a project's identity that can
  * change. The slug cannot: it is in every link anyone has sent, and a URL that
  * quietly stops meaning what it meant is worse than a name nobody likes.
  *
  * Here rather than in Settings for the same reason the people register is —
  * Settings is your own account, this is the cabinet everyone shares. */
-function ThisWorkspace() {
+function ThisProject() {
   const { slug } = Route.useParams();
-  const { workspaceName } = Route.useRouteContext();
+  const { projectName } = Route.useRouteContext();
   const router = useRouter();
-  const [name, setName] = useState(workspaceName);
+  const [name, setName] = useState(projectName);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState(false);
@@ -141,7 +141,7 @@ function ThisWorkspace() {
     setError(undefined);
     setSaved(false);
     try {
-      await renameWorkspace({ data: { workspace: slug, name } });
+      await renameProject({ data: { project: slug, name } });
       /* Invalidating reloads the layout that supplies the rail, so the plate
          and the switcher take the new name without a reload. */
       await router.invalidate();
@@ -155,7 +155,7 @@ function ThisWorkspace() {
 
   return (
     <div className="bench__section">
-      <span className="label">This workspace</span>
+      <span className="label">This project</span>
       <form className="bench__inline" onSubmit={submit}>
         <label className={`field${error ? ' field--error' : ''}`}>
           <span className="label">Name</span>
@@ -170,9 +170,9 @@ function ThisWorkspace() {
           />
         </label>
         <p className="line__caption">
-          Shown on the plate, in everyone's switcher and on any invitation to this workspace. Its
-          slug — <span className="register">{slug}</span> — does not change, so links already sent
-          keep working.
+          Shown on the plate, in everyone's switcher and on any invitation to this project. Its slug
+          — <span className="register">{slug}</span> — does not change, so links already sent keep
+          working.
         </p>
         {error && (
           <p className="notice" role="alert">
@@ -180,7 +180,7 @@ function ThisWorkspace() {
           </p>
         )}
         <div className="bench__controls">
-          <button className="btn btn--quiet" disabled={pending || name.trim() === workspaceName}>
+          <button className="btn btn--quiet" disabled={pending || name.trim() === projectName}>
             {pending ? 'Saving…' : saved ? 'Saved' : 'Save name'}
           </button>
         </div>
@@ -192,15 +192,10 @@ function ThisWorkspace() {
 /* A second corpus on the same instance — the AI team's notes kept apart from
  * the core team's, one deployment.
  *
- * It lives at the foot of the people register rather than in Settings because
- * it is the same subject: who may reach which cabinet. Settings is your own
- * account. The rail's workspace plate links straight here by hash, so the form
- * is open on arrival — a disclosure that arrived closed would be a dead end.
- *
  * The slug follows the name until the moment you touch it, then it is yours.
- * Deriving it silently forever would mean renaming a workspace could not fix a
+ * Deriving it silently forever would mean renaming a project could not fix a
  * typo in its URL; making you type it twice for the ordinary case is worse. */
-function NewWorkspace() {
+function NewProject() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
   const [name, setName] = useState('');
@@ -220,15 +215,15 @@ function NewWorkspace() {
     setPending(true);
     setError(undefined);
     try {
-      const created = await createWorkspace({ data: { workspace: slug, name, slug: value } });
-      /* Straight into it. Creating a workspace and then staying in the old one
+      const created = await createProject({ data: { project: slug, name, slug: value } });
+      /* Straight into it. Creating a project and then staying in the old one
          would leave you to find the switcher to see what you just made. */
-      await navigate({ to: '/w/$slug/sources', params: { slug: created.slug }, search: {} });
+      await navigate({ to: '/p/$slug/sources', params: { slug: created.slug }, search: {} });
     } catch (cause) {
       setError(
         writeFailure(
           cause,
-          'That workspace could not be created. Nothing was created.',
+          'That project could not be created. Nothing was created.',
           'Nothing was created.'
         )
       );
@@ -237,8 +232,8 @@ function NewWorkspace() {
   }
 
   return (
-    <div className="bench__section" id="new-workspace">
-      <span className="label">Start another workspace</span>
+    <div className="bench__section" id="new-project">
+      <span className="label">Start another project</span>
       <form className="bench__inline" onSubmit={submit}>
         <label className={`field${error ? ' field--error' : ''}`}>
           <span className="label">Name</span>
@@ -269,7 +264,7 @@ function NewWorkspace() {
         </label>
         <p className="line__caption">
           Its own sources, its own agent identities, its own activity log — nothing crosses between
-          workspaces, and the slug is what everyone will see in the URL. You become its first
+          projects, and the slug is what everyone will see in the URL. You become its first
           administrator; it starts with the same embedding model as this one, which is the only
           model this instance runs.
         </p>
@@ -280,10 +275,10 @@ function NewWorkspace() {
         )}
         <div className="bench__controls">
           <button className="btn btn--primary" disabled={pending || !value}>
-            {pending ? 'Creating…' : 'Create workspace'}
+            {pending ? 'Creating…' : 'Create project'}
           </button>
-          <Link to="/archived-workspaces" className="btn btn--quiet">
-            Archived workspaces
+          <Link to="/archived-projects" className="btn btn--quiet">
+            Archived projects
           </Link>
         </div>
       </form>
@@ -291,7 +286,7 @@ function NewWorkspace() {
   );
 }
 
-function ArchiveWorkspace() {
+function ArchiveProject() {
   const { slug } = Route.useParams();
   const navigate = useNavigate();
   const [pending, setPending] = useState(false);
@@ -301,19 +296,17 @@ function ArchiveWorkspace() {
     setPending(true);
     setError(undefined);
     try {
-      await archiveWorkspace({ data: { workspace: slug } });
-      await navigate({ to: '/archived-workspaces' });
+      await archiveProject({ data: { project: slug } });
+      await navigate({ to: '/archived-projects' });
     } catch (cause) {
-      setError(
-        writeFailure(cause, 'That workspace could not be archived.', 'Nothing was archived.')
-      );
+      setError(writeFailure(cause, 'That project could not be archived.', 'Nothing was archived.'));
       setPending(false);
     }
   }
 
   return (
     <div className="bench__section">
-      <span className="label">Archive workspace</span>
+      <span className="label">Archive project</span>
       <p className="line__caption prose">
         Removes this project from the switcher and stops browser and MCP access. Its sources,
         knowledge index, people, identities, and keys stay intact until an administrator restores
@@ -331,7 +324,7 @@ function ArchiveWorkspace() {
           disabled={pending}
           onClick={() => void archive()}
         >
-          {pending ? 'Archiving…' : 'Archive workspace'}
+          {pending ? 'Archiving…' : 'Archive project'}
         </button>
       </div>
     </div>

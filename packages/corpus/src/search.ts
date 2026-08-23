@@ -1,7 +1,7 @@
 import type { Embeddings } from '@commonwealth/pipeline';
 import type { Sql } from 'postgres';
 
-export type SearchWorkspaceInput = {
+export type SearchProjectInput = {
   authority?: string;
   embeddings: Pick<Embeddings, 'embedQuery'>;
   limit: number;
@@ -9,10 +9,10 @@ export type SearchWorkspaceInput = {
   sql: Sql;
   tags: string[];
   type?: string;
-  workspaceId: string;
+  projectId: string;
 };
 
-export type SearchWorkspaceResult = {
+export type SearchProjectResult = {
   authority: string;
   commit: string;
   excerpt: string;
@@ -38,10 +38,8 @@ type SearchRow = {
   type: string;
 };
 
-// searchWorkspace is the one retrieval implementation used by MCP and the bench.
-export async function searchWorkspace(
-  input: SearchWorkspaceInput
-): Promise<SearchWorkspaceResult[]> {
+// searchProject is the one retrieval implementation used by MCP and the bench.
+export async function searchProject(input: SearchProjectInput): Promise<SearchProjectResult[]> {
   const embedding = await input.embeddings.embedQuery(input.query);
   if (!embedding) throw new Error('Embedding provider returned no query embedding');
 
@@ -56,12 +54,12 @@ export async function searchWorkspace(
     ), eligible AS NOT MATERIALIZED (
       SELECT concept_chunks.id, concept_chunks.embedding, concept_chunks.search_vector
       FROM concept_chunks
-      JOIN concepts ON concepts.workspace_id = concept_chunks.workspace_id
+      JOIN concepts ON concepts.project_id = concept_chunks.project_id
         AND concepts.path = concept_chunks.concept_path
         AND concepts.commit_sha = concept_chunks.commit_sha
-      JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id
-        AND workspace_index_state.indexed_commit_sha = concepts.commit_sha
-      WHERE concepts.workspace_id = ${input.workspaceId} AND concepts.status = 'stable'
+      JOIN project_index_state ON project_index_state.project_id = concepts.project_id
+        AND project_index_state.indexed_commit_sha = concepts.commit_sha
+      WHERE concepts.project_id = ${input.projectId} AND concepts.status = 'stable'
         AND (${tags}::text[] IS NULL OR concepts.tags && ${tags}::text[])
         AND (${input.type ?? null}::text IS NULL OR concepts.type = ${input.type ?? null})
         AND (${input.authority ?? null}::text IS NULL OR concepts.authority = ${input.authority ?? null})
@@ -95,7 +93,7 @@ export async function searchWorkspace(
            candidate_ids.rrf AS final_score
     FROM candidate_ids
     JOIN concept_chunks ON concept_chunks.id = candidate_ids.id
-    JOIN concepts ON concepts.workspace_id = concept_chunks.workspace_id
+    JOIN concepts ON concepts.project_id = concept_chunks.project_id
       AND concepts.path = concept_chunks.concept_path AND concepts.commit_sha = concept_chunks.commit_sha
     CROSS JOIN query_terms
     ORDER BY candidate_ids.rrf DESC, concepts.path, concept_chunks.id

@@ -47,13 +47,13 @@ export type EventType =
   | 'member_added'
   | 'member_role_changed'
   | 'member_removed'
-  | 'workspace_created'
-  | 'workspace_renamed'
-  | 'workspace_archived'
-  | 'workspace_restored';
+  | 'project_created'
+  | 'project_renamed'
+  | 'project_archived'
+  | 'project_restored';
 
 export type Event = {
-  workspaceId: string;
+  projectId: string;
   /* The signed-in person who acted. Null only where no account is responsible —
      redeeming an invitation files its own arrival before the actor exists as a
      member. */
@@ -64,9 +64,9 @@ export type Event = {
 
 export async function fileEvent(sql: TransactionSql, event: Event): Promise<void> {
   await sql`
-    INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
+    INSERT INTO events (project_id, actor_admin_id, event_type, metadata)
     VALUES (
-      ${event.workspaceId},
+      ${event.projectId},
       ${event.actor},
       ${event.type},
       ${JSON.stringify(event.metadata ?? {})}::jsonb

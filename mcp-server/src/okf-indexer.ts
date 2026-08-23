@@ -1,5 +1,5 @@
 export {
+  type IndexProjectInput,
   type IndexResult,
-  type IndexWorkspaceInput,
-  indexWorkspace,
+  indexProject,
 } from '@commonwealth/corpus/indexer';

@@ -4,7 +4,7 @@ import { authoritySeal, SealChip } from '../../../../components/chrome.js';
 import { inspectRetrieval } from '../../../../lib/concepts.js';
 import { writeFailure } from '../../../../lib/failure.js';
 
-export const Route = createFileRoute('/w/$slug/sources/inspect')({ component: RetrievalInspector });
+export const Route = createFileRoute('/p/$slug/sources/inspect')({ component: RetrievalInspector });
 
 type Result = {
   authority: 'unverified' | 'approved' | 'canonical';
@@ -42,7 +42,7 @@ function RetrievalInspector() {
             query: String(data.get('query') ?? ''),
             tags,
             type: String(data.get('type') ?? '') || undefined,
-            workspace: slug,
+            project: slug,
           },
         })) as Result[]
       );
@@ -124,7 +124,7 @@ function RetrievalInspector() {
                   <Link
                     params={{ path: result.path, slug }}
                     search={{}}
-                    to="/w/$slug/sources/$path"
+                    to="/p/$slug/sources/$path"
                   >
                     {result.title ?? result.path}
                   </Link>

@@ -7,7 +7,7 @@ import { AccessService } from '../src/access-service.js';
 import { hashApiKey, keyPrefix } from '../src/auth.js';
 import type { Config } from '../src/config.js';
 import { runMigrations } from '../src/migrations.js';
-import { indexWorkspace } from '../src/okf-indexer.js';
+import { indexProject } from '../src/okf-indexer.js';
 import { OkfRepository } from '../src/okf-repository.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -78,12 +78,12 @@ if (!databaseUrl) {
         tags: null,
         chunks: null,
       });
-      const [workspace] = await sql<{ id: string }[]>`
-        INSERT INTO workspaces (name, slug) VALUES ('test', 'test') RETURNING id
+      const [project] = await sql<{ id: string }[]>`
+        INSERT INTO projects (name, slug) VALUES ('test', 'test') RETURNING id
       `;
-      assert.ok(workspace);
+      assert.ok(project);
       const [user] = await sql<{ id: string }[]>`
-        INSERT INTO users (workspace_id, display_name, role) VALUES (${workspace.id}, 'Test Admin', 'admin') RETURNING id
+        INSERT INTO users (project_id, display_name, role) VALUES (${project.id}, 'Test Admin', 'admin') RETURNING id
       `;
       assert.ok(user);
       await sql`
@@ -103,23 +103,23 @@ if (!databaseUrl) {
           },
         ],
         subject: 'Create playbooks/deploy.md',
-        workspace: 'test',
+        project: 'test',
       });
-      const indexed = await indexWorkspace({
+      const indexed = await indexProject({
         corpusPath,
         embeddingModel: config.EMBEDDING_MODEL,
         embeddings,
         sql,
-        workspaceId: workspace.id,
-        workspaceSlug: 'test',
+        projectId: project.id,
+        projectSlug: 'test',
       });
       const [indexState] = await sql<
         { indexed_commit_sha: string; chunks: string; concepts: string }[]
       >`
-        SELECT workspace_index_state.indexed_commit_sha,
-               (SELECT count(*) FROM concepts WHERE workspace_id = ${workspace.id}) AS concepts,
-               (SELECT count(*) FROM concept_chunks WHERE workspace_id = ${workspace.id}) AS chunks
-        FROM workspace_index_state WHERE workspace_id = ${workspace.id}
+        SELECT project_index_state.indexed_commit_sha,
+               (SELECT count(*) FROM concepts WHERE project_id = ${project.id}) AS concepts,
+               (SELECT count(*) FROM concept_chunks WHERE project_id = ${project.id}) AS chunks
+        FROM project_index_state WHERE project_id = ${project.id}
       `;
 
       assert.equal(indexed.commit, commit);
@@ -137,9 +137,9 @@ if (!databaseUrl) {
         type: 'Playbook',
       });
       const [createdConcept] = await sql<{ concepts: string; path: string }[]>`
-        SELECT (SELECT count(*) FROM concepts WHERE workspace_id = ${workspace.id}
+        SELECT (SELECT count(*) FROM concepts WHERE project_id = ${project.id}
                 AND commit_sha = ${created.commit}) AS concepts,
-               (SELECT path FROM concepts WHERE workspace_id = ${workspace.id}
+               (SELECT path FROM concepts WHERE project_id = ${project.id}
                 AND commit_sha = ${created.commit} AND path = ${created.path}) AS path
       `;
 
@@ -201,9 +201,9 @@ if (!databaseUrl) {
       await okf.deprecateConcept(actor, created.path);
       await assert.rejects(() => okf.getConcept(actor, created.path), /Concept not found/);
 
-      /* An archived workspace retains its index and Git history, but its agent
+      /* An archived project retains its index and Git history, but its agent
        * credentials must no longer authenticate at the MCP boundary. */
-      await sql`UPDATE workspaces SET archived_at = now() WHERE id = ${workspace.id}`;
+      await sql`UPDATE projects SET archived_at = now() WHERE id = ${project.id}`;
       assert.equal(await access.authenticate(bootstrapKey), null);
     } finally {
       await sql.end();

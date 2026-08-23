@@ -8,7 +8,7 @@ import { documentTitle } from '../../../lib/title.js';
 /* Your own account, and nothing else.
  *
  * Called Account rather than Settings, and moved off that path, now that the
- * workspace has settings of its own. Two pages sharing the plainer word would
+ * project has settings of its own. Two pages sharing the plainer word would
  * have been two pages nobody could name: one grants people access to a shared
  * corpus, the other changes your display name. The chrome had already half
  * argued the split by putting this behind the signed-in name instead of in a
@@ -16,15 +16,15 @@ import { documentTitle } from '../../../lib/title.js';
  *
  * Reachable at every role: changing your own name and password is not a
  * privilege. */
-export const Route = createFileRoute('/w/$slug/account')({
-  /* Named for the workspace it was reached from even though the account itself
-     is instance-wide, because the rail and the URL both say that workspace and
+export const Route = createFileRoute('/p/$slug/account')({
+  /* Named for the project it was reached from even though the account itself
+     is instance-wide, because the rail and the URL both say that project and
      a tab that disagreed with them would be the odd one out. */
   head: ({ match }) => ({
-    meta: [{ title: documentTitle('Account', match.context.workspaceName) }],
+    meta: [{ title: documentTitle('Account', match.context.projectName) }],
   }),
-  /* Your own account, so nothing here is workspace-scoped — but it is reached
-     from a workspace and the rail stays put, so it lives under the same layout.
+  /* Your own account, so nothing here is project-scoped — but it is reached
+     from a project and the rail stays put, so it lives under the same layout.
      That layout has already established who you are; this only fetches the
      name and email the form edits. */
   beforeLoad: async () => {

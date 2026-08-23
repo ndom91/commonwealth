@@ -1,5 +1,5 @@
 import { commitFiles, history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
-import { searchWorkspace } from '@commonwealth/corpus/search';
+import { searchProject } from '@commonwealth/corpus/search';
 import {
   type Embeddings,
   parseOkfDocument,
@@ -11,7 +11,7 @@ import { requirePermission } from './access-service.js';
 import type { Config } from './config.js';
 import type { Actor } from './domain.js';
 import { DomainError } from './errors.js';
-import { indexWorkspace } from './okf-indexer.js';
+import { indexProject } from './okf-indexer.js';
 
 export class OkfRepository {
   constructor(
@@ -33,7 +33,7 @@ export class OkfRepository {
   ): Promise<{ chunks: number; commit: string; path: string }> {
     requirePermission(actor, 'write');
     const path = validateOkfPath(input.path);
-    const existing = await listConceptPaths(this.config.CORPUS_PATH, actor.workspaceSlug);
+    const existing = await listConceptPaths(this.config.CORPUS_PATH, actor.projectSlug);
     if (existing.includes(path)) throw new DomainError('A concept already exists at that path');
 
     const now = new Date().toISOString();
@@ -53,22 +53,22 @@ export class OkfRepository {
       corpusPath: this.config.CORPUS_PATH,
       files: [{ path, text: serializeOkfDocument({ frontmatter, body: input.markdown.trim() }) }],
       subject: `Create ${path}`,
-      workspace: actor.workspaceSlug,
+      project: actor.projectSlug,
     });
-    const indexed = await indexWorkspace({
+    const indexed = await indexProject({
       corpusPath: this.config.CORPUS_PATH,
       embeddingModel: this.config.EMBEDDING_MODEL,
       embeddings: this.embeddings,
       sql: this.sql,
-      workspaceId: actor.workspaceId,
-      workspaceSlug: actor.workspaceSlug,
+      projectId: actor.projectId,
+      projectSlug: actor.projectSlug,
     });
     if (!indexed.indexed || indexed.commit !== commit) {
       throw new Error('Concept commit was superseded before indexing completed');
     }
     await this.sql`
-      INSERT INTO events (workspace_id, actor_id, event_type, metadata)
-      VALUES (${actor.workspaceId}, ${actor.id}, 'concept_created',
+      INSERT INTO events (project_id, actor_id, event_type, metadata)
+      VALUES (${actor.projectId}, ${actor.id}, 'concept_created',
               ${this.sql.json({ path, commit, type: input.type, authority })})
     `;
 
@@ -83,15 +83,15 @@ export class OkfRepository {
     >`
       SELECT concepts.commit_sha, concepts.frontmatter, concepts.type
       FROM concepts
-      JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id
-        AND workspace_index_state.indexed_commit_sha = concepts.commit_sha
-      WHERE concepts.workspace_id = ${actor.workspaceId} AND concepts.path = ${path}
+      JOIN project_index_state ON project_index_state.project_id = concepts.project_id
+        AND project_index_state.indexed_commit_sha = concepts.commit_sha
+      WHERE concepts.project_id = ${actor.projectId} AND concepts.path = ${path}
         AND concepts.status = 'stable'
     `;
     if (!concept) throw new DomainError('Concept not found');
     const markdown = await readFileAtCommit(
       this.config.CORPUS_PATH,
-      actor.workspaceSlug,
+      actor.projectSlug,
       path,
       concept.commit_sha
     );
@@ -104,7 +104,7 @@ export class OkfRepository {
     requirePermission(actor, 'read');
     const path = validateOkfPath(pathInput);
 
-    return history(this.config.CORPUS_PATH, actor.workspaceSlug, path);
+    return history(this.config.CORPUS_PATH, actor.projectSlug, path);
   }
 
   async reviseConcept(
@@ -194,15 +194,15 @@ export class OkfRepository {
     }
   ): Promise<Record<string, unknown>[]> {
     requirePermission(actor, 'read');
-    const rows = await searchWorkspace({
+    const rows = await searchProject({
       ...input,
       embeddings: this.embeddings,
       sql: this.sql,
-      workspaceId: actor.workspaceId,
+      projectId: actor.projectId,
     });
     await this.sql`
-      INSERT INTO events (workspace_id, actor_id, event_type, metadata)
-      VALUES (${actor.workspaceId}, ${actor.id}, 'search',
+      INSERT INTO events (project_id, actor_id, event_type, metadata)
+      VALUES (${actor.projectId}, ${actor.id}, 'search',
               ${this.sql.json({ query: input.query, resultCount: rows.length })})
     `;
 
@@ -222,29 +222,29 @@ export class OkfRepository {
       corpusPath: this.config.CORPUS_PATH,
       files: [{ path, text: serializeOkfDocument({ frontmatter, body: body.trim() }) }],
       subject,
-      workspace: actor.workspaceSlug,
+      project: actor.projectSlug,
     });
-    const indexed = await indexWorkspace({
+    const indexed = await indexProject({
       corpusPath: this.config.CORPUS_PATH,
       embeddingModel: this.config.EMBEDDING_MODEL,
       embeddings: this.embeddings,
       sql: this.sql,
-      workspaceId: actor.workspaceId,
-      workspaceSlug: actor.workspaceSlug,
+      projectId: actor.projectId,
+      projectSlug: actor.projectSlug,
     });
     if (!indexed.indexed || indexed.commit !== commit) {
       throw new Error('Concept commit was superseded before indexing completed');
     }
     await this.sql`
-      INSERT INTO events (workspace_id, actor_id, event_type, metadata)
-      VALUES (${actor.workspaceId}, ${actor.id}, ${eventType}, ${this.sql.json({ path, commit })})
+      INSERT INTO events (project_id, actor_id, event_type, metadata)
+      VALUES (${actor.projectId}, ${actor.id}, ${eventType}, ${this.sql.json({ path, commit })})
     `;
 
     return { chunks: indexed.chunks, commit, path };
   }
 
   private async currentDocument(actor: Actor, path: string) {
-    const markdown = await readFileAtCommit(this.config.CORPUS_PATH, actor.workspaceSlug, path);
+    const markdown = await readFileAtCommit(this.config.CORPUS_PATH, actor.projectSlug, path);
     const document = parseOkfDocument(markdown);
 
     return { body: document.body, frontmatter: document.frontmatter };

@@ -5,11 +5,11 @@ import {
   listConceptPaths,
   readFileAtCommit,
 } from '@commonwealth/corpus';
-import { indexWorkspace } from '@commonwealth/corpus/indexer';
+import { indexProject } from '@commonwealth/corpus/indexer';
 import { parseOkfDocument, serializeOkfDocument, validateOkfPath } from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
-import { requireMember, type Scoped, validateScope, validateWorkspace } from './authorize.js';
-import { conceptVersion, inspectWorkspace } from './concept-inspection.js';
+import { requireMember, type Scoped, validateProject, validateScope } from './authorize.js';
+import { conceptVersion, inspectProject } from './concept-inspection.js';
 import { client, indexClient } from './db.js';
 import { embeddingModel, embeddings } from './pipeline.js';
 
@@ -45,7 +45,7 @@ function actorName(userId: string): string {
 function pathInput(value: unknown): Scoped<{ path: string }> {
   const path = (value as { path?: string })?.path;
   if (typeof path !== 'string') throw new Error('Invalid concept path');
-  return { workspace: validateWorkspace(value), path: validateOkfPath(path) };
+  return { project: validateProject(value), path: validateOkfPath(path) };
 }
 
 function versionInput(value: unknown): Scoped<{ commit: string; path: string }> {
@@ -82,7 +82,7 @@ function retrievalInput(value: unknown): Scoped<{
   }
 
   return {
-    workspace: validateWorkspace(value),
+    project: validateProject(value),
     authority: optionalAuthority(input.authority),
     limit: input.limit as number,
     query,
@@ -111,20 +111,20 @@ export const listConcepts = createServerFn({ method: 'GET' })
   .validator((value: unknown): Scoped<{ authority: Authority | null; type: string | null }> => {
     const input = (value ?? {}) as Record<string, unknown>;
     return {
-      workspace: validateWorkspace(value),
+      project: validateProject(value),
       authority: optionalAuthority(input.authority),
       type: optionalText(input.type, 'type'),
     };
   })
   .handler(async ({ data }) => {
-    const { workspaceId } = await requireMember('read', data.workspace);
+    const { projectId } = await requireMember('read', data.project);
     return client`
       SELECT concepts.path, concepts.commit_sha, concepts.type, concepts.title, concepts.tags,
              concepts.authority, concepts.generated_by, concepts.generated_at
       FROM concepts
-      JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id
-        AND workspace_index_state.indexed_commit_sha = concepts.commit_sha
-      WHERE concepts.workspace_id = ${workspaceId} AND concepts.status = 'stable'
+      JOIN project_index_state ON project_index_state.project_id = concepts.project_id
+        AND project_index_state.indexed_commit_sha = concepts.commit_sha
+      WHERE concepts.project_id = ${projectId} AND concepts.status = 'stable'
         AND (${data.authority}::text IS NULL OR concepts.authority = ${data.authority})
         AND (${data.type}::text IS NULL OR concepts.type = ${data.type})
       ORDER BY concepts.path
@@ -141,7 +141,7 @@ export const searchConcepts = createServerFn({ method: 'GET' })
       const query = optionalText(input.query, 'search');
       if (!query || query.length > 200) throw new Error('Invalid search');
       return {
-        workspace: validateWorkspace(value),
+        project: validateProject(value),
         authority: optionalAuthority(input.authority),
         query,
         type: optionalText(input.type, 'type'),
@@ -149,27 +149,27 @@ export const searchConcepts = createServerFn({ method: 'GET' })
     }
   )
   .handler(async ({ data }) => {
-    const { workspaceId } = await requireMember('read', data.workspace);
+    const { projectId } = await requireMember('read', data.project);
     return client`
       WITH terms AS (SELECT websearch_to_tsquery('english', ${data.query}) AS value)
       SELECT concepts.path, concepts.commit_sha, concepts.type, concepts.title, concepts.tags,
              concepts.authority, concepts.generated_by, concepts.generated_at,
              body.excerpt
       FROM concepts
-      JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id
-        AND workspace_index_state.indexed_commit_sha = concepts.commit_sha
+      JOIN project_index_state ON project_index_state.project_id = concepts.project_id
+        AND project_index_state.indexed_commit_sha = concepts.commit_sha
       CROSS JOIN terms
       LEFT JOIN LATERAL (
         SELECT ts_headline('english', concept_chunks.content, terms.value,
           'MaxFragments=1, MaxWords=28, MinWords=12, StartSel=\x02, StopSel=\x03') AS excerpt
         FROM concept_chunks
-        WHERE concept_chunks.workspace_id = concepts.workspace_id
+        WHERE concept_chunks.project_id = concepts.project_id
           AND concept_chunks.concept_path = concepts.path AND concept_chunks.commit_sha = concepts.commit_sha
           AND concept_chunks.search_vector @@ terms.value
         ORDER BY ts_rank_cd(concept_chunks.search_vector, terms.value) DESC
         LIMIT 1
       ) AS body ON true
-      WHERE concepts.workspace_id = ${workspaceId} AND concepts.status = 'stable'
+      WHERE concepts.project_id = ${projectId} AND concepts.status = 'stable'
         AND (${data.authority}::text IS NULL OR concepts.authority = ${data.authority})
         AND (${data.type}::text IS NULL OR concepts.type = ${data.type})
         AND (body.excerpt IS NOT NULL OR strpos(lower(COALESCE(concepts.title, '')), lower(${data.query})) > 0)
@@ -181,7 +181,7 @@ export const searchConcepts = createServerFn({ method: 'GET' })
 export const getConceptDetail = createServerFn({ method: 'GET' })
   .validator(pathInput)
   .handler(async ({ data }) => {
-    const membership = await requireMember('read', data.workspace);
+    const membership = await requireMember('read', data.project);
     const [concept] = await client<
       {
         commit_sha: string;
@@ -199,12 +199,12 @@ export const getConceptDetail = createServerFn({ method: 'GET' })
       SELECT concepts.commit_sha, concepts.path, concepts.frontmatter, concepts.content_hash, concepts.type,
              concepts.title, concepts.tags, concepts.authority, concepts.generated_at, concepts.generated_by
       FROM concepts
-      JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id
-        AND workspace_index_state.indexed_commit_sha = concepts.commit_sha
-      WHERE concepts.workspace_id = ${membership.workspaceId} AND concepts.path = ${data.path}
+      JOIN project_index_state ON project_index_state.project_id = concepts.project_id
+        AND project_index_state.indexed_commit_sha = concepts.commit_sha
+      WHERE concepts.project_id = ${membership.projectId} AND concepts.path = ${data.path}
         AND concepts.status = 'stable'
     `;
-    if (!concept) throw new Error('That concept is not in the indexed workspace commit');
+    if (!concept) throw new Error('That concept is not in the indexed project commit');
     const markdown = await readFileAtCommit(
       corpusPath(),
       membership.slug,
@@ -222,14 +222,14 @@ export const getConceptDetail = createServerFn({ method: 'GET' })
   });
 
 /* A source mutation immediately refreshes this list. POST avoids the browser
-   serving an earlier history response for the same workspace/path URL. */
+   serving an earlier history response for the same project/path URL. */
 export const getConceptHistory = createServerFn({ method: 'POST' })
   .validator(pathInput)
   .handler(async ({ data }) => {
-    const membership = await requireMember('read', data.workspace);
+    const membership = await requireMember('read', data.project);
     const entries = await history(corpusPath(), membership.slug, data.path);
     const [state] = await client<{ indexed_commit_sha: string | null }[]>`
-      SELECT indexed_commit_sha FROM workspace_index_state WHERE workspace_id = ${membership.workspaceId}
+      SELECT indexed_commit_sha FROM project_index_state WHERE project_id = ${membership.projectId}
     `;
     if (
       !state?.indexed_commit_sha ||
@@ -244,15 +244,15 @@ export const getConceptHistory = createServerFn({ method: 'POST' })
 export const getConceptVersion = createServerFn({ method: 'GET' })
   .validator(versionInput)
   .handler(async ({ data }) => {
-    const membership = await requireMember('read', data.workspace);
-    return conceptVersion({ ...data, corpusPath: corpusPath(), workspace: membership.slug });
+    const membership = await requireMember('read', data.project);
+    return conceptVersion({ ...data, corpusPath: corpusPath(), project: membership.slug });
   });
 
 export const inspectRetrieval = createServerFn({ method: 'GET' })
   .validator(retrievalInput)
   .handler(async ({ data }) => {
-    const { workspaceId } = await requireMember('read', data.workspace);
-    return inspectWorkspace({
+    const { projectId } = await requireMember('read', data.project);
+    return inspectProject({
       authority: data.authority ?? undefined,
       embeddings: embeddings(),
       limit: data.limit,
@@ -260,31 +260,31 @@ export const inspectRetrieval = createServerFn({ method: 'GET' })
       sql: client,
       tags: data.tags,
       type: data.type ?? undefined,
-      workspaceId,
+      projectId,
     });
   });
 
 export const listReviewQueue = createServerFn({ method: 'GET' })
   .validator(validateScope)
   .handler(async ({ data }) => {
-    const { workspaceId } = await requireMember('read', data.workspace);
-    return reviewQueue(workspaceId);
+    const { projectId } = await requireMember('read', data.project);
+    return reviewQueue(projectId);
   });
 
 export const getNavCounts = createServerFn({ method: 'GET' })
   .validator(validateScope)
   .handler(async ({ data }) => {
-    const { workspaceId } = await requireMember('read', data.workspace);
+    const { projectId } = await requireMember('read', data.project);
     const [row] = await client<
       { identities: string; people: string; sources: string; review: string }[]
     >`
       SELECT
-        (SELECT count(*) FROM users WHERE workspace_id = ${workspaceId}) AS identities,
-        (SELECT count(*) FROM member WHERE workspace_id = ${workspaceId}) AS people,
-        (SELECT count(*) FROM concepts JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id AND workspace_index_state.indexed_commit_sha = concepts.commit_sha WHERE concepts.workspace_id = ${workspaceId} AND concepts.status = 'stable') AS sources,
+        (SELECT count(*) FROM users WHERE project_id = ${projectId}) AS identities,
+        (SELECT count(*) FROM member WHERE project_id = ${projectId}) AS people,
+        (SELECT count(*) FROM concepts JOIN project_index_state ON project_index_state.project_id = concepts.project_id AND project_index_state.indexed_commit_sha = concepts.commit_sha WHERE concepts.project_id = ${projectId} AND concepts.status = 'stable') AS sources,
         0 AS review
     `;
-    const review = (await reviewQueue(workspaceId)).length;
+    const review = (await reviewQueue(projectId)).length;
     return {
       identities: Number(row?.identities ?? 0),
       people: Number(row?.people ?? 0),
@@ -296,8 +296,8 @@ export const getNavCounts = createServerFn({ method: 'GET' })
 export const getRegisterSummary = createServerFn({ method: 'GET' })
   .validator(validateScope)
   .handler(async ({ data }) => {
-    const { workspaceId } = await requireMember('read', data.workspace);
-    const rows = await reviewQueue(workspaceId);
+    const { projectId } = await requireMember('read', data.project);
+    const rows = await reviewQueue(projectId);
     const [row] = await client<
       {
         canonical: string;
@@ -307,10 +307,10 @@ export const getRegisterSummary = createServerFn({ method: 'GET' })
       }[]
     >`
       SELECT
-        (SELECT count(*) FROM concepts JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id AND workspace_index_state.indexed_commit_sha = concepts.commit_sha WHERE concepts.workspace_id = ${workspaceId} AND concepts.status = 'stable' AND concepts.authority = 'canonical') AS canonical,
-        (SELECT count(*) FROM concept_chunks JOIN workspace_index_state ON workspace_index_state.workspace_id = concept_chunks.workspace_id AND workspace_index_state.indexed_commit_sha = concept_chunks.commit_sha WHERE concept_chunks.workspace_id = ${workspaceId}) AS chunks,
-        (SELECT max(NULLIF(concepts.frontmatter #>> '{verified,-1,at}', '')::timestamptz) FROM concepts JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id AND workspace_index_state.indexed_commit_sha = concepts.commit_sha WHERE concepts.workspace_id = ${workspaceId} AND concepts.status = 'stable') AS last_verified,
-        (SELECT max(created_at) FROM events WHERE workspace_id = ${workspaceId} AND event_type = 'search') AS last_retrieved
+        (SELECT count(*) FROM concepts JOIN project_index_state ON project_index_state.project_id = concepts.project_id AND project_index_state.indexed_commit_sha = concepts.commit_sha WHERE concepts.project_id = ${projectId} AND concepts.status = 'stable' AND concepts.authority = 'canonical') AS canonical,
+        (SELECT count(*) FROM concept_chunks JOIN project_index_state ON project_index_state.project_id = concept_chunks.project_id AND project_index_state.indexed_commit_sha = concept_chunks.commit_sha WHERE concept_chunks.project_id = ${projectId}) AS chunks,
+        (SELECT max(NULLIF(concepts.frontmatter #>> '{verified,-1,at}', '')::timestamptz) FROM concepts JOIN project_index_state ON project_index_state.project_id = concepts.project_id AND project_index_state.indexed_commit_sha = concepts.commit_sha WHERE concepts.project_id = ${projectId} AND concepts.status = 'stable') AS last_verified,
+        (SELECT max(created_at) FROM events WHERE project_id = ${projectId} AND event_type = 'search') AS last_retrieved
     `;
     return {
       unverified: rows.filter((concept) => concept.is_unverified).length,
@@ -327,10 +327,10 @@ export const listEvents = createServerFn({ method: 'GET' })
   .validator((value: unknown): Scoped<{ eventType: string | null }> => {
     const eventType = optionalText((value as Record<string, unknown>).eventType, 'event type');
     if (eventType && !/^[a-z_]{1,64}$/.test(eventType)) throw new Error('Invalid event type');
-    return { workspace: validateWorkspace(value), eventType };
+    return { project: validateProject(value), eventType };
   })
   .handler(async ({ data }) => {
-    const { workspaceId } = await requireMember('read', data.workspace);
+    const { projectId } = await requireMember('read', data.project);
     const rows = await client`
       SELECT events.id, events.event_type, events.metadata, events.created_at,
              events.metadata ->> 'path' AS concept_path,
@@ -338,7 +338,7 @@ export const listEvents = createServerFn({ method: 'GET' })
       FROM events
       LEFT JOIN users AS agent ON agent.id = events.actor_id
       LEFT JOIN "user" AS administrator ON administrator.id = events.actor_admin_id
-      WHERE events.workspace_id = ${workspaceId}
+      WHERE events.project_id = ${projectId}
         AND (${data.eventType}::text IS NULL OR events.event_type = ${data.eventType})
       ORDER BY events.created_at DESC, events.id DESC LIMIT ${PAGE_SIZE + 1}
     `;
@@ -348,15 +348,15 @@ export const listEvents = createServerFn({ method: 'GET' })
 export const listEventTypes = createServerFn({ method: 'GET' })
   .validator(validateScope)
   .handler(async ({ data }) => {
-    const { workspaceId } = await requireMember('read', data.workspace);
+    const { projectId } = await requireMember('read', data.project);
     const rows = await client<{ event_type: string; count: string }[]>`
-      SELECT event_type, count(*) AS count FROM events WHERE workspace_id = ${workspaceId}
+      SELECT event_type, count(*) AS count FROM events WHERE project_id = ${projectId}
       GROUP BY event_type ORDER BY event_type
     `;
     return rows.map((row) => ({ eventType: row.event_type, count: Number(row.count) }));
   });
 
-async function reviewQueue(workspaceId: string) {
+async function reviewQueue(projectId: string) {
   const rows = await client<
     Array<{
       path: string;
@@ -373,9 +373,9 @@ async function reviewQueue(workspaceId: string) {
            concepts.generated_at, concepts.frontmatter,
            concepts.generated_at > NULLIF(concepts.frontmatter #>> '{verified,-1,at}', '')::timestamptz AS is_stale
     FROM concepts
-    JOIN workspace_index_state ON workspace_index_state.workspace_id = concepts.workspace_id
-      AND workspace_index_state.indexed_commit_sha = concepts.commit_sha
-    WHERE concepts.workspace_id = ${workspaceId} AND concepts.status = 'stable'
+    JOIN project_index_state ON project_index_state.project_id = concepts.project_id
+      AND project_index_state.indexed_commit_sha = concepts.commit_sha
+    WHERE concepts.project_id = ${projectId} AND concepts.status = 'stable'
     ORDER BY concepts.path
   `;
   return rows
@@ -409,21 +409,21 @@ async function commitAndIndex(
     corpusPath: corpusPath(),
     files: [{ path, text: serializeOkfDocument({ frontmatter, body: body.trim() }) }],
     subject,
-    workspace: membership.slug,
+    project: membership.slug,
   });
-  const indexed = await indexWorkspace({
+  const indexed = await indexProject({
     corpusPath: corpusPath(),
     embeddingModel: embeddingModel(),
     embeddings: embeddings(),
     sql: indexClient,
-    workspaceId: membership.workspaceId,
-    workspaceSlug: membership.slug,
+    projectId: membership.projectId,
+    projectSlug: membership.slug,
   });
   if (!indexed.indexed || indexed.commit !== commit)
     throw new Error('Concept commit was superseded before indexing completed');
   await client`
-    INSERT INTO events (workspace_id, actor_admin_id, event_type, metadata)
-    VALUES (${membership.workspaceId}, ${membership.userId}, ${eventType}, ${JSON.stringify({ path, commit })}::jsonb)
+    INSERT INTO events (project_id, actor_admin_id, event_type, metadata)
+    VALUES (${membership.projectId}, ${membership.userId}, ${eventType}, ${JSON.stringify({ path, commit })}::jsonb)
   `;
   return { chunks: indexed.chunks, commit, path };
 }
@@ -441,7 +441,7 @@ export const createConcept = createServerFn({ method: 'POST' })
       if (!markdown || !title || !type || !path)
         throw new Error('A path, type, title, and Markdown are required.');
       return {
-        workspace: validateWorkspace(value),
+        project: validateProject(value),
         markdown,
         path,
         tags: tags(input.tags),
@@ -451,7 +451,7 @@ export const createConcept = createServerFn({ method: 'POST' })
     }
   )
   .handler(async ({ data }) => {
-    const membership = await requireMember('write', data.workspace);
+    const membership = await requireMember('write', data.project);
     if ((await listConceptPaths(corpusPath(), membership.slug)).includes(data.path))
       throw new Error('A concept already exists at that path');
     const now = new Date().toISOString();
@@ -479,10 +479,10 @@ export const reviseConcept = createServerFn({ method: 'POST' })
     const title = optionalText(input.title, 'title');
     const path = typeof input.path === 'string' ? validateOkfPath(input.path) : null;
     if (!markdown || !title || !path) throw new Error('A path, title, and Markdown are required.');
-    return { workspace: validateWorkspace(value), markdown, path, title };
+    return { project: validateProject(value), markdown, path, title };
   })
   .handler(async ({ data }) => {
-    const membership = await requireMember('write', data.workspace);
+    const membership = await requireMember('write', data.project);
     const text = await readFileAtCommit(corpusPath(), membership.slug, data.path);
     const document = parseOkfDocument(text);
     if (
@@ -516,10 +516,10 @@ export const verifyConcept = createServerFn({ method: 'POST' })
     const authority = optionalAuthority(input.authority);
     const path = typeof input.path === 'string' ? validateOkfPath(input.path) : null;
     if (!authority || !path) throw new Error('A path and authority are required.');
-    return { workspace: validateWorkspace(value), authority, path };
+    return { project: validateProject(value), authority, path };
   })
   .handler(async ({ data }) => {
-    const membership = await requireMember('review', data.workspace);
+    const membership = await requireMember('review', data.project);
     const text = await readFileAtCommit(corpusPath(), membership.slug, data.path);
     const document = parseOkfDocument(text);
     const verified = Array.isArray(document.frontmatter.verified)
@@ -549,7 +549,7 @@ export const verifyConcept = createServerFn({ method: 'POST' })
 export const deprecateConcept = createServerFn({ method: 'POST' })
   .validator(pathInput)
   .handler(async ({ data }) => {
-    const membership = await requireMember('review', data.workspace);
+    const membership = await requireMember('review', data.project);
     const text = await readFileAtCommit(corpusPath(), membership.slug, data.path);
     const document = parseOkfDocument(text);
     return commitAndIndex(

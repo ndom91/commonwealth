@@ -183,7 +183,7 @@
      row with slack to spare.
 
      A long holder name (`Dashboard Smoker` wants 326px) still wraps. Sizing the
-     whole column to the longest name in the workspace would cost the bench
+     whole column to the longest name in the project would cost the bench
      ~60px on every screen to save one row two lines — that is what wrapping is
      for. */
   --index: 420px;
@@ -329,7 +329,7 @@ select {
    and so obviously the thing you press. It is not — a reader had to stumble onto
    the switcher to learn it existed, which is a poor way to find out you are
    looking at the wrong corpus. What replaces it is a group mark and a hover
-   label, neither of which is a triangle: the mark names *workspaces* rather than
+   label, neither of which is a triangle: the mark names *projects* rather than
    announcing a menu, and it does not rotate on open. */
 .cabinet__switch {
   position: relative;
@@ -352,7 +352,7 @@ select {
 /* Sits under the plate rather than over the rail: the rail is narrow, and a
    floating panel would either clip against it or cover the drawers the reader
    is about to compare against. */
-.cabinet__workspaces {
+.cabinet__projects {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -364,14 +364,14 @@ select {
   margin: calc(var(--s-section) * -1 + var(--s-snug)) var(--s-base) var(--s-loose);
 }
 
-.cabinet__workspaces .label {
+.cabinet__projects .label {
   padding: var(--s-hair) 2px;
   color: var(--ink-3);
 }
 
 /* Inset to 2px so the names start on the same vertical as SWITCH TO above and
    the drawer icons below, rather than in a third column of their own. */
-.cabinet__workspace {
+.cabinet__project {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -383,12 +383,12 @@ select {
   text-decoration: none;
 }
 
-.cabinet__workspace:hover {
+.cabinet__project:hover {
   box-shadow: inset 0 0 0 100px var(--row-hover);
   color: var(--ink);
 }
 
-.cabinet__workspace-role {
+.cabinet__project-role {
   color: var(--ink-dormant);
   font-size: 11px;
   letter-spacing: 0.04em;
@@ -642,7 +642,7 @@ select {
 
    Only the left edge moves. The masthead's actions sit above the bench, which
    keeps the gutter, so the right edge still agrees with what is under it.
-   Single-column pages — Activity, the Workspace tab — keep the gutter on both
+   Single-column pages — Activity, the Project tab — keep the gutter on both
    sides, because there the thing below the masthead is gutter-inset too.
 
    **A tabbed section is exempt, even where it splits.** Identities is the only
@@ -2262,7 +2262,7 @@ select {
      the panel under, so the negative pull that closes that gap on the wide
      layout would drag the switcher up over the plate. Sit it below instead,
      and let it take the plate's own measure rather than the rail's. */
-  .cabinet__workspaces {
+  .cabinet__projects {
     width: fit-content;
     min-width: 200px;
     margin: calc(var(--s-base) * -1 + var(--s-hair)) var(--s-base) var(--s-base);
@@ -2377,7 +2377,7 @@ select {
 }
 
 /* ── Activity log ───────────────────────────────────────────────────────────
-   One workspace-wide register of what happened, newest first. Four columns:
+   One project-wide register of what happened, newest first. Four columns:
    when, what, to which source, by whom. */
 .log {
   min-width: 0;

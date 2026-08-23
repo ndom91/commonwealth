@@ -13,7 +13,7 @@ import {
   readFileAtCommit,
 } from './corpus.js';
 
-test('initializes, commits, and reads a workspace OKF bundle', async () => {
+test('initializes, commits, and reads a project OKF bundle', async () => {
   const corpusPath = await mkdtemp(join(tmpdir(), 'commonwealth-corpus-test-'));
   try {
     const repository = await ensureRepository(corpusPath, 'core-team');
@@ -27,7 +27,7 @@ test('initializes, commits, and reads a workspace OKF bundle', async () => {
         },
       ],
       subject: 'Create playbooks/deploy.md',
-      workspace: 'core-team',
+      project: 'core-team',
     });
 
     assert.match(repository, /core-team$/);
@@ -47,7 +47,7 @@ test('initializes, commits, and reads a workspace OKF bundle', async () => {
   }
 });
 
-test('refuses paths that can leave a workspace bundle', async () => {
+test('refuses paths that can leave a project bundle', async () => {
   const corpusPath = await mkdtemp(join(tmpdir(), 'commonwealth-corpus-test-'));
   try {
     await assert.rejects(
@@ -57,7 +57,7 @@ test('refuses paths that can leave a workspace bundle', async () => {
           corpusPath,
           files: [{ path: '../escape.md', text: '---\ntype: Reference\n---\n' }],
           subject: 'Escape',
-          workspace: 'core-team',
+          project: 'core-team',
         }),
       /path is invalid/
     );

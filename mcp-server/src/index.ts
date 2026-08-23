@@ -117,7 +117,7 @@ function serverFor(actor: Actor): McpServer {
     'get_concept',
     {
       description:
-        'Get the full OKF Markdown document and frontmatter from the indexed workspace commit.',
+        'Get the full OKF Markdown document and frontmatter from the indexed project commit.',
       inputSchema: input({ path: nonEmpty }),
       annotations: { readOnlyHint: true },
     },
@@ -162,7 +162,7 @@ function serverFor(actor: Actor): McpServer {
     'deprecate_concept',
     {
       description:
-        'Mark an OKF concept deprecated and remove it from the indexed workspace snapshot.',
+        'Mark an OKF concept deprecated and remove it from the indexed project snapshot.',
       inputSchema: input({ path: nonEmpty }),
     },
     async ({ path }) => runTool('deprecate_concept', () => okf.deprecateConcept(actor, path))

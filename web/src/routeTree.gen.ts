@@ -10,37 +10,37 @@
 
 import { Route as rootRouteImport } from './app/__root'
 import { Route as IndexRouteImport } from './app/index'
-import { Route as ArchivedWorkspacesRouteImport } from './app/archived-workspaces'
+import { Route as ArchivedProjectsRouteImport } from './app/archived-projects'
 import { Route as DashboardRouteImport } from './app/dashboard'
 import { Route as SettingsRouteImport } from './app/settings'
 import { Route as SignInRouteImport } from './app/sign-in'
 import { Route as InviteTokenRouteImport } from './app/invite.$token'
-import { Route as WSlugRouteImport } from './app/w/$slug'
+import { Route as PSlugRouteImport } from './app/p/$slug'
 import { Route as ApiAuthSplatRouteImport } from './app/api/auth/$'
-import { Route as WSlugAccountRouteImport } from './app/w/$slug/account'
-import { Route as WSlugActivityRouteImport } from './app/w/$slug/activity'
-import { Route as WSlugReviewRouteImport } from './app/w/$slug/review'
-import { Route as WSlugSettingsRouteImport } from './app/w/$slug/settings'
-import { Route as WSlugSourcesRouteImport } from './app/w/$slug/sources'
-import { Route as WSlugSettingsIndexRouteImport } from './app/w/$slug/settings/index'
-import { Route as WSlugSettingsIdentitiesRouteImport } from './app/w/$slug/settings/identities'
-import { Route as WSlugSettingsPeopleRouteImport } from './app/w/$slug/settings/people'
-import { Route as WSlugSettingsWorkspaceRouteImport } from './app/w/$slug/settings/workspace'
-import { Route as WSlugSourcesIndexRouteImport } from './app/w/$slug/sources/index'
-import { Route as WSlugSourcesPathRouteImport } from './app/w/$slug/sources/$path'
-import { Route as WSlugSourcesInspectRouteImport } from './app/w/$slug/sources/inspect'
-import { Route as WSlugSourcesNewRouteImport } from './app/w/$slug/sources/new'
-import { Route as WSlugSettingsIdentitiesIndexRouteImport } from './app/w/$slug/settings/identities/index'
-import { Route as WSlugSettingsIdentitiesIdentityIdRouteImport } from './app/w/$slug/settings/identities/$identityId'
+import { Route as PSlugAccountRouteImport } from './app/p/$slug/account'
+import { Route as PSlugActivityRouteImport } from './app/p/$slug/activity'
+import { Route as PSlugReviewRouteImport } from './app/p/$slug/review'
+import { Route as PSlugSettingsRouteImport } from './app/p/$slug/settings'
+import { Route as PSlugSourcesRouteImport } from './app/p/$slug/sources'
+import { Route as PSlugSettingsIndexRouteImport } from './app/p/$slug/settings/index'
+import { Route as PSlugSettingsIdentitiesRouteImport } from './app/p/$slug/settings/identities'
+import { Route as PSlugSettingsPeopleRouteImport } from './app/p/$slug/settings/people'
+import { Route as PSlugSettingsProjectRouteImport } from './app/p/$slug/settings/project'
+import { Route as PSlugSourcesIndexRouteImport } from './app/p/$slug/sources/index'
+import { Route as PSlugSourcesPathRouteImport } from './app/p/$slug/sources/$path'
+import { Route as PSlugSourcesInspectRouteImport } from './app/p/$slug/sources/inspect'
+import { Route as PSlugSourcesNewRouteImport } from './app/p/$slug/sources/new'
+import { Route as PSlugSettingsIdentitiesIndexRouteImport } from './app/p/$slug/settings/identities/index'
+import { Route as PSlugSettingsIdentitiesIdentityIdRouteImport } from './app/p/$slug/settings/identities/$identityId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ArchivedWorkspacesRoute = ArchivedWorkspacesRouteImport.update({
-  id: '/archived-workspaces',
-  path: '/archived-workspaces',
+const ArchivedProjectsRoute = ArchivedProjectsRouteImport.update({
+  id: '/archived-projects',
+  path: '/archived-projects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -63,9 +63,9 @@ const InviteTokenRoute = InviteTokenRouteImport.update({
   path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WSlugRoute = WSlugRouteImport.update({
-  id: '/w/$slug',
-  path: '/w/$slug',
+const PSlugRoute = PSlugRouteImport.update({
+  id: '/p/$slug',
+  path: '/p/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -73,240 +73,240 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WSlugAccountRoute = WSlugAccountRouteImport.update({
+const PSlugAccountRoute = PSlugAccountRouteImport.update({
   id: '/account',
   path: '/account',
-  getParentRoute: () => WSlugRoute,
+  getParentRoute: () => PSlugRoute,
 } as any)
-const WSlugActivityRoute = WSlugActivityRouteImport.update({
+const PSlugActivityRoute = PSlugActivityRouteImport.update({
   id: '/activity',
   path: '/activity',
-  getParentRoute: () => WSlugRoute,
+  getParentRoute: () => PSlugRoute,
 } as any)
-const WSlugReviewRoute = WSlugReviewRouteImport.update({
+const PSlugReviewRoute = PSlugReviewRouteImport.update({
   id: '/review',
   path: '/review',
-  getParentRoute: () => WSlugRoute,
+  getParentRoute: () => PSlugRoute,
 } as any)
-const WSlugSettingsRoute = WSlugSettingsRouteImport.update({
+const PSlugSettingsRoute = PSlugSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => WSlugRoute,
+  getParentRoute: () => PSlugRoute,
 } as any)
-const WSlugSourcesRoute = WSlugSourcesRouteImport.update({
+const PSlugSourcesRoute = PSlugSourcesRouteImport.update({
   id: '/sources',
   path: '/sources',
-  getParentRoute: () => WSlugRoute,
+  getParentRoute: () => PSlugRoute,
 } as any)
-const WSlugSettingsIndexRoute = WSlugSettingsIndexRouteImport.update({
+const PSlugSettingsIndexRoute = PSlugSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => WSlugSettingsRoute,
+  getParentRoute: () => PSlugSettingsRoute,
 } as any)
-const WSlugSettingsIdentitiesRoute = WSlugSettingsIdentitiesRouteImport.update({
+const PSlugSettingsIdentitiesRoute = PSlugSettingsIdentitiesRouteImport.update({
   id: '/identities',
   path: '/identities',
-  getParentRoute: () => WSlugSettingsRoute,
+  getParentRoute: () => PSlugSettingsRoute,
 } as any)
-const WSlugSettingsPeopleRoute = WSlugSettingsPeopleRouteImport.update({
+const PSlugSettingsPeopleRoute = PSlugSettingsPeopleRouteImport.update({
   id: '/people',
   path: '/people',
-  getParentRoute: () => WSlugSettingsRoute,
+  getParentRoute: () => PSlugSettingsRoute,
 } as any)
-const WSlugSettingsWorkspaceRoute = WSlugSettingsWorkspaceRouteImport.update({
-  id: '/workspace',
-  path: '/workspace',
-  getParentRoute: () => WSlugSettingsRoute,
+const PSlugSettingsProjectRoute = PSlugSettingsProjectRouteImport.update({
+  id: '/project',
+  path: '/project',
+  getParentRoute: () => PSlugSettingsRoute,
 } as any)
-const WSlugSourcesIndexRoute = WSlugSourcesIndexRouteImport.update({
+const PSlugSourcesIndexRoute = PSlugSourcesIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => WSlugSourcesRoute,
+  getParentRoute: () => PSlugSourcesRoute,
 } as any)
-const WSlugSourcesPathRoute = WSlugSourcesPathRouteImport.update({
+const PSlugSourcesPathRoute = PSlugSourcesPathRouteImport.update({
   id: '/$path',
   path: '/$path',
-  getParentRoute: () => WSlugSourcesRoute,
+  getParentRoute: () => PSlugSourcesRoute,
 } as any)
-const WSlugSourcesInspectRoute = WSlugSourcesInspectRouteImport.update({
+const PSlugSourcesInspectRoute = PSlugSourcesInspectRouteImport.update({
   id: '/inspect',
   path: '/inspect',
-  getParentRoute: () => WSlugSourcesRoute,
+  getParentRoute: () => PSlugSourcesRoute,
 } as any)
-const WSlugSourcesNewRoute = WSlugSourcesNewRouteImport.update({
+const PSlugSourcesNewRoute = PSlugSourcesNewRouteImport.update({
   id: '/new',
   path: '/new',
-  getParentRoute: () => WSlugSourcesRoute,
+  getParentRoute: () => PSlugSourcesRoute,
 } as any)
-const WSlugSettingsIdentitiesIndexRoute =
-  WSlugSettingsIdentitiesIndexRouteImport.update({
+const PSlugSettingsIdentitiesIndexRoute =
+  PSlugSettingsIdentitiesIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => WSlugSettingsIdentitiesRoute,
+    getParentRoute: () => PSlugSettingsIdentitiesRoute,
   } as any)
-const WSlugSettingsIdentitiesIdentityIdRoute =
-  WSlugSettingsIdentitiesIdentityIdRouteImport.update({
+const PSlugSettingsIdentitiesIdentityIdRoute =
+  PSlugSettingsIdentitiesIdentityIdRouteImport.update({
     id: '/$identityId',
     path: '/$identityId',
-    getParentRoute: () => WSlugSettingsIdentitiesRoute,
+    getParentRoute: () => PSlugSettingsIdentitiesRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/archived-workspaces': typeof ArchivedWorkspacesRoute
+  '/archived-projects': typeof ArchivedProjectsRoute
   '/dashboard': typeof DashboardRoute
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/invite/$token': typeof InviteTokenRoute
-  '/w/$slug': typeof WSlugRouteWithChildren
+  '/p/$slug': typeof PSlugRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/w/$slug/account': typeof WSlugAccountRoute
-  '/w/$slug/activity': typeof WSlugActivityRoute
-  '/w/$slug/review': typeof WSlugReviewRoute
-  '/w/$slug/settings': typeof WSlugSettingsRouteWithChildren
-  '/w/$slug/sources': typeof WSlugSourcesRouteWithChildren
-  '/w/$slug/settings/identities': typeof WSlugSettingsIdentitiesRouteWithChildren
-  '/w/$slug/settings/people': typeof WSlugSettingsPeopleRoute
-  '/w/$slug/settings/workspace': typeof WSlugSettingsWorkspaceRoute
-  '/w/$slug/sources/$path': typeof WSlugSourcesPathRoute
-  '/w/$slug/sources/inspect': typeof WSlugSourcesInspectRoute
-  '/w/$slug/sources/new': typeof WSlugSourcesNewRoute
-  '/w/$slug/settings/': typeof WSlugSettingsIndexRoute
-  '/w/$slug/sources/': typeof WSlugSourcesIndexRoute
-  '/w/$slug/settings/identities/$identityId': typeof WSlugSettingsIdentitiesIdentityIdRoute
-  '/w/$slug/settings/identities/': typeof WSlugSettingsIdentitiesIndexRoute
+  '/p/$slug/account': typeof PSlugAccountRoute
+  '/p/$slug/activity': typeof PSlugActivityRoute
+  '/p/$slug/review': typeof PSlugReviewRoute
+  '/p/$slug/settings': typeof PSlugSettingsRouteWithChildren
+  '/p/$slug/sources': typeof PSlugSourcesRouteWithChildren
+  '/p/$slug/settings/identities': typeof PSlugSettingsIdentitiesRouteWithChildren
+  '/p/$slug/settings/people': typeof PSlugSettingsPeopleRoute
+  '/p/$slug/settings/project': typeof PSlugSettingsProjectRoute
+  '/p/$slug/sources/$path': typeof PSlugSourcesPathRoute
+  '/p/$slug/sources/inspect': typeof PSlugSourcesInspectRoute
+  '/p/$slug/sources/new': typeof PSlugSourcesNewRoute
+  '/p/$slug/settings/': typeof PSlugSettingsIndexRoute
+  '/p/$slug/sources/': typeof PSlugSourcesIndexRoute
+  '/p/$slug/settings/identities/$identityId': typeof PSlugSettingsIdentitiesIdentityIdRoute
+  '/p/$slug/settings/identities/': typeof PSlugSettingsIdentitiesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/archived-workspaces': typeof ArchivedWorkspacesRoute
+  '/archived-projects': typeof ArchivedProjectsRoute
   '/dashboard': typeof DashboardRoute
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/invite/$token': typeof InviteTokenRoute
-  '/w/$slug': typeof WSlugRouteWithChildren
+  '/p/$slug': typeof PSlugRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/w/$slug/account': typeof WSlugAccountRoute
-  '/w/$slug/activity': typeof WSlugActivityRoute
-  '/w/$slug/review': typeof WSlugReviewRoute
-  '/w/$slug/settings/people': typeof WSlugSettingsPeopleRoute
-  '/w/$slug/settings/workspace': typeof WSlugSettingsWorkspaceRoute
-  '/w/$slug/sources/$path': typeof WSlugSourcesPathRoute
-  '/w/$slug/sources/inspect': typeof WSlugSourcesInspectRoute
-  '/w/$slug/sources/new': typeof WSlugSourcesNewRoute
-  '/w/$slug/settings': typeof WSlugSettingsIndexRoute
-  '/w/$slug/sources': typeof WSlugSourcesIndexRoute
-  '/w/$slug/settings/identities/$identityId': typeof WSlugSettingsIdentitiesIdentityIdRoute
-  '/w/$slug/settings/identities': typeof WSlugSettingsIdentitiesIndexRoute
+  '/p/$slug/account': typeof PSlugAccountRoute
+  '/p/$slug/activity': typeof PSlugActivityRoute
+  '/p/$slug/review': typeof PSlugReviewRoute
+  '/p/$slug/settings/people': typeof PSlugSettingsPeopleRoute
+  '/p/$slug/settings/project': typeof PSlugSettingsProjectRoute
+  '/p/$slug/sources/$path': typeof PSlugSourcesPathRoute
+  '/p/$slug/sources/inspect': typeof PSlugSourcesInspectRoute
+  '/p/$slug/sources/new': typeof PSlugSourcesNewRoute
+  '/p/$slug/settings': typeof PSlugSettingsIndexRoute
+  '/p/$slug/sources': typeof PSlugSourcesIndexRoute
+  '/p/$slug/settings/identities/$identityId': typeof PSlugSettingsIdentitiesIdentityIdRoute
+  '/p/$slug/settings/identities': typeof PSlugSettingsIdentitiesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/archived-workspaces': typeof ArchivedWorkspacesRoute
+  '/archived-projects': typeof ArchivedProjectsRoute
   '/dashboard': typeof DashboardRoute
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/invite/$token': typeof InviteTokenRoute
-  '/w/$slug': typeof WSlugRouteWithChildren
+  '/p/$slug': typeof PSlugRouteWithChildren
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/w/$slug/account': typeof WSlugAccountRoute
-  '/w/$slug/activity': typeof WSlugActivityRoute
-  '/w/$slug/review': typeof WSlugReviewRoute
-  '/w/$slug/settings': typeof WSlugSettingsRouteWithChildren
-  '/w/$slug/sources': typeof WSlugSourcesRouteWithChildren
-  '/w/$slug/settings/identities': typeof WSlugSettingsIdentitiesRouteWithChildren
-  '/w/$slug/settings/people': typeof WSlugSettingsPeopleRoute
-  '/w/$slug/settings/workspace': typeof WSlugSettingsWorkspaceRoute
-  '/w/$slug/sources/$path': typeof WSlugSourcesPathRoute
-  '/w/$slug/sources/inspect': typeof WSlugSourcesInspectRoute
-  '/w/$slug/sources/new': typeof WSlugSourcesNewRoute
-  '/w/$slug/settings/': typeof WSlugSettingsIndexRoute
-  '/w/$slug/sources/': typeof WSlugSourcesIndexRoute
-  '/w/$slug/settings/identities/$identityId': typeof WSlugSettingsIdentitiesIdentityIdRoute
-  '/w/$slug/settings/identities/': typeof WSlugSettingsIdentitiesIndexRoute
+  '/p/$slug/account': typeof PSlugAccountRoute
+  '/p/$slug/activity': typeof PSlugActivityRoute
+  '/p/$slug/review': typeof PSlugReviewRoute
+  '/p/$slug/settings': typeof PSlugSettingsRouteWithChildren
+  '/p/$slug/sources': typeof PSlugSourcesRouteWithChildren
+  '/p/$slug/settings/identities': typeof PSlugSettingsIdentitiesRouteWithChildren
+  '/p/$slug/settings/people': typeof PSlugSettingsPeopleRoute
+  '/p/$slug/settings/project': typeof PSlugSettingsProjectRoute
+  '/p/$slug/sources/$path': typeof PSlugSourcesPathRoute
+  '/p/$slug/sources/inspect': typeof PSlugSourcesInspectRoute
+  '/p/$slug/sources/new': typeof PSlugSourcesNewRoute
+  '/p/$slug/settings/': typeof PSlugSettingsIndexRoute
+  '/p/$slug/sources/': typeof PSlugSourcesIndexRoute
+  '/p/$slug/settings/identities/$identityId': typeof PSlugSettingsIdentitiesIdentityIdRoute
+  '/p/$slug/settings/identities/': typeof PSlugSettingsIdentitiesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/archived-workspaces'
+    | '/archived-projects'
     | '/dashboard'
     | '/settings'
     | '/sign-in'
     | '/invite/$token'
-    | '/w/$slug'
+    | '/p/$slug'
     | '/api/auth/$'
-    | '/w/$slug/account'
-    | '/w/$slug/activity'
-    | '/w/$slug/review'
-    | '/w/$slug/settings'
-    | '/w/$slug/sources'
-    | '/w/$slug/settings/identities'
-    | '/w/$slug/settings/people'
-    | '/w/$slug/settings/workspace'
-    | '/w/$slug/sources/$path'
-    | '/w/$slug/sources/inspect'
-    | '/w/$slug/sources/new'
-    | '/w/$slug/settings/'
-    | '/w/$slug/sources/'
-    | '/w/$slug/settings/identities/$identityId'
-    | '/w/$slug/settings/identities/'
+    | '/p/$slug/account'
+    | '/p/$slug/activity'
+    | '/p/$slug/review'
+    | '/p/$slug/settings'
+    | '/p/$slug/sources'
+    | '/p/$slug/settings/identities'
+    | '/p/$slug/settings/people'
+    | '/p/$slug/settings/project'
+    | '/p/$slug/sources/$path'
+    | '/p/$slug/sources/inspect'
+    | '/p/$slug/sources/new'
+    | '/p/$slug/settings/'
+    | '/p/$slug/sources/'
+    | '/p/$slug/settings/identities/$identityId'
+    | '/p/$slug/settings/identities/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/archived-workspaces'
+    | '/archived-projects'
     | '/dashboard'
     | '/settings'
     | '/sign-in'
     | '/invite/$token'
-    | '/w/$slug'
+    | '/p/$slug'
     | '/api/auth/$'
-    | '/w/$slug/account'
-    | '/w/$slug/activity'
-    | '/w/$slug/review'
-    | '/w/$slug/settings/people'
-    | '/w/$slug/settings/workspace'
-    | '/w/$slug/sources/$path'
-    | '/w/$slug/sources/inspect'
-    | '/w/$slug/sources/new'
-    | '/w/$slug/settings'
-    | '/w/$slug/sources'
-    | '/w/$slug/settings/identities/$identityId'
-    | '/w/$slug/settings/identities'
+    | '/p/$slug/account'
+    | '/p/$slug/activity'
+    | '/p/$slug/review'
+    | '/p/$slug/settings/people'
+    | '/p/$slug/settings/project'
+    | '/p/$slug/sources/$path'
+    | '/p/$slug/sources/inspect'
+    | '/p/$slug/sources/new'
+    | '/p/$slug/settings'
+    | '/p/$slug/sources'
+    | '/p/$slug/settings/identities/$identityId'
+    | '/p/$slug/settings/identities'
   id:
     | '__root__'
     | '/'
-    | '/archived-workspaces'
+    | '/archived-projects'
     | '/dashboard'
     | '/settings'
     | '/sign-in'
     | '/invite/$token'
-    | '/w/$slug'
+    | '/p/$slug'
     | '/api/auth/$'
-    | '/w/$slug/account'
-    | '/w/$slug/activity'
-    | '/w/$slug/review'
-    | '/w/$slug/settings'
-    | '/w/$slug/sources'
-    | '/w/$slug/settings/identities'
-    | '/w/$slug/settings/people'
-    | '/w/$slug/settings/workspace'
-    | '/w/$slug/sources/$path'
-    | '/w/$slug/sources/inspect'
-    | '/w/$slug/sources/new'
-    | '/w/$slug/settings/'
-    | '/w/$slug/sources/'
-    | '/w/$slug/settings/identities/$identityId'
-    | '/w/$slug/settings/identities/'
+    | '/p/$slug/account'
+    | '/p/$slug/activity'
+    | '/p/$slug/review'
+    | '/p/$slug/settings'
+    | '/p/$slug/sources'
+    | '/p/$slug/settings/identities'
+    | '/p/$slug/settings/people'
+    | '/p/$slug/settings/project'
+    | '/p/$slug/sources/$path'
+    | '/p/$slug/sources/inspect'
+    | '/p/$slug/sources/new'
+    | '/p/$slug/settings/'
+    | '/p/$slug/sources/'
+    | '/p/$slug/settings/identities/$identityId'
+    | '/p/$slug/settings/identities/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ArchivedWorkspacesRoute: typeof ArchivedWorkspacesRoute
+  ArchivedProjectsRoute: typeof ArchivedProjectsRoute
   DashboardRoute: typeof DashboardRoute
   SettingsRoute: typeof SettingsRoute
   SignInRoute: typeof SignInRoute
   InviteTokenRoute: typeof InviteTokenRoute
-  WSlugRoute: typeof WSlugRouteWithChildren
+  PSlugRoute: typeof PSlugRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -319,11 +319,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/archived-workspaces': {
-      id: '/archived-workspaces'
-      path: '/archived-workspaces'
-      fullPath: '/archived-workspaces'
-      preLoaderRoute: typeof ArchivedWorkspacesRouteImport
+    '/archived-projects': {
+      id: '/archived-projects'
+      path: '/archived-projects'
+      fullPath: '/archived-projects'
+      preLoaderRoute: typeof ArchivedProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -354,11 +354,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/w/$slug': {
-      id: '/w/$slug'
-      path: '/w/$slug'
-      fullPath: '/w/$slug'
-      preLoaderRoute: typeof WSlugRouteImport
+    '/p/$slug': {
+      id: '/p/$slug'
+      path: '/p/$slug'
+      fullPath: '/p/$slug'
+      preLoaderRoute: typeof PSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -368,193 +368,193 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/w/$slug/account': {
-      id: '/w/$slug/account'
+    '/p/$slug/account': {
+      id: '/p/$slug/account'
       path: '/account'
-      fullPath: '/w/$slug/account'
-      preLoaderRoute: typeof WSlugAccountRouteImport
-      parentRoute: typeof WSlugRoute
+      fullPath: '/p/$slug/account'
+      preLoaderRoute: typeof PSlugAccountRouteImport
+      parentRoute: typeof PSlugRoute
     }
-    '/w/$slug/activity': {
-      id: '/w/$slug/activity'
+    '/p/$slug/activity': {
+      id: '/p/$slug/activity'
       path: '/activity'
-      fullPath: '/w/$slug/activity'
-      preLoaderRoute: typeof WSlugActivityRouteImport
-      parentRoute: typeof WSlugRoute
+      fullPath: '/p/$slug/activity'
+      preLoaderRoute: typeof PSlugActivityRouteImport
+      parentRoute: typeof PSlugRoute
     }
-    '/w/$slug/review': {
-      id: '/w/$slug/review'
+    '/p/$slug/review': {
+      id: '/p/$slug/review'
       path: '/review'
-      fullPath: '/w/$slug/review'
-      preLoaderRoute: typeof WSlugReviewRouteImport
-      parentRoute: typeof WSlugRoute
+      fullPath: '/p/$slug/review'
+      preLoaderRoute: typeof PSlugReviewRouteImport
+      parentRoute: typeof PSlugRoute
     }
-    '/w/$slug/settings': {
-      id: '/w/$slug/settings'
+    '/p/$slug/settings': {
+      id: '/p/$slug/settings'
       path: '/settings'
-      fullPath: '/w/$slug/settings'
-      preLoaderRoute: typeof WSlugSettingsRouteImport
-      parentRoute: typeof WSlugRoute
+      fullPath: '/p/$slug/settings'
+      preLoaderRoute: typeof PSlugSettingsRouteImport
+      parentRoute: typeof PSlugRoute
     }
-    '/w/$slug/sources': {
-      id: '/w/$slug/sources'
+    '/p/$slug/sources': {
+      id: '/p/$slug/sources'
       path: '/sources'
-      fullPath: '/w/$slug/sources'
-      preLoaderRoute: typeof WSlugSourcesRouteImport
-      parentRoute: typeof WSlugRoute
+      fullPath: '/p/$slug/sources'
+      preLoaderRoute: typeof PSlugSourcesRouteImport
+      parentRoute: typeof PSlugRoute
     }
-    '/w/$slug/settings/': {
-      id: '/w/$slug/settings/'
+    '/p/$slug/settings/': {
+      id: '/p/$slug/settings/'
       path: '/'
-      fullPath: '/w/$slug/settings/'
-      preLoaderRoute: typeof WSlugSettingsIndexRouteImport
-      parentRoute: typeof WSlugSettingsRoute
+      fullPath: '/p/$slug/settings/'
+      preLoaderRoute: typeof PSlugSettingsIndexRouteImport
+      parentRoute: typeof PSlugSettingsRoute
     }
-    '/w/$slug/settings/identities': {
-      id: '/w/$slug/settings/identities'
+    '/p/$slug/settings/identities': {
+      id: '/p/$slug/settings/identities'
       path: '/identities'
-      fullPath: '/w/$slug/settings/identities'
-      preLoaderRoute: typeof WSlugSettingsIdentitiesRouteImport
-      parentRoute: typeof WSlugSettingsRoute
+      fullPath: '/p/$slug/settings/identities'
+      preLoaderRoute: typeof PSlugSettingsIdentitiesRouteImport
+      parentRoute: typeof PSlugSettingsRoute
     }
-    '/w/$slug/settings/people': {
-      id: '/w/$slug/settings/people'
+    '/p/$slug/settings/people': {
+      id: '/p/$slug/settings/people'
       path: '/people'
-      fullPath: '/w/$slug/settings/people'
-      preLoaderRoute: typeof WSlugSettingsPeopleRouteImport
-      parentRoute: typeof WSlugSettingsRoute
+      fullPath: '/p/$slug/settings/people'
+      preLoaderRoute: typeof PSlugSettingsPeopleRouteImport
+      parentRoute: typeof PSlugSettingsRoute
     }
-    '/w/$slug/settings/workspace': {
-      id: '/w/$slug/settings/workspace'
-      path: '/workspace'
-      fullPath: '/w/$slug/settings/workspace'
-      preLoaderRoute: typeof WSlugSettingsWorkspaceRouteImport
-      parentRoute: typeof WSlugSettingsRoute
+    '/p/$slug/settings/project': {
+      id: '/p/$slug/settings/project'
+      path: '/project'
+      fullPath: '/p/$slug/settings/project'
+      preLoaderRoute: typeof PSlugSettingsProjectRouteImport
+      parentRoute: typeof PSlugSettingsRoute
     }
-    '/w/$slug/sources/': {
-      id: '/w/$slug/sources/'
+    '/p/$slug/sources/': {
+      id: '/p/$slug/sources/'
       path: '/'
-      fullPath: '/w/$slug/sources/'
-      preLoaderRoute: typeof WSlugSourcesIndexRouteImport
-      parentRoute: typeof WSlugSourcesRoute
+      fullPath: '/p/$slug/sources/'
+      preLoaderRoute: typeof PSlugSourcesIndexRouteImport
+      parentRoute: typeof PSlugSourcesRoute
     }
-    '/w/$slug/sources/$path': {
-      id: '/w/$slug/sources/$path'
+    '/p/$slug/sources/$path': {
+      id: '/p/$slug/sources/$path'
       path: '/$path'
-      fullPath: '/w/$slug/sources/$path'
-      preLoaderRoute: typeof WSlugSourcesPathRouteImport
-      parentRoute: typeof WSlugSourcesRoute
+      fullPath: '/p/$slug/sources/$path'
+      preLoaderRoute: typeof PSlugSourcesPathRouteImport
+      parentRoute: typeof PSlugSourcesRoute
     }
-    '/w/$slug/sources/inspect': {
-      id: '/w/$slug/sources/inspect'
+    '/p/$slug/sources/inspect': {
+      id: '/p/$slug/sources/inspect'
       path: '/inspect'
-      fullPath: '/w/$slug/sources/inspect'
-      preLoaderRoute: typeof WSlugSourcesInspectRouteImport
-      parentRoute: typeof WSlugSourcesRoute
+      fullPath: '/p/$slug/sources/inspect'
+      preLoaderRoute: typeof PSlugSourcesInspectRouteImport
+      parentRoute: typeof PSlugSourcesRoute
     }
-    '/w/$slug/sources/new': {
-      id: '/w/$slug/sources/new'
+    '/p/$slug/sources/new': {
+      id: '/p/$slug/sources/new'
       path: '/new'
-      fullPath: '/w/$slug/sources/new'
-      preLoaderRoute: typeof WSlugSourcesNewRouteImport
-      parentRoute: typeof WSlugSourcesRoute
+      fullPath: '/p/$slug/sources/new'
+      preLoaderRoute: typeof PSlugSourcesNewRouteImport
+      parentRoute: typeof PSlugSourcesRoute
     }
-    '/w/$slug/settings/identities/': {
-      id: '/w/$slug/settings/identities/'
+    '/p/$slug/settings/identities/': {
+      id: '/p/$slug/settings/identities/'
       path: '/'
-      fullPath: '/w/$slug/settings/identities/'
-      preLoaderRoute: typeof WSlugSettingsIdentitiesIndexRouteImport
-      parentRoute: typeof WSlugSettingsIdentitiesRoute
+      fullPath: '/p/$slug/settings/identities/'
+      preLoaderRoute: typeof PSlugSettingsIdentitiesIndexRouteImport
+      parentRoute: typeof PSlugSettingsIdentitiesRoute
     }
-    '/w/$slug/settings/identities/$identityId': {
-      id: '/w/$slug/settings/identities/$identityId'
+    '/p/$slug/settings/identities/$identityId': {
+      id: '/p/$slug/settings/identities/$identityId'
       path: '/$identityId'
-      fullPath: '/w/$slug/settings/identities/$identityId'
-      preLoaderRoute: typeof WSlugSettingsIdentitiesIdentityIdRouteImport
-      parentRoute: typeof WSlugSettingsIdentitiesRoute
+      fullPath: '/p/$slug/settings/identities/$identityId'
+      preLoaderRoute: typeof PSlugSettingsIdentitiesIdentityIdRouteImport
+      parentRoute: typeof PSlugSettingsIdentitiesRoute
     }
   }
 }
 
-interface WSlugSettingsIdentitiesRouteChildren {
-  WSlugSettingsIdentitiesIdentityIdRoute: typeof WSlugSettingsIdentitiesIdentityIdRoute
-  WSlugSettingsIdentitiesIndexRoute: typeof WSlugSettingsIdentitiesIndexRoute
+interface PSlugSettingsIdentitiesRouteChildren {
+  PSlugSettingsIdentitiesIdentityIdRoute: typeof PSlugSettingsIdentitiesIdentityIdRoute
+  PSlugSettingsIdentitiesIndexRoute: typeof PSlugSettingsIdentitiesIndexRoute
 }
 
-const WSlugSettingsIdentitiesRouteChildren: WSlugSettingsIdentitiesRouteChildren =
+const PSlugSettingsIdentitiesRouteChildren: PSlugSettingsIdentitiesRouteChildren =
   {
-    WSlugSettingsIdentitiesIdentityIdRoute:
-      WSlugSettingsIdentitiesIdentityIdRoute,
-    WSlugSettingsIdentitiesIndexRoute: WSlugSettingsIdentitiesIndexRoute,
+    PSlugSettingsIdentitiesIdentityIdRoute:
+      PSlugSettingsIdentitiesIdentityIdRoute,
+    PSlugSettingsIdentitiesIndexRoute: PSlugSettingsIdentitiesIndexRoute,
   }
 
-const WSlugSettingsIdentitiesRouteWithChildren =
-  WSlugSettingsIdentitiesRoute._addFileChildren(
-    WSlugSettingsIdentitiesRouteChildren,
+const PSlugSettingsIdentitiesRouteWithChildren =
+  PSlugSettingsIdentitiesRoute._addFileChildren(
+    PSlugSettingsIdentitiesRouteChildren,
   )
 
-interface WSlugSettingsRouteChildren {
-  WSlugSettingsIdentitiesRoute: typeof WSlugSettingsIdentitiesRouteWithChildren
-  WSlugSettingsPeopleRoute: typeof WSlugSettingsPeopleRoute
-  WSlugSettingsWorkspaceRoute: typeof WSlugSettingsWorkspaceRoute
-  WSlugSettingsIndexRoute: typeof WSlugSettingsIndexRoute
+interface PSlugSettingsRouteChildren {
+  PSlugSettingsIdentitiesRoute: typeof PSlugSettingsIdentitiesRouteWithChildren
+  PSlugSettingsPeopleRoute: typeof PSlugSettingsPeopleRoute
+  PSlugSettingsProjectRoute: typeof PSlugSettingsProjectRoute
+  PSlugSettingsIndexRoute: typeof PSlugSettingsIndexRoute
 }
 
-const WSlugSettingsRouteChildren: WSlugSettingsRouteChildren = {
-  WSlugSettingsIdentitiesRoute: WSlugSettingsIdentitiesRouteWithChildren,
-  WSlugSettingsPeopleRoute: WSlugSettingsPeopleRoute,
-  WSlugSettingsWorkspaceRoute: WSlugSettingsWorkspaceRoute,
-  WSlugSettingsIndexRoute: WSlugSettingsIndexRoute,
+const PSlugSettingsRouteChildren: PSlugSettingsRouteChildren = {
+  PSlugSettingsIdentitiesRoute: PSlugSettingsIdentitiesRouteWithChildren,
+  PSlugSettingsPeopleRoute: PSlugSettingsPeopleRoute,
+  PSlugSettingsProjectRoute: PSlugSettingsProjectRoute,
+  PSlugSettingsIndexRoute: PSlugSettingsIndexRoute,
 }
 
-const WSlugSettingsRouteWithChildren = WSlugSettingsRoute._addFileChildren(
-  WSlugSettingsRouteChildren,
+const PSlugSettingsRouteWithChildren = PSlugSettingsRoute._addFileChildren(
+  PSlugSettingsRouteChildren,
 )
 
-interface WSlugSourcesRouteChildren {
-  WSlugSourcesPathRoute: typeof WSlugSourcesPathRoute
-  WSlugSourcesInspectRoute: typeof WSlugSourcesInspectRoute
-  WSlugSourcesNewRoute: typeof WSlugSourcesNewRoute
-  WSlugSourcesIndexRoute: typeof WSlugSourcesIndexRoute
+interface PSlugSourcesRouteChildren {
+  PSlugSourcesPathRoute: typeof PSlugSourcesPathRoute
+  PSlugSourcesInspectRoute: typeof PSlugSourcesInspectRoute
+  PSlugSourcesNewRoute: typeof PSlugSourcesNewRoute
+  PSlugSourcesIndexRoute: typeof PSlugSourcesIndexRoute
 }
 
-const WSlugSourcesRouteChildren: WSlugSourcesRouteChildren = {
-  WSlugSourcesPathRoute: WSlugSourcesPathRoute,
-  WSlugSourcesInspectRoute: WSlugSourcesInspectRoute,
-  WSlugSourcesNewRoute: WSlugSourcesNewRoute,
-  WSlugSourcesIndexRoute: WSlugSourcesIndexRoute,
+const PSlugSourcesRouteChildren: PSlugSourcesRouteChildren = {
+  PSlugSourcesPathRoute: PSlugSourcesPathRoute,
+  PSlugSourcesInspectRoute: PSlugSourcesInspectRoute,
+  PSlugSourcesNewRoute: PSlugSourcesNewRoute,
+  PSlugSourcesIndexRoute: PSlugSourcesIndexRoute,
 }
 
-const WSlugSourcesRouteWithChildren = WSlugSourcesRoute._addFileChildren(
-  WSlugSourcesRouteChildren,
+const PSlugSourcesRouteWithChildren = PSlugSourcesRoute._addFileChildren(
+  PSlugSourcesRouteChildren,
 )
 
-interface WSlugRouteChildren {
-  WSlugAccountRoute: typeof WSlugAccountRoute
-  WSlugActivityRoute: typeof WSlugActivityRoute
-  WSlugReviewRoute: typeof WSlugReviewRoute
-  WSlugSettingsRoute: typeof WSlugSettingsRouteWithChildren
-  WSlugSourcesRoute: typeof WSlugSourcesRouteWithChildren
+interface PSlugRouteChildren {
+  PSlugAccountRoute: typeof PSlugAccountRoute
+  PSlugActivityRoute: typeof PSlugActivityRoute
+  PSlugReviewRoute: typeof PSlugReviewRoute
+  PSlugSettingsRoute: typeof PSlugSettingsRouteWithChildren
+  PSlugSourcesRoute: typeof PSlugSourcesRouteWithChildren
 }
 
-const WSlugRouteChildren: WSlugRouteChildren = {
-  WSlugAccountRoute: WSlugAccountRoute,
-  WSlugActivityRoute: WSlugActivityRoute,
-  WSlugReviewRoute: WSlugReviewRoute,
-  WSlugSettingsRoute: WSlugSettingsRouteWithChildren,
-  WSlugSourcesRoute: WSlugSourcesRouteWithChildren,
+const PSlugRouteChildren: PSlugRouteChildren = {
+  PSlugAccountRoute: PSlugAccountRoute,
+  PSlugActivityRoute: PSlugActivityRoute,
+  PSlugReviewRoute: PSlugReviewRoute,
+  PSlugSettingsRoute: PSlugSettingsRouteWithChildren,
+  PSlugSourcesRoute: PSlugSourcesRouteWithChildren,
 }
 
-const WSlugRouteWithChildren = WSlugRoute._addFileChildren(WSlugRouteChildren)
+const PSlugRouteWithChildren = PSlugRoute._addFileChildren(PSlugRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ArchivedWorkspacesRoute: ArchivedWorkspacesRoute,
+  ArchivedProjectsRoute: ArchivedProjectsRoute,
   DashboardRoute: DashboardRoute,
   SettingsRoute: SettingsRoute,
   SignInRoute: SignInRoute,
   InviteTokenRoute: InviteTokenRoute,
-  WSlugRoute: WSlugRouteWithChildren,
+  PSlugRoute: PSlugRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

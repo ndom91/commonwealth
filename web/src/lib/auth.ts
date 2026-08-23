@@ -6,10 +6,10 @@ import { tanstackStartCookies } from 'better-auth/tanstack-start';
 import * as schema from '../db/schema.js';
 import { db } from './db.js';
 
-/* The organization plugin, pointed at the workspace table the knowledge side
+/* The organization plugin, pointed at the project table the knowledge side
  * already scopes everything to rather than a duplicate of it. `concepts`,
  * `concept_chunks`, `users`, `events` and `index_configuration` all carry
- * `workspace_id`, and
+ * `project_id`, and
  * `mcp-server/src/access-service.ts` already scopes every MCP request by it — agents have
  * been multi-tenant all along. This makes people multi-tenant on the same axis.
  *
@@ -20,7 +20,7 @@ import { db } from './db.js';
  * legible place matters more than reusing the plugin's `hasPermission`.
  *
  * What the plugin is here for is the membership table, the role column, and
- * `session.activeOrganizationId` — the workspace switching that wave B needs,
+ * `session.activeOrganizationId` — the project switching that wave B needs,
  * including persisting the choice across requests. */
 const ac = createAccessControl({
   organization: ['update', 'delete'],
@@ -46,21 +46,21 @@ const membership = () =>
     /* Not `owner`, which is the default and would be a fifth role nobody else
        uses. See `roles.ts`. */
     creatorRole: 'admin',
-    /* Workspace creation is our transaction in `management.ts`: it also creates
+    /* Project creation is our transaction in `management.ts`: it also creates
         membership and index configuration. Keep better-auth's narrower endpoint
-        closed so it cannot create an incomplete workspace. */
+        closed so it cannot create an incomplete project. */
     allowUserToCreateOrganization: false,
     schema: {
       organization: {
-        modelName: 'workspaces',
+        modelName: 'projects',
         fields: { createdAt: 'created_at' },
       },
       member: {
-        fields: { organizationId: 'workspace_id', userId: 'user_id', createdAt: 'created_at' },
+        fields: { organizationId: 'project_id', userId: 'user_id', createdAt: 'created_at' },
       },
       invitation: {
         fields: {
-          organizationId: 'workspace_id',
+          organizationId: 'project_id',
           inviterId: 'inviter_id',
           expiresAt: 'expires_at',
           createdAt: 'created_at',
@@ -110,7 +110,7 @@ const shared = {
       '/sign-in/email': { window: 10, max: 3 },
     },
   },
-  /* `workspaces.id` is `uuid` and predates better-auth, so ids the plugin
+  /* `projects.id` is `uuid` and predates better-auth, so ids the plugin
      generates for it have to be uuids. Safe for the tables better-auth already
      owns: `user`, `session`, `account` and `verification` all key on `text`, so
      existing rows keep the ids they have and only new ones change shape.
@@ -153,7 +153,7 @@ export const auth = betterAuth({
    * **What this can and cannot make stale is the whole argument.** Roles and
    * membership are *not* in the cookie: `readMembership` reads the `member`
    * table on every call and never consults the session for anything but an id,
-   * so demoting someone, or removing them from a workspace, takes effect on
+   * so demoting someone, or removing them from a project, takes effect on
    * their very next request — verified by demoting mid-session and watching the
    * next call refuse. What lags is session revocation: signing out on another
    * device, or the row going away, stays usable until the cookie expires. Also

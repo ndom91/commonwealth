@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { createConcept } from '../../../../lib/concepts.js';
 import { writeFailure } from '../../../../lib/failure.js';
 
-export const Route = createFileRoute('/w/$slug/sources/new')({ component: NewConcept });
+export const Route = createFileRoute('/p/$slug/sources/new')({ component: NewConcept });
 
 function NewConcept() {
   const { slug } = Route.useParams();
@@ -24,7 +24,7 @@ function NewConcept() {
     try {
       const result = await createConcept({
         data: {
-          workspace: slug,
+          project: slug,
           path,
           type,
           title,
@@ -37,7 +37,7 @@ function NewConcept() {
       });
       await router.invalidate();
       await navigate({
-        to: '/w/$slug/sources/$path',
+        to: '/p/$slug/sources/$path',
         params: { slug, path: result.path },
         search: {},
       });
@@ -107,7 +107,7 @@ function NewConcept() {
             />
           </label>
           <p className="line__caption">
-            Saving creates an OKF Markdown document, commits it to this workspace bundle, and
+            Saving creates an OKF Markdown document, commits it to this project bundle, and
             publishes that commit as the retrieval snapshot.
           </p>
           {error && (
@@ -123,7 +123,7 @@ function NewConcept() {
               type="button"
               className="btn btn--quiet"
               disabled={pending}
-              onClick={() => void navigate({ to: '/w/$slug/sources', search: {} })}
+              onClick={() => void navigate({ to: '/p/$slug/sources', search: {} })}
             >
               Cancel
             </button>

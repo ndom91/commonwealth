@@ -304,7 +304,7 @@ the option already in force.
 
 **The Silent Default Rule.** A register marks only what departs from the
 ordinary. `approved` + `active` is the common case and takes no chip, because a
-mark every row carries has stopped carrying information: a healthy workspace
+mark every row carries has stopped carrying information: a healthy project
 showed ten identical `APPROVED` outlines out of thirteen rows, out-shouting the
 one `CANONICAL` a reader needed to find. Sealed, unverified, withdrawn, stale and
 failed still mark themselves, and the absence of a mark is legible precisely
@@ -624,7 +624,7 @@ A tab whose page is a register carries that register's size, set in register fac
 at the rail count's weight. This does not compete with the rail: a register's
 size is stated once, in the navigation that owns it, and for People and
 Identities that navigation *is* this row. A tab whose page is not a register —
-the Workspace tab — carries nothing.
+the Project tab — carries nothing.
 
 An unknown count is **omitted, not dashed**, here and in the rail alike: a label
 reading *People —* invites the reader to wonder what the dash says about the
@@ -707,7 +707,7 @@ would make the line rewrite itself every time an agent presented a key, so it
 lives on the credential stub instead.
 
 ### Activity log
-The workspace-wide custody line: one ruled row per event, newest first, in four
+The project-wide custody line: one ruled row per event, newest first, in four
 columns — when, what, which source, who. Event types are rendered as the
 sentence a person would say ("Voided a credential"), with an unmapped type
 falling back to its raw name so a new writer shows up legibly without a code
@@ -782,10 +782,10 @@ thing — manila at a size that reads as applied material rather than as a capti
 
 ### Navigation
 The **plate** at the head of the rail names the corpus you are in and is how
-you leave it: a `<details>` disclosure listing the other workspaces you belong
+you leave it: a `<details>` disclosure listing the other projects you belong
 to, or a plain plate when there is nowhere to go.
 
-It carries a **group mark on its right edge and a *Switch workspace* label on
+It carries a **group mark on its right edge and a *Switch project* label on
 hover**, and only in the disclosure form — a mark on the plain plate would
 promise a menu that opens onto a list of one. Both exist because the plate
 otherwise gave no sign it was pressable, and a reader had to stumble onto the
@@ -795,19 +795,19 @@ accident is discovering too late that you were reading the wrong one. The mark i
 Lucide rather than a drawn drawer mark, for the reason Account and the scheme
 toggle are: the hand-drawn grammar belongs to the drawers, and the plate is
 chrome. It is not a disclosure triangle and does not rotate — it names
-*workspaces* rather than announcing a menu, which is what the Shapes doctrine
+*projects* rather than announcing a menu, which is what the Shapes doctrine
 objects to.
 
 The label **describes rather than names.** The plate's accessible name stays the
-workspace itself, and *Switch workspace* arrives as `aria-describedby` on top of
+project itself, and *Switch project* arrives as `aria-describedby` on top of
 it. This is the opposite treatment from `Hint`, which serves icon-only controls
 where the tooltip merely repeats the `aria-label` and is therefore hidden from
 the accessibility tree. Replacing the name with an `aria-label` here would break
 Label in Name (WCAG 2.5.3): someone driving the page by voice says the words they
-can see, and the words they can see are the workspace's.
+can see, and the words they can see are the project's.
 
 It switches and nothing else —
-creating a workspace lives in Settings, which has a drawer. A disclosure has no
+creating a project lives in Settings, which has a drawer. A disclosure has no
 Escape and no outside-click; that is survivable here because the panel displaces
 nothing and covers nothing, and it is the trade a floating menu could not make.
 
@@ -820,8 +820,8 @@ is built rather than linking to nothing. **No section is dormant today**; every
 drawer routes somewhere, so that branch is currently unexercised and kept only
 as the pattern for the next unbuilt section.
 
-**The rail is cut to the holder's role.** Every member sees the Workspace group
-because anyone may start a project. A reader sees its *Start workspace* entry;
+**The rail is cut to the holder's role.** Every member sees the Project group
+because anyone may start a project. A reader sees its *Start project* entry;
 a writer also sees their own Identities; the full Settings entry appears at
 `admin`. Review queue appears at `reviewer`. Omitted, not
 disabled — a `PENDING` mark says *nobody can open this yet*, which is a
@@ -829,11 +829,11 @@ different sentence from *this is not yours to open*, and showing a drawer that
 answers with a refusal tells someone about a job they do not have on every
 screen. Absence is the quieter and more accurate statement.
 
-Archiving is reversible custody, not destruction. It removes a workspace from
+Archiving is reversible custody, not destruction. It removes a project from
 the switcher and rejects its browser and MCP access while retaining its sources,
 index, identities, keys and memberships. The unscoped archive register is the
 recovery door: administrators can restore a project there even when it was their
-last active workspace.
+last active project.
 
 Each drawer carries a hand-drawn mark in the world's own grammar — a filing tab
 for Sources, a dashed seal for the review queue, an issued tag for Identities, a
@@ -866,7 +866,7 @@ them is administration, and administration has one door.
 **A register's size is stated exactly once, in the navigation that owns it.**
 For Sources and the review queue that is the rail. For People and Identities it
 is the Settings tab bar, which took the counts with it when the drawers went —
-so the rule survived the move instead of being quietly dropped. The Workspace
+so the rule survived the move instead of being quietly dropped. The Project
 tab carries no number, because it is not a register.
 
 A register never repeats its own count in a head above itself: the number is

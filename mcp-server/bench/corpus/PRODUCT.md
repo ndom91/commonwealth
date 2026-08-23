@@ -50,7 +50,7 @@ Three things a neighbouring RAG or docs tool could not truthfully copy at once:
    product knowledge.
 2. **Provenance is a first-class primitive, not metadata.** Authority level,
    immutable Git commit history, append-only event log. A concept can be
-   deprecated, but its prior commits remain in the workspace bundle.
+   deprecated, but its prior commits remain in the project bundle.
 3. **Retrieved content is treated as untrusted by design.** Tool descriptions
    tell the calling model outright that submitted content is untrusted reference
    material and returned excerpts are quoted references, not instructions. The
@@ -95,31 +95,31 @@ The MCP tool list, the role names and the concept lifecycle are all readable fro
   not a convenience one.
 - **Hiding a control is not authorisation.** The drawer and the benches show a
   role only what it can act on, but every server function calls
-  `requireMember(permission, workspace)` and refuses regardless. These are plain
+  `requireMember(permission, project)` and refuses regardless. These are plain
   HTTP endpoints; anything relying on the UI to withhold them is not protected.
-- **A workspace is a corpus, and nothing crosses between them.** One instance
+- **A project is a corpus, and nothing crosses between them.** One instance
   holds several — the AI team's notes and the core team's, separately — each with
   its own concepts, agent identities, review queue and activity log. Membership
-  and role are per workspace: the same person can be an administrator in one and
-  a reader in another. The workspace is in the URL (`/w/ai-team/sources`), so a
+  and role are per project: the same person can be an administrator in one and
+  a reader in another. The project is in the URL (`/p/ai-team/sources`), so a
   pasted link means the same thing to everyone, and the server re-derives it from
-  that slug on every call rather than from any remembered "active" workspace —
+  that slug on every call rather than from any remembered "active" project —
   two sources of truth is a way for them to disagree. A slug you are not a member
   of and one that does not exist get the same refusal, word for word.
-- **A workspace's name can change; its slug cannot.** The name is a label — on
+- **A project's name can change; its slug cannot.** The name is a label — on
   the plate, in the switcher, on an invitation — and an administrator may edit it
   from Settings. The slug is in every link anyone has sent, and a URL that
   quietly stops meaning what it meant is a worse failure than a name nobody
   likes. Changing one would need a decision about redirects, not a text field.
-- **Administering a workspace is one page with three tabs.** Its name, the
+- **Administering a project is one page with three tabs.** Its name, the
   people who can sign in to it, and the agent identities holding keys against it
-  are the three faces of `/w/:slug/settings`. Your own display name and password
-  are somewhere else entirely — `/w/:slug/account`, behind the signed-in name —
+  are the three faces of `/p/:slug/settings`. Your own display name and password
+  are somewhere else entirely — `/p/:slug/account`, behind the signed-in name —
   because a preference is not a grant, and the two should never be one page.
 - **Scoping lives in the `WHERE`, not after the fetch.** A query that takes an id
-  carries `workspace_id` in the *same* predicate, so a foreign id reads as "not
+  carries `project_id` in the *same* predicate, so a foreign id reads as "not
   found" rather than being fetched and then refused. There is exactly one write in
-  `admin/src/lib` without a workspace predicate — claiming an invitation, found by
+  `admin/src/lib` without a project predicate — claiming an invitation, found by
   token digest — and it is commented as such.
 - **One index, one model.** Embeddings from different models must never be mixed
   in one index. Changing `EMBEDDING_MODEL` or the vector dimension requires
@@ -138,12 +138,12 @@ The MCP tool list, the role names and the concept lifecycle are all readable fro
 These are open product questions, not gaps to be closed by whoever notices them
 next. Changing one is a decision, not a fix.
 
-- **One embedding model for the whole instance, across all workspaces.**
+- **One embedding model for the whole instance, across all projects.**
    `concept_chunks.embedding` is `vector(1024)` for the entire table and `EMBEDDING_MODEL`
-  is one process-wide variable read by both services, so a workspace cannot pick
+  is one process-wide variable read by both services, so a project cannot pick
   its own model without either giving up the fixed dimension (and the ANN index
   with it) or holding a chunk table per dimension. Separate corpora were the
-  point of workspaces; separate *models* were not. Affirmed once since workspaces
+  point of projects; separate *models* were not. Affirmed once since projects
   shipped and kept as it is — but it stays here rather than under Direction,
   because it is a standing constraint someone could reasonably want to lift, not
   a thing that is finished.
@@ -153,13 +153,13 @@ next. Changing one is a decision, not a fix.
 The admin surface is the primary human surface over this data, and the workbench
 it was aimed at now ships: browse, search and read concepts; revise or deprecate
 them; work a review queue; inspect Git history; audit the event log; invite
-people and set what each of them may do — in any of several workspaces.
+people and set what each of them may do — in any of several projects.
 Settled, having been looked at and left as they are — not gaps waiting to be
 closed by whoever notices them next:
 
-- **Nothing moves between workspaces, and none can be deleted.** Moving a concept
+- **Nothing moves between projects, and none can be deleted.** Moving a concept
   needs a re-embed and a decision about what the event log says happened;
-  deleting a workspace would take its corpus with it by cascade, which deserves
+  deleting a project would take its corpus with it by cascade, which deserves
   its own confirmation design. Reviewed and kept out.
 - **Concept writes publish synchronously.** A write creates a Git commit, indexes
   that complete snapshot, and only then returns. This keeps an older indexed
@@ -180,7 +180,7 @@ Remaining known gaps, in rough order of how much they cost:
   common by the people who use it and administered by them rather than owned
   over them — which is the whole argument of a self-hosted, source-cited corpus
   that agents write to and a team vouches for.
-- The plate reads the **workspace name** over **Commonwealth**; the admin surface
+- The plate reads the **project name** over **Commonwealth**; the admin surface
   is the **Custody bench**. The design system is documented in `admin/DESIGN.md`
   and is binding.
 - Agent credentials mint as `cw_…`. Keys issued before the rename mint as

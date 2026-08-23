@@ -12,7 +12,7 @@ import {
 } from '../../../../lib/concepts.js';
 import { writeFailure } from '../../../../lib/failure.js';
 
-export const Route = createFileRoute('/w/$slug/sources/$path')({ component: ConceptBench });
+export const Route = createFileRoute('/p/$slug/sources/$path')({ component: ConceptBench });
 
 type Authority = 'unverified' | 'approved' | 'canonical';
 type Detail = {
@@ -68,8 +68,8 @@ function ConceptBench() {
     setError(undefined);
     try {
       const [next, nextEntries] = await Promise.all([
-        getConceptDetail({ data: { workspace: slug, path } }),
-        getConceptHistory({ data: { workspace: slug, path } }),
+        getConceptDetail({ data: { project: slug, path } }),
+        getConceptHistory({ data: { project: slug, path } }),
       ]);
       setDetail(next as Detail);
       setEntries(nextEntries as History[]);
@@ -113,7 +113,7 @@ function ConceptBench() {
     setError(undefined);
     try {
       const version = (await getConceptVersion({
-        data: { workspace: slug, path, commit },
+        data: { project: slug, path, commit },
       })) as Version;
       if (request !== revisionRequest.current) return;
       setHistorical(version);
@@ -239,7 +239,7 @@ function ConceptBench() {
                     disabled={pending || authority === detail.authority}
                     onClick={() =>
                       void act(
-                        () => verifyConcept({ data: { workspace: slug, path, authority } }),
+                        () => verifyConcept({ data: { project: slug, path, authority } }),
                         'The authority could not be changed.'
                       )
                     }
@@ -259,7 +259,7 @@ function ConceptBench() {
                     disabled={pending}
                     onClick={() =>
                       void act(
-                        () => deprecateConcept({ data: { workspace: slug, path } }),
+                        () => deprecateConcept({ data: { project: slug, path } }),
                         'The concept could not be deprecated.'
                       )
                     }
@@ -364,7 +364,7 @@ function ConceptBench() {
             onSubmit={(event) => {
               event.preventDefault();
               void act(
-                () => reviseConcept({ data: { workspace: slug, path, title, markdown: body } }),
+                () => reviseConcept({ data: { project: slug, path, title, markdown: body } }),
                 'The revision could not be saved.'
               );
             }}

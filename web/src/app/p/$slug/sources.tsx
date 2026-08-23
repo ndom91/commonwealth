@@ -21,7 +21,7 @@ function highlight(excerpt: string) {
   });
 }
 
-export const Route = createFileRoute('/w/$slug/sources')({
+export const Route = createFileRoute('/p/$slug/sources')({
   validateSearch: (search: Record<string, unknown>): SourceFilters => ({
     authority: ['unverified', 'approved', 'canonical'].includes(String(search.authority))
       ? (search.authority as SourceFilters['authority'])
@@ -35,14 +35,14 @@ export const Route = createFileRoute('/w/$slug/sources')({
       const sources = deps.q
         ? await searchConcepts({
             data: {
-              workspace: params.slug,
+              project: params.slug,
               authority: deps.authority,
               type: deps.type,
               query: deps.q,
             },
           })
         : await listConcepts({
-            data: { workspace: params.slug, authority: deps.authority, type: deps.type },
+            data: { project: params.slug, authority: deps.authority, type: deps.type },
           });
       return { register: { sources, hasMore: false }, failure: undefined };
     } catch {
@@ -50,7 +50,7 @@ export const Route = createFileRoute('/w/$slug/sources')({
     }
   },
   head: ({ match }) => ({
-    meta: [{ title: documentTitle('Concepts', match.context.workspaceName) }],
+    meta: [{ title: documentTitle('Concepts', match.context.projectName) }],
   }),
   component: Sources,
 });
@@ -68,7 +68,7 @@ type ConceptRow = {
 
 function Sources() {
   const { slug } = Route.useParams();
-  const navigate = useNavigate({ from: '/w/$slug/sources' });
+  const navigate = useNavigate({ from: '/p/$slug/sources' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
   const { register, failure } = Route.useLoaderData();
@@ -87,10 +87,10 @@ function Sources() {
       {...viewer}
       actions={
         <>
-          <Link to="/w/$slug/sources/inspect" search={{}} className="btn btn--quiet">
+          <Link to="/p/$slug/sources/inspect" search={{}} className="btn btn--quiet">
             Inspect retrieval
           </Link>
-          <Link to="/w/$slug/sources/new" search={{}} className="btn btn--primary">
+          <Link to="/p/$slug/sources/new" search={{}} className="btn btn--primary">
             New concept
           </Link>
         </>
@@ -180,7 +180,7 @@ function Sources() {
             {concepts.map((concept) => (
               <li key={concept.path}>
                 <Link
-                  to="/w/$slug/sources/$path"
+                  to="/p/$slug/sources/$path"
                   params={{ slug, path: concept.path }}
                   search={filters}
                   className="entry"

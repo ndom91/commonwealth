@@ -35,7 +35,7 @@ function parseCursor(after: string | undefined) {
  * send another, and one `router.invalidate()` after a mutation refreshes the
  * register, the bench and the rail count together — the old route kept its own
  * effect-driven refetch, so there were two ways to reload one page. */
-export const Route = createFileRoute('/w/$slug/settings/identities')({
+export const Route = createFileRoute('/p/$slug/settings/identities')({
   /* The cursor lives in the URL like every other register state, so a page of
      the register is linkable and a reload does not silently jump back to the
      newest holders. */
@@ -53,7 +53,7 @@ export const Route = createFileRoute('/w/$slug/settings/identities')({
     const cursor = parseCursor(deps.after);
     try {
       const page = await listIdentities({
-        data: { workspace: params.slug, cursor, mine: deps.mine === true },
+        data: { project: params.slug, cursor, mine: deps.mine === true },
       });
       return { page, failure: undefined };
     } catch {
@@ -62,7 +62,7 @@ export const Route = createFileRoute('/w/$slug/settings/identities')({
   },
   /* After `validateSearch` — see the note in `sources.tsx`. */
   head: ({ match }) => ({
-    meta: [{ title: documentTitle('Identities', match.context.workspaceName) }],
+    meta: [{ title: documentTitle('Identities', match.context.projectName) }],
   }),
   component: IdentitiesLayout,
 });
@@ -76,7 +76,7 @@ function IdentitiesLayout() {
   const { page, failure } = Route.useLoaderData();
   const { after, mine } = Route.useSearch();
 
-  /* An administrator sees the whole workspace and may narrow to their own;
+  /* An administrator sees the whole project and may narrow to their own;
      everyone else is already narrowed by the server and is not offered a
      control that could only ever be a no-op. */
   const administers = can(viewer.role, 'admin');
@@ -101,7 +101,7 @@ function IdentitiesLayout() {
   const issuedIdentityIsSelected = issued
     ? Boolean(
         matchRoute({
-          to: '/w/$slug/settings/identities/$identityId',
+          to: '/p/$slug/settings/identities/$identityId',
           params: { slug, identityId: issued.identityId },
         })
       )
@@ -126,7 +126,7 @@ function IdentitiesLayout() {
     setError(undefined);
     try {
       const result = await createIdentity({
-        data: { workspace: slug, name, role, keyLabel, unowned: administers && unowned },
+        data: { project: slug, name, role, keyLabel, unowned: administers && unowned },
       });
       setIssuing(false);
       setName('');
@@ -134,7 +134,7 @@ function IdentitiesLayout() {
       setUnowned(false);
       await router.invalidate();
       await navigate({
-        to: '/w/$slug/settings/identities/$identityId',
+        to: '/p/$slug/settings/identities/$identityId',
         params: { identityId: result.identityId },
       });
       setIssued(result);
@@ -186,7 +186,7 @@ function IdentitiesLayout() {
                   value={mine ? 'mine' : 'all'}
                   onChange={(event) =>
                     void navigate({
-                      to: '/w/$slug/settings/identities',
+                      to: '/p/$slug/settings/identities',
                       params: { slug },
                       /* The cursor is dropped rather than carried: it points
                          into the unfiltered ordering, and a page token from one
@@ -226,7 +226,7 @@ function IdentitiesLayout() {
 
           {/* Two different facts, and saying the first when the second is true
               would tell an administrator filtering to their own that the
-              workspace is empty. A non-administrator's register is always
+              project is empty. A non-administrator's register is always
               filtered, so they always get the second. */}
           {!failure && identities.length === 0 && (
             <p className="empty index__note">
@@ -242,7 +242,7 @@ function IdentitiesLayout() {
               return (
                 <li key={identity.id}>
                   <Link
-                    to="/w/$slug/settings/identities/$identityId"
+                    to="/p/$slug/settings/identities/$identityId"
                     params={{ slug, identityId: identity.id }}
                     className={`entry${identity.disabled_at ? ' entry--disabled' : ''}`}
                     activeProps={{ 'aria-current': 'page' }}
@@ -274,13 +274,13 @@ function IdentitiesLayout() {
           {(hasMore || after) && (
             <div className="index__note index__page">
               {after && (
-                <Link to="/w/$slug/settings/identities" search={{}} className="btn btn--quiet">
+                <Link to="/p/$slug/settings/identities" search={{}} className="btn btn--quiet">
                   Newest
                 </Link>
               )}
               {hasMore && last && (
                 <Link
-                  to="/w/$slug/settings/identities"
+                  to="/p/$slug/settings/identities"
                   search={{ after: `${last.created_at}|${last.id}` }}
                   className="btn btn--quiet"
                 >
@@ -336,7 +336,7 @@ function IdentitiesLayout() {
                   <p className="amend__consequence">
                     A credential cannot do more than you can, so the list stops at{' '}
                     <span className="role">{viewer.role}</span>. This holder will be yours, and is
-                    retired if you leave this workspace.
+                    retired if you leave this project.
                   </p>
                 )}
 
@@ -356,8 +356,8 @@ function IdentitiesLayout() {
                 {administers && (
                   <p className="amend__consequence">
                     {unowned
-                      ? 'A shared holder survives anyone leaving the workspace. Nothing retires it automatically; voiding it is a deliberate act.'
-                      : 'Yours. Removing you from this workspace voids its credentials and disables it.'}
+                      ? 'A shared holder survives anyone leaving the project. Nothing retires it automatically; voiding it is a deliberate act.'
+                      : 'Yours. Removing you from this project voids its credentials and disables it.'}
                   </p>
                 )}
 

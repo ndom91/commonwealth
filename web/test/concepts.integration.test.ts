@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import test from 'node:test';
 import { commitFiles } from '@commonwealth/corpus';
-import { indexWorkspace } from '@commonwealth/corpus/indexer';
+import { indexProject } from '@commonwealth/corpus/indexer';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
@@ -38,7 +38,7 @@ if (!databaseUrl) {
 
       const { auth } = await import('../src/lib/auth.js');
       const { readMembership } = await import('../src/lib/authorize.js');
-      const { conceptVersion, inspectWorkspace } = await import('../src/lib/concept-inspection.js');
+      const { conceptVersion, inspectProject } = await import('../src/lib/concept-inspection.js');
       const { OkfRepository } = await import('../../mcp-server/src/okf-repository.js');
 
       const signUp = await auth.api.signUpEmail({
@@ -48,19 +48,19 @@ if (!databaseUrl) {
           password: 'correct horse battery staple',
         },
       });
-      const [workspace] = await sql<{ id: string }[]>`
-        INSERT INTO workspaces (name, slug) VALUES ('History', 'history') RETURNING id
+      const [project] = await sql<{ id: string }[]>`
+        INSERT INTO projects (name, slug) VALUES ('History', 'history') RETURNING id
       `;
-      const [otherWorkspace] = await sql<{ id: string }[]>`
-        INSERT INTO workspaces (name, slug) VALUES ('Other', 'other') RETURNING id
+      const [otherProject] = await sql<{ id: string }[]>`
+        INSERT INTO projects (name, slug) VALUES ('Other', 'other') RETURNING id
       `;
-      assert.ok(workspace && otherWorkspace);
+      assert.ok(project && otherProject);
       await sql`
-        INSERT INTO member (workspace_id, user_id, role) VALUES (${workspace.id}, ${signUp.user.id}, 'reader')
+        INSERT INTO member (project_id, user_id, role) VALUES (${project.id}, ${signUp.user.id}, 'reader')
       `;
       await sql`
-        INSERT INTO index_configuration (workspace_id, embedding_model, embedding_dimensions)
-        VALUES (${workspace.id}, 'test-embedding-model', 1024)
+        INSERT INTO index_configuration (project_id, embedding_model, embedding_dimensions)
+        VALUES (${project.id}, 'test-embedding-model', 1024)
       `;
 
       const initial = await commitFiles({
@@ -73,7 +73,7 @@ if (!databaseUrl) {
           },
         ],
         subject: 'Create restart playbook',
-        workspace: 'history',
+        project: 'history',
       });
       await commitFiles({
         actor: 'admin/test',
@@ -89,7 +89,7 @@ if (!databaseUrl) {
           },
         ],
         subject: 'Revise restart playbook',
-        workspace: 'history',
+        project: 'history',
       });
       const unrelated = await commitFiles({
         actor: 'admin/test',
@@ -101,17 +101,17 @@ if (!databaseUrl) {
           },
         ],
         subject: 'Revise unrelated playbook',
-        workspace: 'history',
+        project: 'history',
       });
-      await indexWorkspace({
+      await indexProject({
         corpusPath,
         embeddingModel: 'test-embedding-model',
         embeddings: {
           embed: async (texts) => texts.map(() => Array.from({ length: 1024 }, () => 1)),
         },
         sql: (await import('../src/lib/db.js')).indexClient,
-        workspaceId: workspace.id,
-        workspaceSlug: 'history',
+        projectId: project.id,
+        projectSlug: 'history',
       });
 
       const membership = await readMembership('history', signUp.user.id);
@@ -121,7 +121,7 @@ if (!databaseUrl) {
         commit: initial,
         corpusPath,
         path: 'playbooks/restart.md',
-        workspace: 'history',
+        project: 'history',
       });
       assert.equal(historical.authority, 'approved');
       assert.equal(historical.title, 'Original restart');
@@ -136,22 +136,22 @@ if (!databaseUrl) {
             commit: unrelated,
             corpusPath,
             path: 'playbooks/restart.md',
-            workspace: 'history',
+            project: 'history',
           }),
         /not in this concept history/
       );
 
-      const inspected = await inspectWorkspace({
+      const inspected = await inspectProject({
         embeddings: { embedQuery: async () => Array.from({ length: 1024 }, () => 1) },
         limit: 5,
         query: 'restart worker',
         sql,
         tags: ['operations'],
         type: 'Playbook',
-        workspaceId: membership.workspaceId,
+        projectId: membership.projectId,
       });
       const [actor] = await sql<{ id: string }[]>`
-        INSERT INTO users (workspace_id, display_name, role) VALUES (${workspace.id}, 'Agent', 'admin') RETURNING id
+        INSERT INTO users (project_id, display_name, role) VALUES (${project.id}, 'Agent', 'admin') RETURNING id
       `;
       assert.ok(actor);
       const repository = new OkfRepository(
@@ -173,12 +173,12 @@ if (!databaseUrl) {
         sql
       );
       const mcp = await repository.search(
-        { id: actor.id, role: 'admin', workspaceId: workspace.id },
+        { id: actor.id, role: 'admin', projectId: project.id },
         { explain: true, limit: 5, query: 'restart worker', tags: ['operations'], type: 'Playbook' }
       );
       assert.deepEqual(inspected, mcp);
       const [events] = await sql<{ count: string }[]>`
-        SELECT count(*) FROM events WHERE workspace_id = ${workspace.id} AND event_type = 'search'
+        SELECT count(*) FROM events WHERE project_id = ${project.id} AND event_type = 'search'
       `;
       assert.equal(Number(events?.count), 1, 'only the MCP search records a search event');
     } finally {

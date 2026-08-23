@@ -46,18 +46,18 @@ export function canGrant(granter: Role, candidate: Role): boolean {
   return permissions[candidate].every((permission) => can(granter, permission));
 }
 
-/* A workspace as the chrome needs to know it: enough to name it on the plate,
+/* A project as the chrome needs to know it: enough to name it on the plate,
  * link to it from the switcher, and cut the rail to what you may do in it.
  *
  * It lives here for a boundary reason rather than a taxonomic one. It is
- * *produced* by `readWorkspaces` in `authorize.ts` and *consumed* by `AppShell`,
+ * *produced* by `readProjects` in `authorize.ts` and *consumed* by `AppShell`,
  * and it used to be declared in both. Collapsing it into `authorize.ts` would
  * mean a client component importing from the one module whose header warns at
  * length that reaching it from the browser kills hydration — safe only while
  * every such import keeps its `type` keyword, and silent when one does not.
  * This module is already imported by both sides and has no server reach at all,
  * so there is nothing to get wrong. */
-export type WorkspaceRef = { id: string; name: string; slug: string; role: Role };
+export type ProjectRef = { id: string; name: string; slug: string; role: Role };
 
 /* What each role is called and what it may do, in one place, so the invite form
    and the people register describe them identically. */

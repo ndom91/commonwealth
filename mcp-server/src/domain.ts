@@ -1,8 +1,8 @@
 export type Role = 'reader' | 'writer' | 'reviewer' | 'admin';
 export type Actor = {
   id: string;
-  workspaceId: string;
-  workspaceSlug: string;
+  projectId: string;
+  projectSlug: string;
   name: string;
   role: Role;
   autoApprove: boolean;

@@ -69,8 +69,8 @@ it**: the server runs under `tsx`, the admin under Vite, tests under
 `ERR_MODULE_NOT_FOUND` on `packages/pipeline/src/chunking.js` — the barrel's
 `.js` specifier that only exists as `.ts`. Use `node --import tsx`.
 
-`@commonwealth/corpus` is shared for Git bundle access and `indexWorkspace()`.
-The indexer takes the workspace id and slug explicitly so it can be called from
+`@commonwealth/corpus` is shared for Git bundle access and `indexProject()`.
+The indexer takes the project id and slug explicitly so it can be called from
 either service without inheriting either service's request or permission model.
 The MCP and admin repository wrappers keep their own authorisation and event
 writes; only the commit-to-index pipeline is shared.
@@ -160,9 +160,9 @@ the pool are fine.
 
 ## Indexing publishes complete Git commits
 
-Git bundles are authoritative. `indexWorkspace()` reads one workspace `HEAD`,
+Git bundles are authoritative. `indexProject()` reads one project `HEAD`,
 embeds every indexable non-deprecated concept from that commit, then publishes
-it by setting `workspace_index_state.indexed_commit_sha` inside the transaction
+it by setting `project_index_state.indexed_commit_sha` inside the transaction
 that inserted its `concepts` and `concept_chunks` rows. Every MCP and admin read
 joins against that published commit. Three things follow from that:
 
@@ -176,41 +176,41 @@ joins against that published commit. Three things follow from that:
   index the resulting snapshot, and only then return success. There is no source
   ingestion queue or retry state in Postgres.
 
-## The workspace comes from the URL, and the server re-derives it
+## The project comes from the URL, and the server re-derives it
 
-Every route under `admin/src/app/w/$slug/` is one corpus. The slug in the path is
-the scope; `app/w/$slug.tsx` resolves it to a workspace and confirms membership
+Every route under `admin/src/app/p/$slug/` is one corpus. The slug in the path is
+the scope; `app/p/$slug.tsx` resolves it to a project and confirms membership
 before any child renders. That layout is **not** the enforcement — it decides
 what to draw. Every server function takes the same slug and re-checks it:
 
 ```ts
-const { userId, workspaceId, role } = await requireMember('write', data.workspace);
+const { userId, projectId, role } = await requireMember('write', data.project);
 ```
 
 `requireMember` resolves the slug and the membership in one query, so
 authorisation and scoping can never disagree. Three rules follow:
 
-- **Every server function that reads or writes workspace data takes a
-  `workspace`.** `Scoped<T>` in `concepts.ts` and `management.ts` is the type;
-  `validateWorkspace` is the validator. The exceptions are `getSession`,
-  `getWorkspaces`, and the two pre-account invitation functions, which have no
-  caller-supplied workspace at all.
+- **Every server function that reads or writes project data takes a
+  `project`.** `Scoped<T>` in `concepts.ts` and `management.ts` is the type;
+  `validateProject` is the validator. The exceptions are `getSession`,
+  `getProjects`, and the two pre-account invitation functions, which have no
+  caller-supplied project at all.
 - **The predicate goes in the same `WHERE` as the id.** A query keyed by an
-  identity id also filters `workspace_id`, so a foreign id answers "not found"
+  identity id also filters `project_id`, so a foreign id answers "not found"
   instead of being fetched and then refused. This includes the `UPDATE`s that run
   after a scoped `SELECT` inside the same transaction — the guard is cheap and it
   survives someone moving the statements around later.
-- **Nothing reads an "active workspace" from the session.** better-auth's
+- **Nothing reads an "active project" from the session.** better-auth's
   organization plugin offers `session.activeOrganizationId` and it is deliberately
   unused: with the slug in the URL, a second source of truth is a way for the two
   to disagree.
 
-A missing `workspace` is a *runtime* failure, not a compile error — the
+A missing `project` is a *runtime* failure, not a compile error — the
 validators take `unknown`. When adding a call site, check it passes one; the
 concept register loader shipped without it and typechecked cleanly.
 
-`src/` needs none of this. It has always scoped to `actor.workspaceId`, so agents
-were isolated before workspaces were visible in the browser. If a change here
+`src/` needs none of this. It has always scoped to `actor.projectId`, so agents
+were isolated before projects were visible in the browser. If a change here
 seems to require one there, the scoping model is wrong.
 
 ## Two migration chains, on purpose
