@@ -109,7 +109,7 @@ if (!databaseUrl) {
         embeddings: {
           embed: async (texts) => texts.map(() => Array.from({ length: 1024 }, () => 1)),
         },
-        sql,
+        sql: (await import('../src/lib/db.js')).indexClient,
         workspaceId: workspace.id,
         workspaceSlug: 'history',
       });
@@ -182,7 +182,8 @@ if (!databaseUrl) {
       `;
       assert.equal(Number(events?.count), 1, 'only the MCP search records a search event');
     } finally {
-      await (await import('../src/lib/db.js')).client.end({ timeout: 1 });
+      const { client, indexClient } = await import('../src/lib/db.js');
+      await Promise.all([client.end({ timeout: 1 }), indexClient.end({ timeout: 1 })]);
       await sql.end({ timeout: 1 });
       await rm(corpusPath, { recursive: true, force: true });
     }

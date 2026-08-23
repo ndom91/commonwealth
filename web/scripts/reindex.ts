@@ -9,7 +9,7 @@
 
 import { head } from '@commonwealth/corpus';
 import { indexWorkspace } from '@commonwealth/corpus/indexer';
-import { client } from '../src/lib/db.js';
+import { client, indexClient } from '../src/lib/db.js';
 import { embeddingModel, embeddings } from '../src/lib/pipeline.js';
 
 function flag(name: string): string | undefined {
@@ -51,7 +51,7 @@ if (dryRun) {
     corpusPath,
     embeddingModel: embeddingModel(),
     embeddings: embeddings(),
-    sql: client,
+    sql: indexClient,
     workspaceId: workspace.id,
     workspaceSlug: slug,
   });
@@ -59,4 +59,4 @@ if (dryRun) {
     `Published ${result.commit.slice(0, 12)}: ${result.concepts} concept(s), ${result.chunks} passage(s).`
   );
 }
-await client.end();
+await Promise.all([client.end(), indexClient.end()]);

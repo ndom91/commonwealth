@@ -6,6 +6,10 @@ const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required');
 const client = postgres(databaseUrl);
 
+/* The shared indexer uses postgres.js's native `sql.json()` serializer, so it
+   must not receive the client that Drizzle mutates below. */
+export const indexClient = postgres(databaseUrl);
+
 /* `drizzle()` mutates the client it is handed, in two ways that both surface as
    quiet wrong data rather than as errors.
  *

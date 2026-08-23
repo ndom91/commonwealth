@@ -1681,6 +1681,33 @@ select {
   border: 1px solid var(--rule-hair);
 }
 
+.content-tabs {
+  display: flex;
+  gap: var(--s-base);
+  margin-left: auto;
+}
+
+.content-tabs__tab {
+  padding: 0 0 var(--s-snug);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.content-tabs__tab:hover {
+  color: var(--ink);
+}
+
+.content-tabs__tab[aria-selected="true"] {
+  border-bottom-color: var(--mark);
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .retrieval-form {
   display: grid;
   grid-template-columns: minmax(14rem, 2fr) repeat(3, minmax(8rem, 1fr)) 5rem auto;

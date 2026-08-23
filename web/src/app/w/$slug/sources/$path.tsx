@@ -52,8 +52,10 @@ function ConceptBench() {
   const [editing, setEditing] = useState(false);
   const [armDeprecate, setArmDeprecate] = useState(false);
   const [historical, setHistorical] = useState<Version>();
-  const [comparing, setComparing] = useState(false);
+  const [historicalContent, setHistoricalContent] = useState<'body' | 'diff'>('body');
   const revisionRequest = useRef(0);
+  const bodyTab = useRef<HTMLButtonElement>(null);
+  const diffTab = useRef<HTMLButtonElement>(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
 
@@ -67,7 +69,7 @@ function ConceptBench() {
       setDetail(next as Detail);
       setEntries(nextEntries as History[]);
       setHistorical(undefined);
-      setComparing(false);
+      setHistoricalContent('body');
     } catch (cause) {
       setError(writeFailure(cause, 'This concept could not be read.'));
     }
@@ -99,7 +101,7 @@ function ConceptBench() {
     const request = ++revisionRequest.current;
     if (commit === detail?.commit_sha) {
       setHistorical(undefined);
-      setComparing(false);
+      setHistoricalContent('body');
       return;
     }
     setPending(true);
@@ -110,12 +112,25 @@ function ConceptBench() {
       })) as Version;
       if (request !== revisionRequest.current) return;
       setHistorical(version);
-      setComparing(false);
+      setHistoricalContent('body');
     } catch (cause) {
       setError(writeFailure(cause, 'That revision could not be read.'));
     } finally {
       if (request === revisionRequest.current) setPending(false);
     }
+  }
+
+  function switchHistoricalContent(event: React.KeyboardEvent<HTMLButtonElement>) {
+    const next =
+      event.key === 'ArrowLeft' || event.key === 'Home'
+        ? 'body'
+        : event.key === 'ArrowRight' || event.key === 'End'
+          ? 'diff'
+          : undefined;
+    if (!next) return;
+    event.preventDefault();
+    setHistoricalContent(next);
+    (next === 'body' ? bodyTab : diffTab).current?.focus();
   }
 
   if (error && !detail) {
@@ -137,6 +152,15 @@ function ConceptBench() {
   const viewedCommit = historical?.commit ?? detail.commit_sha;
   const historicalView = Boolean(historical);
   const viewed = historical ?? detail;
+  const sourceBody = (
+    <>
+      <pre className="source-body">{historical?.markdown ?? detail.markdown}</pre>
+      <p className="line__caption">
+        The complete OKF document is shown as text from the{' '}
+        {historicalView ? 'selected' : 'indexed'} Git commit.
+      </p>
+    </>
+  );
 
   return (
     <section className="detail" aria-label="Selected concept">
@@ -264,15 +288,37 @@ function ConceptBench() {
             Content ·{' '}
             {historicalView ? viewedCommit.slice(0, 12) : `${detail.content_hash.slice(0, 12)}…`}
           </span>
-          {historicalView && !comparing && (
-            <button className="btn btn--quiet" type="button" onClick={() => setComparing(true)}>
-              Compare with published
-            </button>
-          )}
-          {historicalView && comparing && (
-            <button className="btn btn--quiet" type="button" onClick={() => setComparing(false)}>
-              Show revision
-            </button>
+          {historicalView && (
+            <div className="content-tabs" role="tablist" aria-label="Historical revision content">
+              <button
+                ref={bodyTab}
+                className="content-tabs__tab"
+                id="concept-content-body-tab"
+                type="button"
+                role="tab"
+                aria-controls="concept-content-body-panel"
+                aria-selected={historicalContent === 'body'}
+                tabIndex={historicalContent === 'body' ? 0 : -1}
+                onClick={() => setHistoricalContent('body')}
+                onKeyDown={switchHistoricalContent}
+              >
+                Full body
+              </button>
+              <button
+                ref={diffTab}
+                className="content-tabs__tab"
+                id="concept-content-diff-tab"
+                type="button"
+                role="tab"
+                aria-controls="concept-content-diff-panel"
+                aria-selected={historicalContent === 'diff'}
+                tabIndex={historicalContent === 'diff' ? 0 : -1}
+                onClick={() => setHistoricalContent('diff')}
+                onKeyDown={switchHistoricalContent}
+              >
+                Diff
+              </button>
+            </div>
           )}
           {!historicalView && !editing && (
             <button
@@ -288,10 +334,16 @@ function ConceptBench() {
             </button>
           )}
         </div>
-        {comparing && historical ? (
-          <Suspense fallback={<p className="empty">Preparing revision comparison…</p>}>
-            <ConceptDiff newer={detail.markdown} older={historical.markdown} path={path} />
-          </Suspense>
+        {historicalView && historicalContent === 'diff' && historical ? (
+          <div
+            id="concept-content-diff-panel"
+            role="tabpanel"
+            aria-labelledby="concept-content-diff-tab"
+          >
+            <Suspense fallback={<p className="empty">Preparing revision comparison…</p>}>
+              <ConceptDiff newer={detail.markdown} older={historical.markdown} path={path} />
+            </Suspense>
+          </div>
         ) : editing ? (
           <form
             className="revise"
@@ -338,14 +390,16 @@ function ConceptBench() {
               </button>
             </div>
           </form>
+        ) : historicalView ? (
+          <div
+            id="concept-content-body-panel"
+            role="tabpanel"
+            aria-labelledby="concept-content-body-tab"
+          >
+            {sourceBody}
+          </div>
         ) : (
-          <>
-            <pre className="source-body">{historical?.markdown ?? detail.markdown}</pre>
-            <p className="line__caption">
-              The complete OKF document is shown as text from the{' '}
-              {historicalView ? 'selected' : 'indexed'} Git commit.
-            </p>
-          </>
+          sourceBody
         )}
       </div>
 

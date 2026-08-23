@@ -4,7 +4,7 @@ import { parseOkfDocument, serializeOkfDocument, validateOkfPath } from '@common
 import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateScope, validateWorkspace } from './authorize.js';
 import { conceptVersion, inspectWorkspace } from './concept-inspection.js';
-import { client } from './db.js';
+import { client, indexClient } from './db.js';
 import { embeddingModel, embeddings } from './pipeline.js';
 
 const AUTHORITIES = ['unverified', 'approved', 'canonical'] as const;
@@ -396,7 +396,7 @@ async function commitAndIndex(
     corpusPath: corpusPath(),
     embeddingModel: embeddingModel(),
     embeddings: embeddings(),
-    sql: client,
+    sql: indexClient,
     workspaceId: membership.workspaceId,
     workspaceSlug: membership.slug,
   });
