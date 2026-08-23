@@ -33,16 +33,16 @@ export const Route = createFileRoute('/p/$slug/sources')({
   loaderDeps: ({ search }) => search,
   loader: async ({ context, deps, params }) => {
     try {
-      const sources = await context.queryClient.ensureQueryData(
+      await context.queryClient.ensureQueryData(
         conceptRegisterQuery(params.slug, {
           authority: deps.authority,
           query: deps.q,
           type: deps.type,
         })
       );
-      return { register: { sources, hasMore: false }, failure: undefined };
+      return { failure: undefined };
     } catch {
-      return { register: undefined, failure: readFailure('The register') };
+      return { failure: readFailure('The register') };
     }
   },
   head: ({ match }) => ({
@@ -67,7 +67,7 @@ function Sources() {
   const navigate = useNavigate({ from: '/p/$slug/sources' });
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
-  const { register, failure } = Route.useLoaderData();
+  const { failure: loaderFailure } = Route.useLoaderData();
   const query = useQuery(
     conceptRegisterQuery(slug, {
       authority: filters.authority,
@@ -75,7 +75,12 @@ function Sources() {
       type: filters.type,
     })
   );
-  const concepts = (query.data ?? register?.sources ?? []) as unknown as ConceptRow[];
+  const concepts = (query.data ?? []) as unknown as ConceptRow[];
+  const failure = query.isError
+    ? readFailure('The register')
+    : query.data === undefined
+      ? loaderFailure
+      : undefined;
   const searching = Boolean(filters.q);
   const narrowed = Boolean(filters.authority || filters.type);
   const setFilter = (key: keyof SourceFilters, value: string) =>

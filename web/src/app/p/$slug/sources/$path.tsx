@@ -12,7 +12,7 @@ import {
   verifyConcept,
 } from '../../../../lib/concepts.js';
 import { writeFailure } from '../../../../lib/failure.js';
-import { projectQueryKey } from '../../../../lib/queries.js';
+import { conceptQueryKey } from '../../../../lib/queries.js';
 
 export const Route = createFileRoute('/p/$slug/sources/$path')({ component: ConceptBench });
 
@@ -102,7 +102,7 @@ function ConceptBench() {
       await action();
       setEditing(false);
       setArmDeprecate(false);
-      await queryClient.invalidateQueries({ queryKey: projectQueryKey(slug) });
+      await queryClient.invalidateQueries({ queryKey: conceptQueryKey(slug) });
       await load();
       void router.invalidate();
     } catch (cause) {

@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useState } from 'react';
 import { createConcept } from '../../../../lib/concepts.js';
 import { writeFailure } from '../../../../lib/failure.js';
-import { projectQueryKey } from '../../../../lib/queries.js';
+import { conceptQueryKey } from '../../../../lib/queries.js';
 
 export const Route = createFileRoute('/p/$slug/sources/new')({ component: NewConcept });
 
@@ -38,7 +38,7 @@ function NewConcept() {
             .filter(Boolean),
         },
       });
-      await queryClient.invalidateQueries({ queryKey: projectQueryKey(slug) });
+      await queryClient.invalidateQueries({ queryKey: conceptQueryKey(slug) });
       await router.invalidate();
       await navigate({
         to: '/p/$slug/sources/$path',

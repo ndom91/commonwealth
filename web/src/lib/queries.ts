@@ -7,13 +7,13 @@ export type ConceptFilters = {
   type?: string;
 };
 
-export function projectQueryKey(project: string) {
-  return ['projects', project] as const;
+export function conceptQueryKey(project: string) {
+  return ['projects', project, 'concepts'] as const;
 }
 
 export function conceptRegisterQuery(project: string, filters: ConceptFilters) {
   return queryOptions({
-    queryKey: [...projectQueryKey(project), 'concepts', filters],
+    queryKey: [...conceptQueryKey(project), filters],
     // MCP writes bypass the browser, so refresh the active register whenever
     // its reader returns to this window, even inside the normal stale window.
     refetchOnWindowFocus: 'always',

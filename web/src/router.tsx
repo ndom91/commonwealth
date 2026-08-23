@@ -10,6 +10,9 @@ export function getRouter() {
     defaultOptions: {
       queries: {
         refetchOnReconnect: true,
+        // A failed server render should preserve the register's immediate
+        // inline failure rather than wait through Query's client retry backoff.
+        retry: typeof window === 'undefined' ? false : 3,
         staleTime: 30_000,
       },
     },
