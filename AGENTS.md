@@ -225,11 +225,11 @@ A column the MCP server reads must ship in **both**. A column only the admin
 reads ships in `web/drizzle/` alone — and must, if it references a
   better-auth table, since those do not exist in the test chain.
 
-`web/drizzle/meta/_journal.json` needs a matching entry for every new file.
-`web/scripts/db-init.sql` creates the full schema for a fresh
-database and seeds the current Drizzle timestamp. The journal begins empty after
-that baseline; every future migration needs a timestamp after `1786702198002`.
-Pre-OKF database upgrades are unsupported.
+`web/drizzle/meta/_journal.json` needs a matching entry for every new file. The
+initial migration creates the full schema, including extensions and the tables
+better-auth uses; `pnpm migrate` applies it and then idempotently seeds the first
+administrator, workspace, and embedding configuration. Every future migration
+needs a timestamp after `1786702198003`.
 
 better-auth issues string ids, so `user.id` is `text`. A `uuid` foreign key
 referencing it cannot be created.

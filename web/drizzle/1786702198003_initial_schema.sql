@@ -1,4 +1,4 @@
--- Applied only to a database with no Drizzle ledger.
+-- Initial Drizzle migration for a clean database.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS vector;
 

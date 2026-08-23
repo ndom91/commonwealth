@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { member, user } from '../src/db/schema.js';
@@ -14,39 +12,6 @@ import { client, db } from '../src/lib/db.js';
    migration. */
 process.env.BETTER_AUTH_ALLOW_SIGN_UP = 'true';
 const { auth } = await import('../src/lib/auth.js');
-
-/* Drizzle advances by the latest `created_at`. Keep the timestamp as the floor
-   for every future journal entry; the hash identifies this bootstrap payload. */
-const okfBaselineTimestamp = 1786702198002;
-const [ledger] = await client<{ exists: boolean }[]>`
-  SELECT to_regclass('drizzle.__drizzle_migrations') IS NOT NULL AS exists
-`;
-if (!ledger?.exists) {
-  const [legacy] = await client<{ exists: boolean }[]>`
-    SELECT to_regclass('sources') IS NOT NULL AS exists
-  `;
-  if (legacy?.exists) {
-    throw new Error('Pre-OKF databases are not supported; start from a clean database.');
-  }
-  const baseline = await readFile(new URL('./db-init.sql', import.meta.url), 'utf8');
-  const okfBaselineHash = createHash('sha256').update(baseline).digest('hex');
-  await client.unsafe(baseline);
-  await client`CREATE SCHEMA IF NOT EXISTS "drizzle"`;
-  await client`
-    CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
-      "id" serial PRIMARY KEY NOT NULL,
-      "hash" text NOT NULL,
-      "created_at" bigint
-    )
-  `;
-  await client`
-    INSERT INTO "drizzle"."__drizzle_migrations" ("hash", "created_at")
-    SELECT ${okfBaselineHash}, ${okfBaselineTimestamp}
-    WHERE NOT EXISTS (
-      SELECT 1 FROM "drizzle"."__drizzle_migrations" WHERE "hash" = ${okfBaselineHash}
-    )
-  `;
-}
 
 await migrate(db, { migrationsFolder: new URL('../drizzle', import.meta.url).pathname });
 
