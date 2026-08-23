@@ -57,3 +57,30 @@ test('rejects an invalid OpenAI embedding response', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('prefixes asymmetric-model queries without changing document inputs', async () => {
+  const originalFetch = globalThis.fetch;
+  const inputs: string[][] = [];
+  globalThis.fetch = (async (_input, init) => {
+    inputs.push((JSON.parse(String(init?.body)) as { input: string[] }).input);
+    return new Response(JSON.stringify({ data: [{ index: 0, embedding: vector(1) }] }));
+  }) as typeof fetch;
+
+  try {
+    const embeddings = new Embeddings({
+      embeddingUrl: 'http://inference:8080',
+      model: 'qwen3-embedding-test',
+      queryInstruction: 'Retrieve relevant knowledge.',
+    });
+
+    await embeddings.embed(['document']);
+    await embeddings.embedQuery('question');
+
+    assert.deepEqual(inputs, [
+      ['document'],
+      ['Instruct: Retrieve relevant knowledge.\nQuery: question'],
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

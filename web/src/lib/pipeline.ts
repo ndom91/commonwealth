@@ -18,6 +18,7 @@ export function embeddings(): Embeddings {
   cached ??= new Embeddings({
     embeddingUrl: required('EMBEDDING_URL'),
     model: required('EMBEDDING_MODEL'),
+    queryInstruction: process.env.EMBEDDING_QUERY_INSTRUCTION?.trim() || undefined,
   });
   return cached;
 }

@@ -10,8 +10,8 @@ services:
       CORPUS_PATH: ${COMPOSE_CORPUS_PATH:-/app/corpora}
       # Paired with EMBEDDING_MODEL above, and only correct for it.
       # qwen3-embedding is asymmetric: queries want `Instruct: …\nQuery: …`,
-      # documents want raw text. Only this service embeds queries — the web app
-      # embeds documents and searches lexically, so it takes no instruction.
+      # documents want raw text. The web app's retrieval inspector uses this same
+      # instruction for queries while continuing to embed documents without it.
       # Change the model and this has to change or be removed with it.
       EMBEDDING_QUERY_INSTRUCTION: ${EMBEDDING_QUERY_INSTRUCTION:-Given a question from a teammate, retrieve passages from the team knowledge base that answer it}
       PORT: 3000
@@ -42,6 +42,7 @@ services:
       # two models in one index do not error, they quietly stop matching.
       EMBEDDING_URL: ${COMPOSE_EMBEDDING_URL:-http://inference:8080}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-qwen3-embedding-0.6b-q8_0-370f27d}
+      EMBEDDING_QUERY_INSTRUCTION: ${EMBEDDING_QUERY_INSTRUCTION:-Given a question from a teammate, retrieve passages from the team knowledge base that answer it}
       CORPUS_PATH: ${COMPOSE_CORPUS_PATH:-/app/corpora}
       PORT: 3001
       # This service is bound to loopback with nothing in front of it by default.
