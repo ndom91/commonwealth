@@ -885,6 +885,12 @@ select {
   gap: var(--s-tight);
 }
 
+.authority-summary__head {
+  display: flex;
+  align-items: start;
+  gap: var(--s-base);
+}
+
 .authority-summary__standing {
   display: flex;
   flex-wrap: wrap;
@@ -924,6 +930,7 @@ select {
 }
 
 .authority-control legend {
+  margin-bottom: var(--s-tight);
   padding: 0;
 }
 

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   commitFiles,
+  commitInfo,
   ensureRepository,
   head,
   history,
@@ -36,6 +37,7 @@ test('initializes, commits, and reads a workspace OKF bundle', async () => {
     const entries = await history(corpusPath, 'core-team', 'playbooks/deploy.md');
     assert.equal(entries[0]?.commit, commit);
     assert.equal(entries[0]?.subject, 'Create playbooks/deploy.md');
+    assert.deepEqual(await commitInfo(corpusPath, 'core-team', commit), entries[0]);
     assert.equal(
       await readFileAtCommit(corpusPath, 'core-team', 'playbooks/deploy.md'),
       '---\ntype: Playbook\ntitle: Deploy\n---\n\n# Deploy\n'

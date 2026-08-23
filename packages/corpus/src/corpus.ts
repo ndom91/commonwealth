@@ -114,6 +114,20 @@ export async function history(
   return entries;
 }
 
+// commitInfo returns the recorded metadata for one commit, including a workspace
+// snapshot that may not have directly changed the source being viewed.
+export async function commitInfo(
+  corpusPath: string,
+  workspace: string,
+  commit: string
+): Promise<HistoryEntry> {
+  const repository = await ensureRepository(corpusPath, workspace);
+  const output = (await git(repository, ['show', '-s', '--format=%H%x09%aI%x09%s', commit])).trim();
+  const [id, timestamp, subject] = output.split('\t');
+  if (!id || !timestamp || subject === undefined) throw new Error('Git commit could not be read');
+  return { commit: id, timestamp, subject };
+}
+
 // listConceptPaths returns every non-reserved Markdown concept at a commit.
 export async function listConceptPaths(
   corpusPath: string,

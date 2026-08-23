@@ -201,7 +201,18 @@ function ConceptBench() {
 
       <div className="bench__section">
         <div className="authority-summary">
-          <span className="label">Authority</span>
+          <div className="authority-summary__head">
+            <span className="label">Authority</span>
+            {historicalView && (
+              <button
+                className="btn btn--quiet authority-summary__latest"
+                type="button"
+                onClick={() => void showRevision(detail.commit_sha)}
+              >
+                Back to latest
+              </button>
+            )}
+          </div>
           <div className="authority-summary__standing">
             <span className="authority-summary__value">{viewed.authority}</span>
             <span className="register authority-summary__verified">
@@ -213,15 +224,6 @@ function ConceptBench() {
                 'Never verified by a human'
               )}
             </span>
-            {historicalView && (
-              <button
-                className="btn btn--quiet authority-summary__latest"
-                type="button"
-                onClick={() => void showRevision(detail.commit_sha)}
-              >
-                Go to latest
-              </button>
-            )}
           </div>
         </div>
         {!historicalView && (
