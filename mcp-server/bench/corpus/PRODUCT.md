@@ -124,7 +124,7 @@ The MCP tool list, the role names and the concept lifecycle are all readable fro
 - **One index, one model.** Embeddings from different models must never be mixed
   in one index. Changing `EMBEDDING_MODEL` or the vector dimension requires
   reindexing every chunk, and `index_configuration` refuses a silent change.
-  `qwen3-embedding:0.6b` is explicitly a replaceable baseline, not a choice the
+   `qwen3-embedding-0.6b-q8_0-370f27d` is explicitly a replaceable baseline, not a choice the
   product is built around.
 - **The indexed commit is the retrieval invariant.** `indexed_commit_sha` is
   the only snapshot MCP and admin reads may use. Indexing inserts all concepts

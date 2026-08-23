@@ -5,6 +5,7 @@ set -eu
 : "${MODEL_FILE:?MODEL_FILE is required}"
 : "${MODEL_SHA256:?MODEL_SHA256 is required}"
 : "${MODEL_URL:?MODEL_URL is required}"
+MODEL_POOLING=${MODEL_POOLING:-last}
 
 case "$MODEL_FILE" in
   */* | .* | '')
@@ -28,7 +29,7 @@ exec /app/llama-server \
   --model "$model" \
   --alias "$EMBEDDING_MODEL" \
   --embedding \
-  --pooling last \
+  --pooling "$MODEL_POOLING" \
   --host 0.0.0.0 \
   --port 8080 \
   "$@"

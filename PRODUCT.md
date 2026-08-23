@@ -124,7 +124,7 @@ The MCP tool list, the role names and the concept lifecycle are all readable fro
 - **One index, one model.** Embeddings from different models must never be mixed
   in one index. Changing `EMBEDDING_MODEL` or the vector dimension requires
   reindexing every chunk, and `index_configuration` refuses a silent change.
-  `qwen3-embedding:0.6b` is explicitly a replaceable baseline, not a choice the
+   `qwen3-embedding-0.6b-q8_0-370f27d` is explicitly a replaceable baseline, not a choice the
   product is built around — and `pnpm bench` takes `EMBEDDING_MODEL` from the
   environment precisely so replacing it is a measured decision rather than a
   swap.
@@ -198,7 +198,7 @@ Remaining known gaps, in rough order of how much they cost:
   arm matching any term instead of every one, and finally rank fusion across the
   two arms. What it cannot say is whether a *different* model would do better:
   the harness reads `EMBEDDING_MODEL` from the environment and has only ever been
-  pointed at one. Until a second model has been through it, `qwen3-embedding:0.6b`
+   pointed at one. Until a second model has been through it, `qwen3-embedding-0.6b-q8_0-370f27d`
   is a baseline that has been tuned around, not a choice that has been justified.
 - **The operational half of the model gate is untouched.** RAM, image size and
   CPU cold-start, per `PLAN.md`. These decide whether the default is usable on a

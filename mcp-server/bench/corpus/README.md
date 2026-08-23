@@ -32,8 +32,9 @@ to connect to `http://localhost:3000/mcp` with:
 Authorization: Bearer <your key>
 ```
 
-The default embedding model is a small local baseline. `qwen3-embedding:0.6b`
-is Apache-2.0 licensed and approximately 639 MB. Treat it as a baseline: use
+The default embedding model is a small local baseline.
+`Qwen3-Embedding-0.6B-Q8_0.gguf` is Apache-2.0 licensed and approximately 639 MB.
+Treat it as a baseline: use
 the evaluation corpus described in `PLAN.md` before changing the default.
 
 ## Local development

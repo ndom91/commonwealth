@@ -19,7 +19,7 @@ export type EmbeddingOptions = {
 };
 
 /* Chunks per request. Embedding cost is linear in chunk count — roughly 0.7s
-   each for qwen3-embedding:0.6b on CPU — so a single request carrying every
+   each for Qwen3-Embedding-0.6B on CPU — so a single request carrying every
    chunk of a document made the deadline below depend on document size. A note
    embedded in a second; a converted PDF of fifty chunks blew a thirty-second
    timeout and reported "aborted due to timeout" with no clue which of the two

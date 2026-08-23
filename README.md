@@ -55,9 +55,8 @@ Vite development server; both use port 3001.
 The default inference service is CPU-only and supports Linux `amd64` and `arm64`.
 On Linux with NVIDIA Container Toolkit, add `-f compose.cuda.yaml`; on Linux with
 ROCm, add `-f compose.rocm.yaml`. Apple Silicon Docker runs the portable Linux CPU
-image. For Metal acceleration, run a native `llama-server` and point
-`EMBEDDING_URL` at it instead of starting the Compose inference service. See
-[`docs/inference.md`](docs/inference.md) for model and platform details.
+image. See [`docs/inference.md`](docs/inference.md) for model replacement and
+native Metal instructions.
 
 ## License
 
