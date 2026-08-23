@@ -36,6 +36,11 @@ type Version = Pick<Detail, 'authority' | 'last_verified_at' | 'tags' | 'title' 
 };
 
 const AUTHORITIES: Authority[] = ['unverified', 'approved', 'canonical'];
+const AUTHORITY_ACTIONS: Record<Authority, string> = {
+  unverified: 'Unverify',
+  approved: 'Approve',
+  canonical: 'Mark canonical',
+};
 const ConceptDiff = lazy(() =>
   import('../../../../components/concept-diff.js').then(({ ConceptDiff }) => ({
     default: ConceptDiff,
@@ -195,17 +200,20 @@ function ConceptBench() {
       )}
 
       <div className="bench__section">
-        <div className="bench__section-head">
-          <span className="label">
-            Authority{' '}
-            {viewed.last_verified_at ? (
-              <>
-                · last verified <Stamp at={viewed.last_verified_at} />
-              </>
-            ) : (
-              '· never verified by a human'
-            )}
-          </span>
+        <div className="authority-summary">
+          <span className="label">Authority</span>
+          <div className="authority-summary__standing">
+            <span className="authority-summary__value">{viewed.authority}</span>
+            <span className="register authority-summary__verified">
+              {viewed.last_verified_at ? (
+                <>
+                  Last verified <Stamp at={viewed.last_verified_at} />
+                </>
+              ) : (
+                'Never verified by a human'
+              )}
+            </span>
+          </div>
         </div>
         {historicalView ? (
           <button
@@ -216,9 +224,9 @@ function ConceptBench() {
             Return to published revision
           </button>
         ) : (
-          <div className="authority-set">
+          <div className="authority-actions">
             <fieldset className="authority-control">
-              <legend className="label">Set authority to</legend>
+              <legend className="label">Change authority</legend>
               <div className="authority-control__choices">
                 {AUTHORITIES.map((authority) => (
                   <button
@@ -233,45 +241,48 @@ function ConceptBench() {
                       )
                     }
                   >
-                    {authority}
+                    {authority === detail.authority ? authority : AUTHORITY_ACTIONS[authority]}
                   </button>
                 ))}
               </div>
             </fieldset>
-            {armDeprecate ? (
-              <>
+            <div className="authority-retire">
+              <span className="label">Retire source</span>
+              {armDeprecate ? (
+                <div className="authority-retire__actions">
+                  <button
+                    type="button"
+                    className="btn btn--void"
+                    disabled={pending}
+                    onClick={() =>
+                      void act(
+                        () => deprecateConcept({ data: { workspace: slug, path } }),
+                        'The concept could not be deprecated.'
+                      )
+                    }
+                  >
+                    {pending ? 'Deprecating…' : 'Confirm deprecate'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--quiet"
+                    disabled={pending}
+                    onClick={() => setArmDeprecate(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
                   className="btn btn--void"
                   disabled={pending}
-                  onClick={() =>
-                    void act(
-                      () => deprecateConcept({ data: { workspace: slug, path } }),
-                      'The concept could not be deprecated.'
-                    )
-                  }
+                  onClick={() => setArmDeprecate(true)}
                 >
-                  {pending ? 'Deprecating…' : 'Confirm deprecate'}
+                  Deprecate
                 </button>
-                <button
-                  type="button"
-                  className="btn btn--quiet"
-                  disabled={pending}
-                  onClick={() => setArmDeprecate(false)}
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn btn--void"
-                disabled={pending}
-                onClick={() => setArmDeprecate(true)}
-              >
-                Deprecate
-              </button>
-            )}
+              )}
+            </div>
           </div>
         )}
         {!historicalView && armDeprecate && (

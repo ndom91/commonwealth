@@ -880,11 +880,34 @@ select {
   color: var(--ink-2);
 }
 
-.authority-set {
+.authority-summary {
+  display: grid;
+  gap: var(--s-tight);
+}
+
+.authority-summary__standing {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--s-tight);
+  align-items: baseline;
+  gap: var(--s-tight) var(--s-base);
+}
+
+.authority-summary__value {
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.authority-summary__verified {
+  color: var(--ink-3);
+}
+
+.authority-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: var(--s-loose);
+  margin-top: var(--s-loose);
 }
 
 .authority-control {
@@ -896,14 +919,27 @@ select {
   gap: var(--s-tight);
 }
 
+.authority-control legend {
+  padding: 0;
+}
+
 .authority-control__choices {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-tight);
 }
 
-.authority-set__spacer {
-  flex: 1 1 var(--s-loose);
+.authority-retire {
+  display: grid;
+  gap: var(--s-tight);
+  padding-inline-start: var(--s-loose);
+  border-inline-start: 1px solid var(--rule-hair);
+}
+
+.authority-retire__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-tight);
 }
 
 /* ── Review queue ────────────────────────────────────────────────────────── */
