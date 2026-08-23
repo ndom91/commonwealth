@@ -117,7 +117,7 @@ function ConceptBench() {
     comparisonRequest.current += 1;
     setComparison(undefined);
     setPreparingComparison(false);
-    if (commit === detail?.commit_sha) {
+    if (commit === detail?.commit_sha || commit === entries[0]?.commit) {
       setHistorical(undefined);
       setHistoricalContent('body');
       return;
@@ -140,7 +140,8 @@ function ConceptBench() {
 
   function previousRevision(commit: string) {
     const index = entries.findIndex((entry) => entry.commit === commit);
-    return index >= 0 ? entries[index + 1] : undefined;
+    if (index >= 0) return entries[index + 1];
+    return commit === detail?.commit_sha ? entries[1] : undefined;
   }
 
   async function showDiff() {
@@ -293,97 +294,97 @@ function ConceptBench() {
                 </div>
               </fieldset>
             )}
-          </div>
-          <div className="authority-actions">
-            {hasDiff && !editing && (
-              <div className="content-tabs" role="tablist" aria-label="Concept content">
+            <div className="authority-actions authority-actions--operations">
+              {historicalView ? (
                 <button
-                  ref={bodyTab}
-                  className="content-tabs__tab"
-                  id="concept-content-body-tab"
+                  className="btn btn--quiet"
                   type="button"
-                  role="tab"
-                  aria-controls="concept-content-body-panel"
-                  aria-selected={historicalContent === 'body'}
-                  tabIndex={historicalContent === 'body' ? 0 : -1}
-                  onClick={() => setHistoricalContent('body')}
-                  onKeyDown={switchHistoricalContent}
+                  onClick={() => void showRevision(detail.commit_sha)}
                 >
-                  Content
+                  Back to latest
                 </button>
-                <button
-                  ref={diffTab}
-                  className="content-tabs__tab"
-                  id="concept-content-diff-tab"
-                  type="button"
-                  role="tab"
-                  aria-controls="concept-content-diff-panel"
-                  aria-selected={historicalContent === 'diff'}
-                  tabIndex={historicalContent === 'diff' ? 0 : -1}
-                  onClick={() => void showDiff()}
-                  onKeyDown={switchHistoricalContent}
-                >
-                  Diff
-                </button>
-              </div>
-            )}
-            {historicalView ? (
-              <button
-                className="btn btn--quiet"
-                type="button"
-                onClick={() => void showRevision(detail.commit_sha)}
-              >
-                Back to latest
-              </button>
-            ) : armDeprecate ? (
-              <>
+              ) : armDeprecate ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn--void"
+                    disabled={pending}
+                    onClick={() =>
+                      void act(
+                        () => deprecateConcept({ data: { project: slug, path } }),
+                        'The concept could not be deprecated.'
+                      )
+                    }
+                  >
+                    {pending ? 'Deprecating…' : 'Confirm deprecate'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--quiet"
+                    disabled={pending}
+                    onClick={() => setArmDeprecate(false)}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
                   className="btn btn--void"
                   disabled={pending}
-                  onClick={() =>
-                    void act(
-                      () => deprecateConcept({ data: { project: slug, path } }),
-                      'The concept could not be deprecated.'
-                    )
-                  }
+                  onClick={() => setArmDeprecate(true)}
                 >
-                  {pending ? 'Deprecating…' : 'Confirm deprecate'}
+                  Deprecate
                 </button>
+              )}
+              {!historicalView && !editing && (
                 <button
                   type="button"
                   className="btn btn--quiet"
-                  disabled={pending}
-                  onClick={() => setArmDeprecate(false)}
+                  onClick={() => {
+                    setTitle(detail.title ?? '');
+                    setBody(detail.body);
+                    setHistoricalContent('body');
+                    setEditing(true);
+                  }}
                 >
-                  Cancel
+                  Edit
                 </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn btn--void"
-                disabled={pending}
-                onClick={() => setArmDeprecate(true)}
-              >
-                Deprecate
-              </button>
-            )}
-            {!historicalView && !editing && (
-              <button
-                type="button"
-                className="btn btn--quiet"
-                onClick={() => {
-                  setTitle(detail.title ?? '');
-                  setBody(detail.body);
-                  setHistoricalContent('body');
-                  setEditing(true);
-                }}
-              >
-                Edit
-              </button>
-            )}
+              )}
+            </div>
           </div>
+          {hasDiff && !editing && (
+            <div className="content-tabs" role="tablist" aria-label="Concept content">
+              <button
+                ref={bodyTab}
+                className="content-tabs__tab"
+                id="concept-content-body-tab"
+                type="button"
+                role="tab"
+                aria-controls="concept-content-body-panel"
+                aria-selected={historicalContent === 'body'}
+                tabIndex={historicalContent === 'body' ? 0 : -1}
+                onClick={() => setHistoricalContent('body')}
+                onKeyDown={switchHistoricalContent}
+              >
+                Content
+              </button>
+              <button
+                ref={diffTab}
+                className="content-tabs__tab"
+                id="concept-content-diff-tab"
+                type="button"
+                role="tab"
+                aria-controls="concept-content-diff-panel"
+                aria-selected={historicalContent === 'diff'}
+                tabIndex={historicalContent === 'diff' ? 0 : -1}
+                onClick={() => void showDiff()}
+                onKeyDown={switchHistoricalContent}
+              >
+                Diff
+              </button>
+            </div>
+          )}
         </div>
         {!historicalView && armDeprecate && (
           <p className="bench__consequence">
@@ -476,7 +477,7 @@ function ConceptBench() {
                 className="stub__revision"
                 disabled={pending}
                 onClick={() => void showRevision(entry.commit)}
-                aria-pressed={entry.commit === viewedCommit}
+                aria-pressed={!historicalView && entry === entries[0]}
                 type="button"
               >
                 <span className="stub__label">{entry.subject}</span>
@@ -485,7 +486,7 @@ function ConceptBench() {
                   <Stamp at={entry.timestamp} precision="datetime" />
                 </span>
               </button>
-              {entry.commit === detail.commit_sha && (
+              {entry === entries[0] && (
                 <span className="stub__action">
                   <SealChip state="signed">Latest</SealChip>
                 </span>

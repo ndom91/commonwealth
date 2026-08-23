@@ -1,10 +1,4 @@
-import {
-  commitFiles,
-  commitInfo,
-  history,
-  listConceptPaths,
-  readFileAtCommit,
-} from '@commonwealth/corpus';
+import { commitFiles, history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
 import { indexProject } from '@commonwealth/corpus/indexer';
 import { parseOkfDocument, serializeOkfDocument, validateOkfPath } from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
@@ -227,18 +221,7 @@ export const getConceptHistory = createServerFn({ method: 'POST' })
   .validator(pathInput)
   .handler(async ({ data }) => {
     const membership = await requireMember('read', data.project);
-    const entries = await history(corpusPath(), membership.slug, data.path);
-    const [state] = await client<{ indexed_commit_sha: string | null }[]>`
-      SELECT indexed_commit_sha FROM project_index_state WHERE project_id = ${membership.projectId}
-    `;
-    if (
-      !state?.indexed_commit_sha ||
-      entries.some((entry) => entry.commit === state.indexed_commit_sha)
-    ) {
-      return entries;
-    }
-    const snapshot = await commitInfo(corpusPath(), membership.slug, state.indexed_commit_sha);
-    return [{ ...snapshot, subject: 'Current published snapshot' }, ...entries];
+    return history(corpusPath(), membership.slug, data.path);
   });
 
 export const getConceptVersion = createServerFn({ method: 'GET' })

@@ -909,17 +909,21 @@ select {
 
 .authority-summary {
   display: grid;
-  gap: var(--s-tight);
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--s-loose);
+  row-gap: var(--s-tight);
 }
 
 .authority-summary__head {
   display: flex;
+  grid-column: 1 / -1;
   align-items: start;
   gap: var(--s-base);
 }
 
 .authority-summary__standing {
   display: flex;
+  grid-column: 1 / -1;
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--s-tight) var(--s-base);
@@ -945,9 +949,14 @@ select {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-self: flex-end;
   gap: var(--s-tight);
+}
+
+.authority-actions--operations {
+  padding-inline-start: var(--s-loose);
+  border-inline-start: 1px solid var(--rule-hair);
 }
 
 .authority-control {
@@ -1779,18 +1788,28 @@ select {
 
 .content-tabs {
   display: flex;
-  gap: var(--s-base);
+  align-self: flex-end;
+  margin-left: auto;
 }
 
 .content-tabs__tab {
-  padding: 0 0 var(--s-snug);
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
+  position: relative;
+  margin-left: -1px;
+  padding: var(--s-tight) var(--s-snug);
+  border: 1px solid var(--rule-hair);
+  background: var(--slate-ground);
   color: var(--ink-2);
-  font: inherit;
-  font-size: 12.5px;
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  line-height: 1.2;
+  text-transform: uppercase;
   cursor: pointer;
+}
+
+.content-tabs__tab:first-child {
+  margin-left: 0;
 }
 
 .content-tabs__tab:hover {
@@ -1798,9 +1817,10 @@ select {
 }
 
 .content-tabs__tab[aria-selected="true"] {
-  border-bottom-color: var(--mark);
+  z-index: 1;
+  border-color: var(--rule-strong);
+  background: var(--slate-raised);
   color: var(--ink);
-  font-weight: 600;
 }
 
 .retrieval-form {
@@ -2262,8 +2282,12 @@ select {
     flex-wrap: wrap;
   }
 
+  .authority-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .authority-actions {
-    flex-basis: 100%;
+    grid-column: 1;
   }
 
   .retrieval-form {
