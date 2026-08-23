@@ -79,10 +79,14 @@ if (process.env.TRUST_FORWARDED_FOR === 'true') {
   }
 }
 
+const trustedOrigins = ['http://localhost:3001', 'http://127.0.0.1:3001'];
+const authUrl = process.env.BETTER_AUTH_URL?.trim();
+if (authUrl) trustedOrigins.push(authUrl);
+
 const shared = {
-  baseURL: process.env.BETTER_AUTH_URL,
+  baseURL: authUrl,
   secret: process.env.BETTER_AUTH_SECRET,
-  trustedOrigins: ['http://localhost:3001', 'http://127.0.0.1:3001'],
+  trustedOrigins,
   database: drizzleAdapter(db, { provider: 'pg', schema }),
   /* Covers better-auth's own endpoints only — `/api/auth/*`. Our server
    * functions are a separate surface with a separate limiter; see

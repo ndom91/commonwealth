@@ -35,7 +35,9 @@ reverse proxy in front of them for public access; examples are in
 [`docs/proxy/`](docs/proxy/). Set `APP_TRUST_FORWARDED_FOR=true` and/or
 `WEB_TRUST_FORWARDED_FOR=true` only for a service reached through that trusted
 proxy. Cloudflare orange-cloud deployments also set the matching
-`*_FORWARDED_IP_HEADER=cf-connecting-ip` value.
+`*_FORWARDED_IP_HEADER=cf-connecting-ip` value and set
+`BETTER_AUTH_URL` to the public dashboard URL, such as
+`https://commonwealth.example.com`.
 
 ## License
 
