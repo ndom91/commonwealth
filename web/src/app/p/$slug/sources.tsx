@@ -193,6 +193,15 @@ function Sources() {
                   {concept.excerpt && (
                     <span className="entry__excerpt">{highlight(concept.excerpt)}</span>
                   )}
+                  {concept.tags.length > 0 && (
+                    <span className="tags entry__tags">
+                      {concept.tags.map((tag) => (
+                        <span className="tag" key={tag}>
+                          {tag}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                   {concept.authority !== 'approved' && (
                     <span className="entry__role">
                       <SealChip state={authoritySeal(concept.authority)}>

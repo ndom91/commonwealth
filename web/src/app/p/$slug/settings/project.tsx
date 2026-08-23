@@ -80,7 +80,7 @@ function Corpus({
   failure: string | undefined;
 }) {
   return (
-    <div className="bench__section">
+    <div className="bench__section project-archive">
       <span className="label">This corpus</span>
       {failure ? (
         <p className="notice" role="alert">

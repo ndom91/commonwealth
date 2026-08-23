@@ -585,6 +585,14 @@ select {
   min-height: 0;
 }
 
+/* A standalone bench is the main column's final child. Let it carry the bench
+   ground to the viewport edge, while split workbenches continue to size through
+   their `.panes` grid. */
+.main > .detail {
+  flex: 1;
+  min-height: 0;
+}
+
 /* A hairline, not the 2px rule this once carried: at this density a doubled
    rule in the hairline colour reads as two stacked lines rather than as
    emphasis, so it looked like a mistake on every page. The masthead is already
@@ -1052,6 +1060,17 @@ select {
   font-variant-numeric: tabular-nums;
 }
 
+.entry__tags {
+  grid-column: 1;
+  gap: var(--s-hair);
+  margin-top: var(--s-tight);
+}
+
+.entry__tags .tag {
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+}
+
 .entry[aria-current="page"] .entry__accession {
   color: var(--mark);
 }
@@ -1509,6 +1528,10 @@ select {
 .bench__section > .label {
   display: block;
   margin-bottom: var(--s-snug);
+}
+
+.project-archive .bench__controls {
+  margin-top: var(--s-base);
 }
 
 .bench__seal {
