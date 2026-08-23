@@ -1,5 +1,6 @@
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
+import type { QueryClient } from '@tanstack/react-query';
+import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 import { readTheme } from '../lib/session.js';
 import type { Theme } from '../lib/theme.js';
 import appCss from './styles.css?url';
@@ -53,7 +54,7 @@ function RootDocument() {
   );
 }
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: () => readTheme(),
   head: ({ loaderData }) => ({
     meta: [

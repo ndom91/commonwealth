@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { lazy, Suspense, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { authoritySeal, SealChip } from '../../../../components/chrome.js';
@@ -11,6 +12,7 @@ import {
   verifyConcept,
 } from '../../../../lib/concepts.js';
 import { writeFailure } from '../../../../lib/failure.js';
+import { projectQueryKey } from '../../../../lib/queries.js';
 
 export const Route = createFileRoute('/p/$slug/sources/$path')({ component: ConceptBench });
 
@@ -49,6 +51,7 @@ const ConceptDiff = lazy(() =>
 
 function ConceptBench() {
   const { slug, path } = Route.useParams();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const [detail, setDetail] = useState<Detail>();
   const [entries, setEntries] = useState<History[]>([]);
@@ -99,6 +102,7 @@ function ConceptBench() {
       await action();
       setEditing(false);
       setArmDeprecate(false);
+      await queryClient.invalidateQueries({ queryKey: projectQueryKey(slug) });
       await load();
       void router.invalidate();
     } catch (cause) {

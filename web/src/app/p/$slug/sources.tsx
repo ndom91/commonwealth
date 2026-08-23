@@ -1,9 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, Outlet, useNavigate } from '@tanstack/react-router';
 import { Search, X } from 'lucide-react';
 import { AppShell, authoritySeal, IconButton, SealChip } from '../../../components/chrome.js';
 import { Stamp } from '../../../components/stamp.js';
-import { listConcepts, searchConcepts } from '../../../lib/concepts.js';
 import { readFailure } from '../../../lib/failure.js';
+import { conceptRegisterQuery } from '../../../lib/queries.js';
 import { documentTitle } from '../../../lib/title.js';
 
 export type SourceFilters = {
@@ -30,20 +31,15 @@ export const Route = createFileRoute('/p/$slug/sources')({
     q: typeof search.q === 'string' && search.q.trim() ? search.q.trim().slice(0, 200) : undefined,
   }),
   loaderDeps: ({ search }) => search,
-  loader: async ({ deps, params }) => {
+  loader: async ({ context, deps, params }) => {
     try {
-      const sources = deps.q
-        ? await searchConcepts({
-            data: {
-              project: params.slug,
-              authority: deps.authority,
-              type: deps.type,
-              query: deps.q,
-            },
-          })
-        : await listConcepts({
-            data: { project: params.slug, authority: deps.authority, type: deps.type },
-          });
+      const sources = await context.queryClient.ensureQueryData(
+        conceptRegisterQuery(params.slug, {
+          authority: deps.authority,
+          query: deps.q,
+          type: deps.type,
+        })
+      );
       return { register: { sources, hasMore: false }, failure: undefined };
     } catch {
       return { register: undefined, failure: readFailure('The register') };
@@ -72,7 +68,14 @@ function Sources() {
   const viewer = Route.useRouteContext();
   const filters = Route.useSearch();
   const { register, failure } = Route.useLoaderData();
-  const concepts = (register?.sources ?? []) as unknown as ConceptRow[];
+  const query = useQuery(
+    conceptRegisterQuery(slug, {
+      authority: filters.authority,
+      query: filters.q,
+      type: filters.type,
+    })
+  );
+  const concepts = (query.data ?? register?.sources ?? []) as unknown as ConceptRow[];
   const searching = Boolean(filters.q);
   const narrowed = Boolean(filters.authority || filters.type);
   const setFilter = (key: keyof SourceFilters, value: string) =>

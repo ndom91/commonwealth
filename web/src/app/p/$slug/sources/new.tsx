@@ -1,12 +1,15 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { createConcept } from '../../../../lib/concepts.js';
 import { writeFailure } from '../../../../lib/failure.js';
+import { projectQueryKey } from '../../../../lib/queries.js';
 
 export const Route = createFileRoute('/p/$slug/sources/new')({ component: NewConcept });
 
 function NewConcept() {
   const { slug } = Route.useParams();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const navigate = useNavigate();
   const [path, setPath] = useState('notes/');
@@ -35,6 +38,7 @@ function NewConcept() {
             .filter(Boolean),
         },
       });
+      await queryClient.invalidateQueries({ queryKey: projectQueryKey(slug) });
       await router.invalidate();
       await navigate({
         to: '/p/$slug/sources/$path',
