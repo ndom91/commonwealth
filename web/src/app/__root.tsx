@@ -76,7 +76,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
          tab title cannot afford to be. */
       { title: 'Commonwealth' },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      { rel: 'stylesheet', href: appCss },
+    ],
   }),
   component: RootDocument,
   notFoundComponent: () => <main>Page not found</main>,
