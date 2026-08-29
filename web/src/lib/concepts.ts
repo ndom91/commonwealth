@@ -1,6 +1,11 @@
 import { commitFiles, history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
 import { indexProject } from '@commonwealth/corpus/indexer';
-import { parseOkfDocument, serializeOkfDocument, validateOkfPath } from '@commonwealth/pipeline';
+import {
+  okfMetadata,
+  parseOkfDocument,
+  serializeOkfDocument,
+  validateOkfPath,
+} from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateProject, validateScope } from './authorize.js';
 import { conceptVersion, inspectProject } from './concept-inspection.js';
@@ -83,15 +88,6 @@ function retrievalInput(value: unknown): Scoped<{
     tags: selectedTags.map((tag) => tag.trim()),
     type: optionalText(input.type, 'type'),
   };
-}
-
-function revisionTime(frontmatter: Record<string, unknown>): string | null {
-  const verified = frontmatter.verified;
-  if (!Array.isArray(verified)) return null;
-  const latest = verified.at(-1);
-  if (latest === null || typeof latest !== 'object') return null;
-  const at = (latest as Record<string, unknown>).at;
-  return typeof at === 'string' ? at : null;
 }
 
 function owner(frontmatter: Record<string, unknown>): string | null {
@@ -206,12 +202,13 @@ export const getConceptDetail = createServerFn({ method: 'GET' })
       concept.commit_sha
     );
     const document = parseOkfDocument(markdown);
+    const metadata = okfMetadata(document.frontmatter);
     const { frontmatter: _frontmatter, ...detail } = concept;
     return {
       ...detail,
       markdown,
       body: document.body,
-      last_verified_at: revisionTime(document.frontmatter),
+      last_verified_at: metadata.lastVerifiedAt,
     };
   });
 
@@ -363,7 +360,7 @@ async function reviewQueue(projectId: string) {
   `;
   return rows
     .map((row) => {
-      const verifiedAt = revisionTime(row.frontmatter);
+      const verifiedAt = okfMetadata(row.frontmatter).lastVerifiedAt;
       return {
         path: row.path,
         commit_sha: row.commit_sha,

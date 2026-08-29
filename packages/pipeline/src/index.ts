@@ -35,7 +35,11 @@
 export { type Chunk, chunkMarkdown, embeddingInput } from './chunking.js';
 export { EMBEDDING_DIMENSIONS, type EmbeddingOptions, Embeddings } from './embeddings.js';
 export {
+  OKF_AUTHORITIES,
+  type OkfAuthority,
   type OkfDocument,
+  type OkfMetadata,
+  okfMetadata,
   parseOkfDocument,
   serializeOkfDocument,
   validateOkfPath,

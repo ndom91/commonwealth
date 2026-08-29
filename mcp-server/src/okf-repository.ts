@@ -2,6 +2,7 @@ import { commitFiles, history, listConceptPaths, readFileAtCommit } from '@commo
 import { searchProject } from '@commonwealth/corpus/search';
 import {
   type Embeddings,
+  okfMetadata,
   parseOkfDocument,
   serializeOkfDocument,
   validateOkfPath,
@@ -115,7 +116,7 @@ export class OkfRepository {
     const path = validateOkfPath(input.path);
     const current = await this.currentDocument(actor, path);
     const generatedBy = actorName(actor);
-    const author = nestedString(current.frontmatter.generated, 'by');
+    const author = okfMetadata(current.frontmatter).generatedBy;
     if (actor.role === 'writer' && author !== generatedBy) {
       throw new DomainError('Writers can only revise concepts they created');
     }
@@ -261,16 +262,6 @@ function objectOf(value: unknown): Record<string, unknown> {
   }
 
   return {};
-}
-
-function nestedString(value: unknown, key: string): string | null {
-  return stringOf(objectOf(value)[key]);
-}
-
-function stringOf(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-
-  return value;
 }
 
 function uniqueTags(tags: string[]): string[] {

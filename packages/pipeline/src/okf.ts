@@ -7,6 +7,21 @@ export type OkfDocument = {
   frontmatter: Record<string, unknown>;
 };
 
+export const OKF_AUTHORITIES = ['unverified', 'approved', 'canonical'] as const;
+export type OkfAuthority = (typeof OKF_AUTHORITIES)[number];
+
+export type OkfMetadata = {
+  authority: OkfAuthority;
+  description: string | null;
+  generatedAt: string | null;
+  generatedBy: string | null;
+  lastVerifiedAt: string | null;
+  status: 'deprecated' | 'draft' | 'stable';
+  tags: string[];
+  title: string | null;
+  type: string;
+};
+
 // parseOkfDocument validates and parses one OKF concept document.
 export function parseOkfDocument(text: string): OkfDocument {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
@@ -27,6 +42,41 @@ export function parseOkfDocument(text: string): OkfDocument {
   }
 
   return { body: text.slice(match[0].length), frontmatter: value };
+}
+
+export function okfMetadata(frontmatter: Record<string, unknown>): OkfMetadata {
+  const status = frontmatter.status;
+  if (
+    status !== undefined &&
+    status !== 'draft' &&
+    status !== 'stable' &&
+    status !== 'deprecated'
+  ) {
+    throw new Error('OKF status must be draft, stable, or deprecated');
+  }
+  const tags = frontmatter.tags;
+  if (tags !== undefined && (!Array.isArray(tags) || tags.some((tag) => typeof tag !== 'string'))) {
+    throw new Error('OKF tags must be an array of strings');
+  }
+  const commonwealth = objectOf(frontmatter.commonwealth);
+  const authority = commonwealth.authority;
+  const generated = objectOf(frontmatter.generated);
+  const verified = frontmatter.verified;
+  const latestVerification = Array.isArray(verified) ? objectOf(verified.at(-1)) : {};
+
+  return {
+    authority: OKF_AUTHORITIES.includes(authority as OkfAuthority)
+      ? (authority as OkfAuthority)
+      : 'unverified',
+    description: stringOf(frontmatter.description),
+    generatedAt: stringOf(generated.at),
+    generatedBy: stringOf(generated.by),
+    lastVerifiedAt: stringOf(latestVerification.at),
+    status: status ?? 'stable',
+    tags: tags ?? [],
+    title: stringOf(frontmatter.title),
+    type: frontmatter.type as string,
+  };
 }
 
 // serializeOkfDocument returns a canonical UTF-8 OKF concept document.
@@ -60,4 +110,12 @@ export function validateOkfPath(path: string): string {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function objectOf(value: unknown): Record<string, unknown> {
+  return isObject(value) ? value : {};
+}
+
+function stringOf(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
 }

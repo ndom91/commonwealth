@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseOkfDocument, serializeOkfDocument, validateOkfPath } from './okf.js';
+import { okfMetadata, parseOkfDocument, serializeOkfDocument, validateOkfPath } from './okf.js';
 
 test('parses an OKF concept and preserves unknown frontmatter', () => {
   const parsed = parseOkfDocument(
@@ -28,6 +28,32 @@ test('serializes a parseable canonical concept', () => {
     frontmatter: { type: 'Reference', tags: ['docs'] },
     body: '# Reference\n',
   });
+});
+
+test('normalizes optional OKF metadata', () => {
+  assert.deepEqual(
+    okfMetadata({
+      type: 'Playbook',
+      tags: ['operations'],
+      title: 'Deploy',
+      generated: { by: 'admin/1', at: '2026-08-01T12:00:00Z' },
+      verified: [{ at: '2026-08-02T12:00:00Z' }],
+      commonwealth: { authority: 'approved' },
+    }),
+    {
+      authority: 'approved',
+      description: null,
+      generatedAt: '2026-08-01T12:00:00Z',
+      generatedBy: 'admin/1',
+      lastVerifiedAt: '2026-08-02T12:00:00Z',
+      status: 'stable',
+      tags: ['operations'],
+      title: 'Deploy',
+      type: 'Playbook',
+    }
+  );
+  assert.throws(() => okfMetadata({ type: 'Playbook', status: 'invalid' }), /status/);
+  assert.throws(() => okfMetadata({ type: 'Playbook', tags: ['valid', 1] }), /tags/);
 });
 
 test('only accepts safe non-reserved concept paths', () => {

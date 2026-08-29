@@ -3,6 +3,7 @@ import {
   chunkMarkdown,
   type Embeddings,
   embeddingInput,
+  okfMetadata,
   parseOkfDocument,
 } from '@commonwealth/pipeline';
 import type { JSONValue, Sql } from 'postgres';
@@ -118,25 +119,23 @@ async function conceptsAtCommit(
   for (const path of paths) {
     const text = await readFileAtCommit(corpusPath, project, path, commit);
     const document = parseOkfDocument(text);
-    const status = statusOf(document.frontmatter.status);
-    if (status === 'deprecated') continue;
+    const metadata = okfMetadata(document.frontmatter);
+    if (metadata.status === 'deprecated') continue;
     if (chunkMarkdown(document.body).length === 0)
       throw new Error(`Concept ${path} has no indexable body`);
-    const type = document.frontmatter.type;
-    if (typeof type !== 'string') throw new Error(`Concept ${path} has an invalid type`);
     concepts.push({
-      authority: authorityOf(document.frontmatter.commonwealth),
+      authority: metadata.authority,
       body: document.body,
       contentHash: createHash('sha256').update(text).digest('hex'),
-      description: stringOf(document.frontmatter.description),
+      description: metadata.description,
       frontmatter: document.frontmatter,
-      generatedAt: nestedString(document.frontmatter.generated, 'at'),
-      generatedBy: nestedString(document.frontmatter.generated, 'by'),
+      generatedAt: metadata.generatedAt,
+      generatedBy: metadata.generatedBy,
       path,
-      status,
-      tags: stringsOf(document.frontmatter.tags, 'tags'),
-      title: stringOf(document.frontmatter.title),
-      type,
+      status: metadata.status,
+      tags: metadata.tags,
+      title: metadata.title,
+      type: metadata.type,
     });
   }
   return concepts;
@@ -161,41 +160,6 @@ async function prepareChunks(concepts: Concept[], embeddings: Pick<Embeddings, '
     prepared.set(concept.path, indexed);
   }
   return prepared;
-}
-
-function authorityOf(value: unknown): 'approved' | 'canonical' | 'unverified' {
-  const authority = objectOf(value).authority;
-  return authority === 'approved' || authority === 'canonical' || authority === 'unverified'
-    ? authority
-    : 'unverified';
-}
-
-function statusOf(value: unknown): 'deprecated' | 'draft' | 'stable' {
-  if (value === undefined || value === 'stable') return 'stable';
-  if (value === 'draft' || value === 'deprecated') return value;
-  throw new Error('OKF status must be draft, stable, or deprecated');
-}
-
-function objectOf(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function nestedString(value: unknown, key: string): string | null {
-  return stringOf(objectOf(value)[key]);
-}
-
-function stringOf(value: unknown): string | null {
-  return typeof value === 'string' ? value : null;
-}
-
-function stringsOf(value: unknown, field: string): string[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
-    throw new Error(`OKF ${field} must be an array of strings`);
-  }
-  return value;
 }
 
 function vector(embedding: number[]): string {
