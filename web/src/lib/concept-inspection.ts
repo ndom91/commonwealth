@@ -1,5 +1,4 @@
 import { history, readFileAtCommit } from '@commonwealth/corpus';
-import { type SearchProjectInput, searchProject } from '@commonwealth/corpus/search';
 import { okfMetadata, parseOkfDocument } from '@commonwealth/pipeline';
 
 export async function conceptVersion(input: {
@@ -30,8 +29,4 @@ export async function conceptVersion(input: {
     title: metadata.title,
     type: metadata.type,
   };
-}
-
-export function inspectProject(input: SearchProjectInput) {
-  return searchProject(input);
 }

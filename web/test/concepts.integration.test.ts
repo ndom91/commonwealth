@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises';
 import test from 'node:test';
 import { commitFiles } from '@commonwealth/corpus';
 import { indexProject } from '@commonwealth/corpus/indexer';
+import { searchProject } from '@commonwealth/corpus/search';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
@@ -38,7 +39,7 @@ if (!databaseUrl) {
 
       const { auth } = await import('../src/lib/auth.js');
       const { readMembership } = await import('../src/lib/authorize.js');
-      const { conceptVersion, inspectProject } = await import('../src/lib/concept-inspection.js');
+      const { conceptVersion } = await import('../src/lib/concept-inspection.js');
       const { OkfRepository } = await import('../../mcp-server/src/okf-repository.js');
 
       const signUp = await auth.api.signUpEmail({
@@ -141,7 +142,7 @@ if (!databaseUrl) {
         /not in this concept history/
       );
 
-      const inspected = await inspectProject({
+      const inspected = await searchProject({
         embeddings: { embedQuery: async () => Array.from({ length: 1024 }, () => 1) },
         limit: 5,
         query: 'restart worker',

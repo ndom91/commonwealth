@@ -1,9 +1,10 @@
 import { history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
 import { commitConcept } from '@commonwealth/corpus/indexer';
+import { searchProject } from '@commonwealth/corpus/search';
 import { okfMetadata, parseOkfDocument, validateOkfPath } from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateProject, validateScope } from './authorize.js';
-import { conceptVersion, inspectProject } from './concept-inspection.js';
+import { conceptVersion } from './concept-inspection.js';
 import { client, indexClient } from './db.js';
 import { embeddingModel, embeddings } from './pipeline.js';
 
@@ -227,7 +228,7 @@ export const inspectRetrieval = createServerFn({ method: 'GET' })
   .validator(retrievalInput)
   .handler(async ({ data }) => {
     const { projectId } = await requireMember('read', data.project);
-    return inspectProject({
+    return searchProject({
       authority: data.authority ?? undefined,
       embeddings: embeddings(),
       limit: data.limit,
