@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { AppShell, accessionOf, SealChip, SettingsTabs } from '../../../../components/chrome.js';
 import { CredentialTag, type Identity, type Issued } from '../../../../components/identity.js';
 import { readFailure, writeFailure } from '../../../../lib/failure.js';
-import { createIdentity, listIdentities } from '../../../../lib/management.js';
+import { createIdentity, listIdentities } from '../../../../lib/identities.js';
 import { can, canGrant, ROLES, type Role } from '../../../../lib/roles.js';
 import { documentTitle } from '../../../../lib/title.js';
 

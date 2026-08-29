@@ -7,12 +7,9 @@ import {
   type Invitation,
   invitePerson,
   listInvitations,
-  listPeople,
-  type Person,
-  removePerson,
   revokeInvitation,
-  updatePersonRole,
-} from '../../../../lib/management.js';
+} from '../../../../lib/invitations.js';
+import { listPeople, type Person, removePerson, updatePersonRole } from '../../../../lib/people.js';
 import { ROLE_SUMMARY, ROLES, type Role } from '../../../../lib/roles.js';
 import { documentTitle } from '../../../../lib/title.js';
 

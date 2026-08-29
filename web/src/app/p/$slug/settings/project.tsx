@@ -8,7 +8,7 @@ import {
   createProject,
   getProjectFacts,
   renameProject,
-} from '../../../../lib/management.js';
+} from '../../../../lib/projects.js';
 import { can } from '../../../../lib/roles.js';
 import { documentTitle } from '../../../../lib/title.js';
 

@@ -102,7 +102,7 @@ export const invitation = pgTable('invitation', {
    role. Not better-auth's, because its `acceptInvitation` requires the invitee
    to hold an account already and the whole point is the person who does not.
 
-   Read and written with raw SQL in `lib/management.ts` like the rest of the
+   Read and written with raw SQL in `lib/invitations.ts` like the rest of the
    domain; declared here so drizzle-kit sees the whole schema. */
 export const memberInvitation = pgTable('member_invitation', {
   id: uuid('id').primaryKey().defaultRandom(),

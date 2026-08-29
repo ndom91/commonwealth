@@ -20,7 +20,7 @@ import { can, isRole, type Permission, type ProjectRef, type Role } from './role
  * is what the export touches, not whether it is a server function.
  *
  * So this file, whose every export reaches the database, is imported only by
- * `concepts.ts`, `management.ts` and `session.ts` — modules whose own exports
+ * `concepts.ts`, the management domain modules, and `session.ts` — modules whose own exports
  * are all server functions or plain data, and which are therefore stripped. */
 
 export type Membership = { userId: string; projectId: string; slug: string; role: Role };
@@ -168,8 +168,8 @@ export function validateProject(value: unknown): string {
 }
 
 /* The payload shape of a scoped server function, and the validator for one that
-   takes nothing else. Both live here rather than in `concepts.ts` and
-   `management.ts` because they belong to the gate, not to either subject — and
+   takes nothing else. Both live here rather than in `concepts.ts` and the
+   management domain modules because they belong to the gate, not to either subject — and
    because two identical copies is how the two drift. */
 export type Scoped<T> = T & { project: string };
 

@@ -46,7 +46,7 @@ const membership = () =>
     /* Not `owner`, which is the default and would be a fifth role nobody else
        uses. See `roles.ts`. */
     creatorRole: 'admin',
-    /* Project creation is our transaction in `management.ts`: it also creates
+    /* Project creation is our transaction in `projects.ts`: it also creates
         membership and index configuration. Keep better-auth's narrower endpoint
         closed so it cannot create an incomplete project. */
     allowUserToCreateOrganization: false,
@@ -90,7 +90,7 @@ const shared = {
   database: drizzleAdapter(db, { provider: 'pg', schema }),
   /* Covers better-auth's own endpoints only — `/api/auth/*`. Our server
    * functions are a separate surface with a separate limiter; see
-   * `management.ts` for the invitation routes, which are the unauthenticated
+   * `invitations.ts` for the invitation routes, which are the unauthenticated
    * ones.
    *
    * `enabled` is set rather than left alone because better-auth turns the

@@ -15,7 +15,7 @@ import {
   revokeKey,
   setIdentityDisabled,
   updateIdentity,
-} from '../../../../../lib/management.js';
+} from '../../../../../lib/identities.js';
 import { ROLES, type Role } from '../../../../../lib/roles.js';
 
 export const Route = createFileRoute('/p/$slug/settings/identities/$identityId')({

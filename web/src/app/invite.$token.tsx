@@ -2,7 +2,7 @@ import { createFileRoute, Link, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
 import { authClient } from '../lib/auth-client.js';
 import { writeFailure } from '../lib/failure.js';
-import { acceptInvitation, readInvitation } from '../lib/management.js';
+import { acceptInvitation, readInvitation } from '../lib/invitations.js';
 import { ROLE_SUMMARY, type Role } from '../lib/roles.js';
 
 /* The one page in the product a stranger is meant to reach.

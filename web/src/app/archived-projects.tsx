@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect, useNavigate, useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
-import { restoreProject } from '../lib/management.js';
+import { restoreProject } from '../lib/projects.js';
 import { getArchivedProjects, getSession } from '../lib/session.js';
 
 export const Route = createFileRoute('/archived-projects')({
