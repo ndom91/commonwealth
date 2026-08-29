@@ -1,6 +1,7 @@
 import { getRequest } from '@tanstack/react-start/server';
 import { auth } from './auth.js';
 import { client } from './db.js';
+import { SLUG } from './project-inputs.js';
 import { can, isRole, type Permission, type ProjectRef, type Role } from './roles.js';
 
 /* The authorisation gate, kept in its own module for a build reason worth
@@ -27,7 +28,7 @@ export type Membership = { userId: string; projectId: string; slug: string; role
 
 /* Slugs are the URL segment, so they are shape-checked before reaching SQL and
    the same expression validates one on the way in at `createProject`. */
-export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export { type Scoped, SLUG, validateProject } from './project-inputs.js';
 
 /* Both readers take an optional pre-resolved id so a caller that has already
  * established who is asking does not establish it again. `getProjectViewer`
@@ -159,20 +160,4 @@ function refusal(permission: Permission): string {
   return 'Membership of this project is required.';
 }
 
-/* Server-function validators all need the project out of the payload, and all
-   need to reject the same shapes. */
-export function validateProject(value: unknown): string {
-  const slug = (value as { project?: string } | undefined)?.project?.trim();
-  if (!slug || !SLUG.test(slug)) throw new Error('Invalid project');
-  return slug;
-}
-
-/* The payload shape of a scoped server function, and the validator for one that
-   takes nothing else. Both live here rather than in `concepts.ts` and the
-   management domain modules because they belong to the gate, not to either subject — and
-   because two identical copies is how the two drift. */
-export type Scoped<T> = T & { project: string };
-
-export function validateScope(value: unknown): { project: string } {
-  return { project: validateProject(value) };
-}
+export { validateScope } from './project-inputs.js';

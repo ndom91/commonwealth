@@ -115,6 +115,19 @@ if (!databaseUrl) {
         projectSlug: 'history',
       });
 
+      const [published] = await sql<{ commit_sha: string; title: string; status: string }[]>`
+        SELECT concepts.commit_sha, concepts.title, concepts.status
+        FROM concepts
+        JOIN project_index_state ON project_index_state.project_id = concepts.project_id
+          AND project_index_state.indexed_commit_sha = concepts.commit_sha
+        WHERE concepts.project_id = ${project.id} AND concepts.path = 'playbooks/restart.md'
+      `;
+      assert.deepEqual(published, {
+        commit_sha: unrelated,
+        title: 'Current restart',
+        status: 'stable',
+      });
+
       const membership = await readMembership('history', signUp.user.id);
       assert.ok(membership);
       assert.equal(await readMembership('other', signUp.user.id), null);

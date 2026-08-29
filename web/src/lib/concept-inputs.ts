@@ -1,5 +1,5 @@
 import { validateOkfPath } from '@commonwealth/pipeline';
-import { type Scoped, validateProject } from './authorize.js';
+import { type Scoped, validateProject } from './project-inputs.js';
 
 const AUTHORITIES = ['unverified', 'approved', 'canonical'] as const;
 export type Authority = (typeof AUTHORITIES)[number];
