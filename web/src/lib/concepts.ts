@@ -38,9 +38,24 @@ function actorName(userId: string): string {
 }
 
 function pathInput(value: unknown): Scoped<{ path: string }> {
+  return { project: validateProject(value), path: requiredPath(value) };
+}
+
+function requiredPath(value: unknown): string {
   const path = (value as { path?: string })?.path;
   if (typeof path !== 'string') throw new Error('Invalid concept path');
-  return { project: validateProject(value), path: validateOkfPath(path) };
+  return validateOkfPath(path);
+}
+
+function optionalFilters(
+  value: unknown
+): Scoped<{ authority: Authority | null; type: string | null }> {
+  const input = (value ?? {}) as Record<string, unknown>;
+  return {
+    project: validateProject(value),
+    authority: optionalAuthority(input.authority),
+    type: optionalText(input.type, 'type'),
+  };
 }
 
 function versionInput(value: unknown): Scoped<{ commit: string; path: string }> {
@@ -94,14 +109,7 @@ function owner(frontmatter: Record<string, unknown>): string | null {
 }
 
 export const listConcepts = createServerFn({ method: 'GET' })
-  .validator((value: unknown): Scoped<{ authority: Authority | null; type: string | null }> => {
-    const input = (value ?? {}) as Record<string, unknown>;
-    return {
-      project: validateProject(value),
-      authority: optionalAuthority(input.authority),
-      type: optionalText(input.type, 'type'),
-    };
-  })
+  .validator(optionalFilters)
   .handler(async ({ data }) => {
     const { projectId } = await requireMember('read', data.project);
     return client`
@@ -127,10 +135,8 @@ export const searchConcepts = createServerFn({ method: 'GET' })
       const query = optionalText(input.query, 'search');
       if (!query || query.length > 200) throw new Error('Invalid search');
       return {
-        project: validateProject(value),
-        authority: optionalAuthority(input.authority),
+        ...optionalFilters(value),
         query,
-        type: optionalText(input.type, 'type'),
       };
     }
   )
@@ -409,7 +415,7 @@ export const createConcept = createServerFn({ method: 'POST' })
       const markdown = optionalText(input.markdown, 'Markdown');
       const title = optionalText(input.title, 'title');
       const type = optionalText(input.type, 'type');
-      const path = typeof input.path === 'string' ? validateOkfPath(input.path) : null;
+      const path = typeof input.path === 'string' ? requiredPath(input) : null;
       if (!markdown || !title || !type || !path)
         throw new Error('A path, type, title, and Markdown are required.');
       return {
@@ -449,7 +455,7 @@ export const reviseConcept = createServerFn({ method: 'POST' })
     const input = value as Record<string, unknown>;
     const markdown = optionalText(input.markdown, 'Markdown');
     const title = optionalText(input.title, 'title');
-    const path = typeof input.path === 'string' ? validateOkfPath(input.path) : null;
+    const path = typeof input.path === 'string' ? requiredPath(input) : null;
     if (!markdown || !title || !path) throw new Error('A path, title, and Markdown are required.');
     return { project: validateProject(value), markdown, path, title };
   })
@@ -486,7 +492,7 @@ export const verifyConcept = createServerFn({ method: 'POST' })
   .validator((value: unknown): Scoped<{ authority: Authority; path: string }> => {
     const input = value as Record<string, unknown>;
     const authority = optionalAuthority(input.authority);
-    const path = typeof input.path === 'string' ? validateOkfPath(input.path) : null;
+    const path = typeof input.path === 'string' ? requiredPath(input) : null;
     if (!authority || !path) throw new Error('A path and authority are required.');
     return { project: validateProject(value), authority, path };
   })
