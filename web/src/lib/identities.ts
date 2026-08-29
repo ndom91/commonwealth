@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { createServerFn } from '@tanstack/react-start';
+import type { TransactionSql } from 'postgres';
 import { requireMember, type Scoped, validateProject } from './authorize.js';
 import { PAGE_SIZE } from './concepts.js';
 import { client } from './db.js';
@@ -19,6 +20,31 @@ const KEY_PREFIX = 'cw_';
 
 function mintSecret(): string {
   return `${KEY_PREFIX}${randomBytes(32).toString('base64url')}`;
+}
+
+async function issueKey(
+  transaction: TransactionSql,
+  input: { createdByAdminId: string; identityId: string; keyLabel: string; projectId: string }
+) {
+  const secret = mintSecret();
+  const salt = randomBytes(16).toString('hex');
+  const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
+  const keyId = randomUUID();
+  await transaction`
+    INSERT INTO api_keys (id, user_id, key_prefix, secret_hash)
+    VALUES (${keyId}, ${input.identityId}, ${secret.slice(0, 12)}, ${secretHash})
+  `;
+  await transaction`
+    INSERT INTO managed_api_key (id, knowledge_user_id, label, created_by_admin_id)
+    VALUES (${keyId}, ${input.identityId}, ${input.keyLabel}, ${input.createdByAdminId})
+  `;
+  await fileEvent(transaction, {
+    projectId: input.projectId,
+    actor: input.createdByAdminId,
+    type: 'api_key_created',
+    metadata: { identityId: input.identityId, keyId, label: input.keyLabel },
+  });
+  return { key: secret, keyId, prefix: secret.slice(0, 12) };
 }
 
 type IdentityInput = { name: string; role: Role; keyLabel: string; unowned: boolean };
@@ -157,11 +183,8 @@ export const createIdentity = createServerFn({ method: 'POST' })
      * holder is untrusted by default and only `updateIdentity` — still `admin`
      * — can change that. */
     const owner = data.unowned && can(role, 'admin') ? null : createdByAdminId;
-    const secret = mintSecret();
-    const salt = randomBytes(16).toString('hex');
-    const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
-    const keyId = randomUUID();
     let identityId: string | undefined;
+    let credential: Awaited<ReturnType<typeof issueKey>> | undefined;
     await client.begin(async (transaction) => {
       /* Filed under the project the caller is looking at. An agent belongs to
          exactly one project — `mcp-server/src/access-service.ts` reads
@@ -174,23 +197,15 @@ export const createIdentity = createServerFn({ method: 'POST' })
       `;
       if (!identity) throw new Error('Unable to create identity');
       identityId = identity.id;
-      await transaction`
-        INSERT INTO api_keys (id, user_id, key_prefix, secret_hash)
-        VALUES (${keyId}, ${identity.id}, ${secret.slice(0, 12)}, ${secretHash})
-      `;
-      await transaction`
-        INSERT INTO managed_api_key (id, knowledge_user_id, label, created_by_admin_id)
-        VALUES (${keyId}, ${identity.id}, ${data.keyLabel}, ${createdByAdminId})
-      `;
-      await fileEvent(transaction, {
+      credential = await issueKey(transaction, {
+        createdByAdminId,
+        identityId: identity.id,
+        keyLabel: data.keyLabel,
         projectId,
-        actor: createdByAdminId,
-        type: 'api_key_created',
-        metadata: { identityId: identity.id, keyId, label: data.keyLabel },
       });
     });
-    if (!identityId) throw new Error('Unable to create identity');
-    return { identityId, key: secret, prefix: secret.slice(0, 12) };
+    if (!identityId || !credential) throw new Error('Unable to create identity');
+    return { identityId, key: credential.key, prefix: credential.prefix };
   });
 
 /* Amend a holder's record. Role changes alter what every credential this
@@ -333,32 +348,22 @@ export const issueCredential = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }) => {
     const { userId: createdByAdminId, projectId } = await requireMember('admin', data.project);
-    const secret = mintSecret();
-    const salt = randomBytes(16).toString('hex');
-    const secretHash = `${salt}:${scryptSync(secret, salt, 32).toString('hex')}`;
-    const keyId = randomUUID();
+    let credential: Awaited<ReturnType<typeof issueKey>> | undefined;
     await client.begin(async (transaction) => {
       const [identity] = await transaction<{ id: string; project_id: string }[]>`
         SELECT id, project_id FROM users
         WHERE id = ${data.identityId} AND project_id = ${projectId}
       `;
       if (!identity) throw new Error('That identity no longer exists');
-      await transaction`
-        INSERT INTO api_keys (id, user_id, key_prefix, secret_hash)
-        VALUES (${keyId}, ${identity.id}, ${secret.slice(0, 12)}, ${secretHash})
-      `;
-      await transaction`
-        INSERT INTO managed_api_key (id, knowledge_user_id, label, created_by_admin_id)
-        VALUES (${keyId}, ${identity.id}, ${data.keyLabel}, ${createdByAdminId})
-      `;
-      await fileEvent(transaction, {
+      credential = await issueKey(transaction, {
+        createdByAdminId,
+        identityId: identity.id,
+        keyLabel: data.keyLabel,
         projectId: identity.project_id,
-        actor: createdByAdminId,
-        type: 'api_key_created',
-        metadata: { identityId: identity.id, keyId, label: data.keyLabel },
       });
     });
-    return { identityId: data.identityId, key: secret, prefix: secret.slice(0, 12) };
+    if (!credential) throw new Error('Unable to issue credential');
+    return { identityId: data.identityId, key: credential.key, prefix: credential.prefix };
   });
 
 export const revokeKey = createServerFn({ method: 'POST' })
