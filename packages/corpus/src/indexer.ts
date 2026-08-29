@@ -5,9 +5,10 @@ import {
   embeddingInput,
   okfMetadata,
   parseOkfDocument,
+  serializeOkfDocument,
 } from '@commonwealth/pipeline';
 import type { JSONValue, Sql } from 'postgres';
-import { head, listConceptPaths, readFileAtCommit } from './corpus.js';
+import { commitFiles, head, listConceptPaths, readFileAtCommit } from './corpus.js';
 
 export type IndexResult = { chunks: number; commit: string; concepts: number; indexed: boolean };
 
@@ -19,6 +20,41 @@ export type IndexProjectInput = {
   projectId: string;
   projectSlug: string;
 };
+
+export type CommitConceptInput = IndexProjectInput & {
+  actor: string;
+  body: string;
+  frontmatter: Record<string, unknown>;
+  path: string;
+  subject: string;
+};
+
+export type CommitConceptResult = {
+  chunks: number;
+  commit: string;
+  path: string;
+};
+
+export async function commitConcept(input: CommitConceptInput): Promise<CommitConceptResult> {
+  const commit = await commitFiles({
+    actor: input.actor,
+    corpusPath: input.corpusPath,
+    files: [
+      {
+        path: input.path,
+        text: serializeOkfDocument({ frontmatter: input.frontmatter, body: input.body.trim() }),
+      },
+    ],
+    subject: input.subject,
+    project: input.projectSlug,
+  });
+  const indexed = await indexProject(input);
+  if (!indexed.indexed || indexed.commit !== commit) {
+    throw new Error('Concept commit was superseded before indexing completed');
+  }
+
+  return { chunks: indexed.chunks, commit, path: input.path };
+}
 
 // indexProject publishes one complete Git commit as the project retrieval snapshot.
 export async function indexProject(input: IndexProjectInput): Promise<IndexResult> {

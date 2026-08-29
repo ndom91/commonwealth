@@ -1,11 +1,6 @@
-import { commitFiles, history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
-import { indexProject } from '@commonwealth/corpus/indexer';
-import {
-  okfMetadata,
-  parseOkfDocument,
-  serializeOkfDocument,
-  validateOkfPath,
-} from '@commonwealth/pipeline';
+import { history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
+import { commitConcept } from '@commonwealth/corpus/indexer';
+import { okfMetadata, parseOkfDocument, validateOkfPath } from '@commonwealth/pipeline';
 import { createServerFn } from '@tanstack/react-start';
 import { requireMember, type Scoped, validateProject, validateScope } from './authorize.js';
 import { conceptVersion, inspectProject } from './concept-inspection.js';
@@ -384,28 +379,24 @@ async function commitAndIndex(
   subject: string,
   eventType: string
 ) {
-  const commit = await commitFiles({
+  const result = await commitConcept({
     actor: actorName(membership.userId),
-    corpusPath: corpusPath(),
-    files: [{ path, text: serializeOkfDocument({ frontmatter, body: body.trim() }) }],
-    subject,
-    project: membership.slug,
-  });
-  const indexed = await indexProject({
+    body,
     corpusPath: corpusPath(),
     embeddingModel: embeddingModel(),
     embeddings: embeddings(),
+    frontmatter,
+    path,
     sql: indexClient,
     projectId: membership.projectId,
     projectSlug: membership.slug,
+    subject,
   });
-  if (!indexed.indexed || indexed.commit !== commit)
-    throw new Error('Concept commit was superseded before indexing completed');
   await client`
     INSERT INTO events (project_id, actor_admin_id, event_type, metadata)
-    VALUES (${membership.projectId}, ${membership.userId}, ${eventType}, ${JSON.stringify({ path, commit })}::jsonb)
+    VALUES (${membership.projectId}, ${membership.userId}, ${eventType}, ${JSON.stringify({ path, commit: result.commit })}::jsonb)
   `;
-  return { chunks: indexed.chunks, commit, path };
+  return result;
 }
 
 export const createConcept = createServerFn({ method: 'POST' })

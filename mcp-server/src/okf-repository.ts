@@ -1,10 +1,9 @@
-import { commitFiles, history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
+import { history, listConceptPaths, readFileAtCommit } from '@commonwealth/corpus';
 import { searchProject } from '@commonwealth/corpus/search';
 import {
   type Embeddings,
   okfMetadata,
   parseOkfDocument,
-  serializeOkfDocument,
   validateOkfPath,
 } from '@commonwealth/pipeline';
 import type { Sql } from 'postgres';
@@ -12,7 +11,7 @@ import { requirePermission } from './access-service.js';
 import type { Config } from './config.js';
 import type { Actor } from './domain.js';
 import { DomainError } from './errors.js';
-import { indexProject } from './okf-indexer.js';
+import { commitConcept } from './okf-indexer.js';
 
 export class OkfRepository {
   constructor(
@@ -49,31 +48,26 @@ export class OkfRepository {
     };
     if (input.description) frontmatter.description = input.description;
     if (actor.autoApprove) frontmatter.verified = [{ by: generatedBy, at: now }];
-    const commit = await commitFiles({
+    const result = await commitConcept({
       actor: generatedBy,
-      corpusPath: this.config.CORPUS_PATH,
-      files: [{ path, text: serializeOkfDocument({ frontmatter, body: input.markdown.trim() }) }],
-      subject: `Create ${path}`,
-      project: actor.projectSlug,
-    });
-    const indexed = await indexProject({
+      body: input.markdown,
       corpusPath: this.config.CORPUS_PATH,
       embeddingModel: this.config.EMBEDDING_MODEL,
       embeddings: this.embeddings,
+      frontmatter,
+      path,
       sql: this.sql,
       projectId: actor.projectId,
       projectSlug: actor.projectSlug,
+      subject: `Create ${path}`,
     });
-    if (!indexed.indexed || indexed.commit !== commit) {
-      throw new Error('Concept commit was superseded before indexing completed');
-    }
     await this.sql`
       INSERT INTO events (project_id, actor_id, event_type, metadata)
       VALUES (${actor.projectId}, ${actor.id}, 'concept_created',
-              ${this.sql.json({ path, commit, type: input.type, authority })})
+              ${this.sql.json({ path, commit: result.commit, type: input.type, authority })})
     `;
 
-    return { chunks: indexed.chunks, commit, path };
+    return result;
   }
 
   async getConcept(actor: Actor, pathInput: string): Promise<Record<string, unknown>> {
@@ -218,30 +212,25 @@ export class OkfRepository {
     subject: string,
     eventType: string
   ): Promise<{ chunks: number; commit: string; path: string }> {
-    const commit = await commitFiles({
+    const result = await commitConcept({
       actor: actorName(actor),
-      corpusPath: this.config.CORPUS_PATH,
-      files: [{ path, text: serializeOkfDocument({ frontmatter, body: body.trim() }) }],
-      subject,
-      project: actor.projectSlug,
-    });
-    const indexed = await indexProject({
+      body,
       corpusPath: this.config.CORPUS_PATH,
       embeddingModel: this.config.EMBEDDING_MODEL,
       embeddings: this.embeddings,
+      frontmatter,
+      path,
       sql: this.sql,
       projectId: actor.projectId,
       projectSlug: actor.projectSlug,
+      subject,
     });
-    if (!indexed.indexed || indexed.commit !== commit) {
-      throw new Error('Concept commit was superseded before indexing completed');
-    }
     await this.sql`
       INSERT INTO events (project_id, actor_id, event_type, metadata)
-      VALUES (${actor.projectId}, ${actor.id}, ${eventType}, ${this.sql.json({ path, commit })})
+      VALUES (${actor.projectId}, ${actor.id}, ${eventType}, ${this.sql.json({ path, commit: result.commit })})
     `;
 
-    return { chunks: indexed.chunks, commit, path };
+    return result;
   }
 
   private async currentDocument(actor: Actor, path: string) {
