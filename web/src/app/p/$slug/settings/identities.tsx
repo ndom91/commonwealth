@@ -8,9 +8,10 @@ import {
 } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { AppShell, accessionOf, SealChip, SettingsTabs } from '../../../../components/chrome.js';
-import { CredentialTag, type Identity, type Issued } from '../../../../components/identity.js';
+import type { Identity, Issued } from '../../../../components/identity.js';
+import { IdentityRevealContext } from '../../../../components/identity.js';
 import { readFailure, writeFailure } from '../../../../lib/failure.js';
-import { createIdentity, listIdentities } from '../../../../lib/identities.js';
+import { createIdentity, getMcpUrl, listIdentities } from '../../../../lib/identities.js';
 import { can, canGrant, ROLES, type Role } from '../../../../lib/roles.js';
 import { documentTitle } from '../../../../lib/title.js';
 
@@ -52,12 +53,13 @@ export const Route = createFileRoute('/p/$slug/settings/identities')({
        failure in full, and two alarms for one fault would be noise. */
     const cursor = parseCursor(deps.after);
     try {
-      const page = await listIdentities({
-        data: { project: params.slug, cursor, mine: deps.mine === true },
-      });
-      return { page, failure: undefined };
+      const [page, mcpUrl] = await Promise.all([
+        listIdentities({ data: { project: params.slug, cursor, mine: deps.mine === true } }),
+        getMcpUrl({ data: { project: params.slug } }),
+      ]);
+      return { page, mcpUrl, failure: undefined };
     } catch {
-      return { page: undefined, failure: readFailure('The register') };
+      return { page: undefined, mcpUrl: null, failure: readFailure('The register') };
     }
   },
   /* After `validateSearch` — see the note in `sources.tsx`. */
@@ -73,7 +75,7 @@ function IdentitiesLayout() {
   const navigate = useNavigate();
   const matchRoute = useMatchRoute();
   const viewer = Route.useRouteContext();
-  const { page, failure } = Route.useLoaderData();
+  const { page, mcpUrl, failure } = Route.useLoaderData();
   const { after, mine } = Route.useSearch();
 
   /* An administrator sees the whole project and may narrow to their own;
@@ -291,14 +293,9 @@ function IdentitiesLayout() {
           )}
         </section>
 
-        {/* The detail pane belongs to the layout rather than to each child, so
-            the credential tag can sit above whichever bench is showing. Children
-            render their contents, not their own section. */}
+        {/* Children own their bench order; the layout owns issuance that survives
+            navigation from the new-holder form to the selected holder. */}
         <section className="detail" aria-label="Selected holder">
-          {issued && issuedIdentityIsSelected && (
-            <CredentialTag issued={issued} onDismiss={() => setIssued(undefined)} />
-          )}
-
           {issuing ? (
             <form onSubmit={submit}>
               <div className="bench__head">
@@ -397,7 +394,15 @@ function IdentitiesLayout() {
               </div>
             </form>
           ) : (
-            <Outlet />
+            <IdentityRevealContext
+              value={{
+                issued: issuedIdentityIsSelected ? issued : undefined,
+                mcpUrl,
+                redactIssued: () => setIssued(undefined),
+              }}
+            >
+              <Outlet />
+            </IdentityRevealContext>
           )}
         </section>
       </div>

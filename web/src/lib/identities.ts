@@ -144,6 +144,18 @@ export const listIdentities = createServerFn({ method: 'GET' })
     return { identities: rows.slice(0, PAGE_SIZE), hasMore };
   });
 
+/* The public MCP endpoint may live on a different origin from the dashboard.
+ * Keep that deployment detail server-side and disclose it only to a project
+ * member who is already allowed to issue a credential. */
+export const getMcpUrl = createServerFn({ method: 'GET' })
+  .validator(
+    (value: unknown): Scoped<Record<never, never>> => ({ project: validateProject(value) })
+  )
+  .handler(async ({ data }) => {
+    await requireMember('write', data.project);
+    return process.env.MCP_URL || null;
+  });
+
 export const createIdentity = createServerFn({ method: 'POST' })
   .validator((value: unknown): Scoped<IdentityInput> => {
     const input = value as Partial<IdentityInput>;

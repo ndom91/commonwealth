@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { createContext, useState } from 'react';
 import type { Role } from '../lib/roles.js';
 
 /* Shared between the identity register and the holder bench, which are separate
@@ -52,6 +52,12 @@ export type Identity = {
 
 export type Issued = { identityId: string; key: string; prefix: string };
 
+export const IdentityRevealContext = createContext<{
+  issued: Issued | undefined;
+  mcpUrl: string | null;
+  redactIssued: () => void;
+} | null>(null);
+
 export const labelOf = (key: Credential) => key.label?.trim() || `Unlabelled · ${key.prefix}`;
 
 /* Only immutable moments belong on the line: the holder's registration, and
@@ -75,19 +81,38 @@ export function custodyLine(identity: Identity) {
 /* The one-time reveal. The secret is readable for exactly as long as this tag
    is on the bench; dismissing it drops the credential to the stub, which is
    all the database keeps. */
-export function CredentialTag({ issued, onDismiss }: { issued: Issued; onDismiss: () => void }) {
-  const [copy, setCopy] = useState<'idle' | 'copied' | 'unavailable'>('idle');
+export function CredentialTag({
+  issued,
+  mcpUrl,
+  onDismiss,
+}: {
+  issued: Issued;
+  mcpUrl: string | null;
+  onDismiss: () => void;
+}) {
+  const [copyState, setCopyState] = useState<'idle' | 'secret' | 'config' | 'unavailable'>('idle');
+  const endpoint = mcpUrl || new URL('/mcp', window.location.origin).toString();
+  const config = JSON.stringify(
+    {
+      commonwealth: {
+        baseUrl: endpoint,
+        headers: { Authorization: `Bearer ${issued.key}` },
+      },
+    },
+    null,
+    2
+  );
 
   /* The clipboard API is absent on insecure origins. Never report a copy that
-      did not happen — the user would redact a secret they never captured. */
-  async function copySecret() {
+       did not happen — the user would redact a secret they never captured. */
+  async function copyValue(value: string, copied: 'secret' | 'config', id: string) {
     const ok = await navigator.clipboard
-      ?.writeText(issued.key)
+      ?.writeText(value)
       .then(() => true)
       .catch(() => false);
-    setCopy(ok ? 'copied' : 'unavailable');
+    setCopyState(ok ? copied : 'unavailable');
     if (!ok) {
-      const node = document.getElementById('credential-secret');
+      const node = document.getElementById(id);
       if (node) getSelection()?.selectAllChildren(node);
     }
   }
@@ -104,18 +129,36 @@ export function CredentialTag({ issued, onDismiss }: { issued: Issued; onDismiss
         id="credential-secret"
         className="credential__secret"
         aria-label="Copy credential to clipboard"
-        onClick={copySecret}
+        onClick={() => void copyValue(issued.key, 'secret', 'credential-secret')}
       >
         {issued.key}
       </button>
 
+      <figure className="credential__config">
+        <figcaption>
+          <span className="label">MCP server configuration</span>
+          <button
+            type="button"
+            className="credential__copy"
+            onClick={() => void copyValue(config, 'config', 'credential-config')}
+          >
+            {copyState === 'config' ? 'Copied' : 'Copy config'}
+          </button>
+        </figcaption>
+        <pre id="credential-config">
+          <code>{config}</code>
+        </pre>
+      </figure>
+
       <div className="credential__foot">
         <p className="credential__note">
-          {copy === 'copied'
-            ? 'Copied to clipboard.'
-            : copy === 'unavailable'
-              ? 'Clipboard unavailable over http — the key is selected, copy it manually before redacting.'
-              : 'Click to copy. It is not stored and cannot be shown again.'}
+          {copyState === 'secret'
+            ? 'Credential copied to clipboard.'
+            : copyState === 'config'
+              ? 'MCP configuration copied to clipboard.'
+              : copyState === 'unavailable'
+                ? 'Clipboard unavailable over http — the selected value can be copied manually before redacting.'
+                : 'Click to copy. It is not stored and cannot be shown again.'}
         </p>
         <button type="button" className="credential__dismiss" onClick={onDismiss}>
           Redact

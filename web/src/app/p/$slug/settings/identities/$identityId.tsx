@@ -1,10 +1,11 @@
 import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { accessionOf, SealChip } from '../../../../../components/chrome.js';
 import {
   CredentialTag,
   custodyLine,
   type Identity,
+  IdentityRevealContext,
   type Issued,
   labelOf,
 } from '../../../../../components/identity.js';
@@ -41,6 +42,9 @@ function HolderBench() {
   const { page } = useLoaderData({ from: '/p/$slug/settings/identities' }) as {
     page: { identities: Identity[] } | undefined;
   };
+  const reveal = useContext(IdentityRevealContext);
+  const createdIssued = reveal?.issued;
+  const mcpUrl = reveal?.mcpUrl ?? null;
   const identity = (page?.identities ?? []).find((entry) => entry.id === identityId);
 
   const [arming, setArming] = useState<string>();
@@ -77,6 +81,7 @@ function HolderBench() {
   const line = custodyLine(identity);
   const live = identity.keys.filter((key) => !key.revokedAt).length;
   const disabled = Boolean(identity.disabled_at);
+  const revealed = createdIssued ?? issued;
 
   async function void_(keyId: string) {
     setVoiding(keyId);
@@ -265,8 +270,6 @@ function HolderBench() {
 
   return (
     <>
-      {issued && <CredentialTag issued={issued} onDismiss={() => setIssued(undefined)} />}
-
       <div className="bench__head">
         <div>
           <span className="label">
@@ -459,6 +462,14 @@ function HolderBench() {
           </div>
         )}
       </div>
+
+      {revealed && (
+        <CredentialTag
+          issued={revealed}
+          mcpUrl={mcpUrl}
+          onDismiss={createdIssued ? () => reveal?.redactIssued() : () => setIssued(undefined)}
+        />
+      )}
 
       <div className="bench__section">
         <span className="label">Custody line</span>

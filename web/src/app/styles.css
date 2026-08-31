@@ -1404,7 +1404,7 @@ select {
 
 .credential {
   position: relative;
-  max-width: 34rem;
+  max-width: 42rem;
   margin: var(--s-base) 0 var(--s-loose);
   padding: var(--s-base) 18px;
   background: var(--tag);
@@ -1451,6 +1451,56 @@ select {
   word-break: break-all;
   text-align: left;
   cursor: copy;
+}
+
+.credential__config {
+  margin: var(--s-snug) 0 0;
+}
+
+.credential__config figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-snug);
+  margin-bottom: var(--s-tight);
+}
+
+.credential__config .label {
+  color: var(--tag-ink-2);
+}
+
+.credential__config pre {
+  max-height: 15rem;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--tag-edge);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--tag-edge) 35%, transparent);
+  color: var(--tag-ink);
+  font-family: var(--font-register);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.credential__copy {
+  flex: none;
+  padding: 5px 10px;
+  border: 1px solid var(--tag-ink-2);
+  border-radius: 0;
+  background: none;
+  color: var(--tag-ink);
+  font-family: var(--font-register);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.credential__copy:hover {
+  background: var(--tag-ink);
+  color: var(--tag);
 }
 
 .credential__foot {

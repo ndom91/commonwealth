@@ -38,6 +38,7 @@ services:
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://team_kb:team_kb@postgres:5432/team_kb}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      MCP_URL: ${MCP_URL:-}
       # Editing a source rewrites its chunks, so the web app now embeds too. It
       # must resolve to the same embedding service and model as `app`: chunks from
       # two models in one index do not error, they quietly stop matching.
