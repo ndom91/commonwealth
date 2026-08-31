@@ -2,7 +2,7 @@
 
 A self-hosted knowledge base that gives MCP clients source-cited answers.
 
-![Concept Screenshot](./github/assets/screenshot_001.png)
+![Concept Screenshot](./.github/assets/screenshot_001.png)
 
 ## Quick start
 
