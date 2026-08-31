@@ -43,19 +43,23 @@ export function isoUtc(value: Date | string | null | undefined): string | null {
 }
 
 /* Built once. `Intl.DateTimeFormat` construction is the expensive part of
-   formatting, and the register builds dozens of these per paint.
+   formatting, and the register builds dozens of these per paint. Vivaldi can
+   expose an updated `navigator.languages` list while retaining a stale default
+   `Intl` locale, so pass the browser's ordered preferences explicitly.
  *
  * Two-digit numeric rather than `dateStyle: 'medium'`: DESIGN.md sets
  * timestamps in the register face, which is mono with `tabular-nums` so a
  * column of figures lines up. "Jul 27, 2026" has a variable-width month and
  * defeats that; "27.07.2026" — still the reader's own locale — does not. */
-const localDate = new Intl.DateTimeFormat(undefined, {
+const browserLocales = typeof navigator === 'undefined' ? undefined : navigator.languages;
+
+const localDate = new Intl.DateTimeFormat(browserLocales, {
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
 });
 
-const localDateTime = new Intl.DateTimeFormat(undefined, {
+const localDateTime = new Intl.DateTimeFormat(browserLocales, {
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
@@ -65,7 +69,7 @@ const localDateTime = new Intl.DateTimeFormat(undefined, {
 
 /* For a row that sits under a date head and so only needs to say when in the
    day it happened. */
-const localTime = new Intl.DateTimeFormat(undefined, {
+const localTime = new Intl.DateTimeFormat(browserLocales, {
   hour: '2-digit',
   minute: '2-digit',
 });
